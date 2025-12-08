@@ -1,0 +1,13 @@
+npm start
+
+--Fix
+npx tsc --noEmit
+
+
+rm -rf node_modules/.cache
+npx tsc --force
+
+
+Remove-Item -Recurse -Force node_modules
+Remove-Item package-lock.json
+npm install
