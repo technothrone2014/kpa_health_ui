@@ -1,162 +1,122 @@
 import { useState, useMemo } from "react";
-import {
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  TableContainer,
-  TablePagination,
-  Paper,
-  CircularProgress,
-  TextField,
-  TableSortLabel,
-  Toolbar,
-  Typography,
-} from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
+import { Search, Plus, ChevronDown, Download } from "lucide-react";
 import { getEmployees } from "../api/employees";
-import { Employee } from "../types/Employee";
-
-type Order = "asc" | "desc";
+import LoadingSpinner from "../components/LoadingSpinner";
+import EmployeeTable from "../components/EmployeeTable";
 
 export default function Employees() {
-  const { data, isLoading, error } = useQuery<Employee[]>({
+  const { data: employees, isLoading, error } = useQuery({
     queryKey: ["employees"],
     queryFn: getEmployees,
   });
 
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [search, setSearch] = useState("");
-  const [orderBy, setOrderBy] = useState<keyof Employee>("FullName");
-  const [order, setOrder] = useState<Order>("asc");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [showFilters, setShowFilters] = useState(false);
 
-  // --- Sorting logic ---
-  const handleSort = (property: keyof Employee) => {
-    const isAsc = orderBy === property && order === "asc";
-    setOrder(isAsc ? "desc" : "asc");
-    setOrderBy(property);
-  };
+  const filteredEmployees = useMemo(() => {
+    if (!employees) return [];
+    
+    return employees.filter((emp) => {
+      const matchesSearch = searchTerm === "" || 
+        emp.FullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.IDNumber?.includes(searchTerm) ||
+        emp.StationTitle?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === "all" ||
+        (statusFilter === "active" && emp.Status === 1) ||
+        (statusFilter === "inactive" && emp.Status === 0);
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [employees, searchTerm, statusFilter]);
 
-  const filteredData = useMemo(() => {
-    if (!data) return [];
-    return data
-      .filter((emp) =>
-        Object.values(emp)
-          .join(" ")
-          .toLowerCase()
-          .includes(search.toLowerCase())
-      )
-      .sort((a, b) => {
-        const aValue = a[orderBy];
-        const bValue = b[orderBy];
-        if (aValue < bValue) return order === "asc" ? -1 : 1;
-        if (aValue > bValue) return order === "asc" ? 1 : -1;
-        return 0;
-      });
-  }, [data, search, order, orderBy]);
-
-  const paginatedData = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredData.slice(start, start + rowsPerPage);
-  }, [filteredData, page, rowsPerPage]);
-
-  if (isLoading)
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <CircularProgress />
-      </div>
-    );
-
-  if (error) return <div>Error loading employees</div>;
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <div className="text-red-600">Error loading employees</div>;
 
   return (
-    <Paper sx={{ width: "100%", p: 2 }}>
-      {/* Header and Search */}
-      <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-        <Typography variant="h6" component="div">
-          Employees Dashboard
-        </Typography>
-        <TextField
-          variant="outlined"
-          size="small"
-          placeholder="Search employee..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </Toolbar>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
+          <p className="text-gray-600 mt-1">Manage and view all registered employees</p>
+        </div>
+        <button className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+          <Plus className="h-5 w-5 mr-2" />
+          Add Employee
+        </button>
+      </div>
 
-      {/* Table */}
-      <TableContainer>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === "Id"}
-                  direction={orderBy === "Id" ? order : "asc"}
-                  onClick={() => handleSort("Id")}
-                >
-                  ID
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === "FullName"}
-                  direction={orderBy === "FullName" ? order : "asc"}
-                  onClick={() => handleSort("FullName")}
-                >
-                  Full Name
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === "CategoryTitle"}
-                  direction={orderBy === "CategoryTitle" ? order : "asc"}
-                  onClick={() => handleSort("CategoryTitle")}
-                >
-                  Category
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === "StationTitle"}
-                  direction={orderBy === "StationTitle" ? order : "asc"}
-                  onClick={() => handleSort("StationTitle")}
-                >
-                  Station
-                </TableSortLabel>
-              </TableCell>
-            </TableRow>
-          </TableHead>
+      {/* Filters */}
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by name, ID number, or station..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center"
+            >
+              <ChevronDown className="h-5 w-5 mr-2" />
+              Filters
+            </button>
+            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center">
+              <Download className="h-5 w-5 mr-2" />
+              Export
+            </button>
+          </div>
+        </div>
 
-          <TableBody>
-            {paginatedData.map((emp) => (
-              <TableRow key={emp.Id} hover>
-                <TableCell>{emp.Id}</TableCell>
-                <TableCell>{emp.FullName}</TableCell>
-                <TableCell>{emp.CategoryTitle}</TableCell>
-                <TableCell>{emp.StationTitle}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex gap-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  value="all"
+                  checked={statusFilter === "all"}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="form-radio text-red-600"
+                />
+                <span className="ml-2">All</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  value="active"
+                  checked={statusFilter === "active"}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="form-radio text-red-600"
+                />
+                <span className="ml-2">Active</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  value="inactive"
+                  checked={statusFilter === "inactive"}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="form-radio text-red-600"
+                />
+                <span className="ml-2">Inactive</span>
+              </label>
+            </div>
+          </div>
+        )}
+      </div>
 
-      {/* Pagination */}
-      <TablePagination
-        component="div"
-        count={filteredData.length}
-        page={page}
-        onPageChange={(_, newPage) => setPage(newPage)}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={(e) => {
-          setRowsPerPage(parseInt(e.target.value, 10));
-          setPage(0);
-        }}
-        rowsPerPageOptions={[5, 10, 25, 50]}
-      />
-    </Paper>
+      {/* Employee Table */}
+      <EmployeeTable employees={filteredEmployees} />
+    </div>
   );
 }
