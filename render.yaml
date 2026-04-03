@@ -1,9 +1,14 @@
+# kpa_health_ui/render.yaml
 services:
   - type: web
     name: kpa-health-ui
     runtime: static
     buildCommand: npm install && npm run build
-    staticPublishPath: dist
+    staticPublishPath: ./dist
     envVars:
-      - key: VITE_API_BASE_URL
-        value: https://your-backend-url.onrender.com/api/v1
+      - key: VITE_API_URL
+        value: https://kpa-health-api.onrender.com/api/v1
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
