@@ -9,7 +9,7 @@ interface StatCardProps {
     value: number;
     isPositive: boolean;
   };
-  color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'indigo' | 'orange' | 'pink' | 'teal';
+  color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'indigo' | 'orange' | 'pink' | 'teal' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'accent';
   loading?: boolean;
   onClick?: () => void;
   subtitle?: string;
@@ -17,6 +17,7 @@ interface StatCardProps {
 }
 
 const colorStyles = {
+  // Original colors
   blue: {
     bg: 'bg-blue-50',
     icon: 'text-blue-600',
@@ -80,6 +81,49 @@ const colorStyles = {
     trendPositive: 'text-green-600',
     trendNegative: 'text-red-600',
   },
+  // KPA Theme Colors
+  primary: {
+    bg: 'bg-blue-50',
+    icon: 'text-[#0033A0]',
+    border: 'hover:border-[#0033A0]',
+    trendPositive: 'text-green-600',
+    trendNegative: 'text-red-600',
+  },
+  secondary: {
+    bg: 'bg-blue-50',
+    icon: 'text-[#0055B8]',
+    border: 'hover:border-[#0055B8]',
+    trendPositive: 'text-green-600',
+    trendNegative: 'text-red-600',
+  },
+  success: {
+    bg: 'bg-green-50',
+    icon: 'text-[#10B981]',
+    border: 'hover:border-[#10B981]',
+    trendPositive: 'text-green-600',
+    trendNegative: 'text-red-600',
+  },
+  warning: {
+    bg: 'bg-yellow-50',
+    icon: 'text-[#F59E0B]',
+    border: 'hover:border-[#F59E0B]',
+    trendPositive: 'text-green-600',
+    trendNegative: 'text-red-600',
+  },
+  danger: {
+    bg: 'bg-red-50',
+    icon: 'text-[#EF4444]',
+    border: 'hover:border-[#EF4444]',
+    trendPositive: 'text-green-600',
+    trendNegative: 'text-red-600',
+  },
+  accent: {
+    bg: 'bg-sky-50',
+    icon: 'text-[#00A3E0]',
+    border: 'hover:border-[#00A3E0]',
+    trendPositive: 'text-green-600',
+    trendNegative: 'text-red-600',
+  },
 };
 
 export default function StatCard({ 
@@ -93,7 +137,7 @@ export default function StatCard({
   subtitle,
   footer
 }: StatCardProps) {
-  const styles = colorStyles[color];
+  const styles = colorStyles[color] || colorStyles.blue;
 
   // Format large numbers
   const formatValue = (val: number | string): string => {
