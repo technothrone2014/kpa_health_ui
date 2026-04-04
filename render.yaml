@@ -4,7 +4,7 @@ services:
     name: kpa-health-ui
     runtime: static
     buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
+    staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
         value: https://kpa-health-api.onrender.com/api/v1
