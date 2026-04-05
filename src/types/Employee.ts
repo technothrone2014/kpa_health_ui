@@ -1,11 +1,21 @@
 // kpa_health_ui/src/types/Employee.ts
-
 export interface Employee {
   Id: number;
-  FullName: string;
+  UserId: number;
   IDNumber: string;
+  FullName: string;
+  FirstName: string;
+  LastName: string;
+  GenderId: number;
+  GenderTitle: string;
+  PhoneNumber: string;
+  CategoryId: number;
   CategoryTitle: string;
+  StationId: number;
   StationTitle: string;
-  Status: number; // 1 for Active, 0 for Inactive
-  // Add other properties as needed
+  PostedOn: string;
+  UpdatedOn: string;
+  Pinned: boolean;
+  Status: boolean;  // PostgreSQL returns boolean
+  Deleted: boolean;
 }

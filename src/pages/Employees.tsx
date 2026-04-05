@@ -25,8 +25,8 @@ export default function Employees() {
         emp.StationTitle?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === "all" ||
-        (statusFilter === "active" && emp.Status === 1) ||
-        (statusFilter === "inactive" && emp.Status === 0);
+        (statusFilter === "active" && emp.Status === true) ||
+        (statusFilter === "inactive" && emp.Status === false);
       
       return matchesSearch && matchesStatus;
     });
