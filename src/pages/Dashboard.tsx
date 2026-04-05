@@ -1,12 +1,12 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Users, Building2, Briefcase, Activity, TrendingUp, Award, Heart, Shield } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { Users, Building2, Briefcase, Activity, TrendingUp, Award, Heart, Shield, AlertCircle } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from "recharts";
 import { format, subDays } from "date-fns";
 import { getDashboardOverview, getEmployeeBloodPressureResults, getEmployeeBMIResults } from "../api/analytics";
 import StatCard from "../components/StatCard";
 import LoadingSpinner from "../components/LoadingSpinner";
-import { Box, Typography, Paper, Avatar, Divider } from "@mui/material";
+import { Box, Typography, Paper, Avatar, Divider, Alert, AlertTitle } from "@mui/material";
 
 // KPA Theme Colors
 const kpaColors = {
@@ -23,39 +23,52 @@ const kpaColors = {
 
 export default function Dashboard() {
   // Fetch real data from backend
-  const { data: overview, isLoading: overviewLoading } = useQuery({
+  const { data: overview, isLoading: overviewLoading, error: overviewError } = useQuery({
     queryKey: ["dashboard-overview"],
     queryFn: () => getDashboardOverview(),
   });
 
-  const { data: bloodPressure, isLoading: bpLoading } = useQuery({
+  const { data: bloodPressure, isLoading: bpLoading, error: bpError } = useQuery({
     queryKey: ["blood-pressure"],
     queryFn: () => getEmployeeBloodPressureResults(),
   });
 
-  const { data: bmi, isLoading: bmiLoading } = useQuery({
+  const { data: bmi, isLoading: bmiLoading, error: bmiError } = useQuery({
     queryKey: ["bmi"],
     queryFn: () => getEmployeeBMIResults(),
   });
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log("Dashboard Data:", {
+      overview,
+      bloodPressure,
+      bmi,
+      overviewError,
+      bpError,
+      bmiError
+    });
+  }, [overview, bloodPressure, bmi, overviewError, bpError, bmiError]);
 
   if (overviewLoading || bpLoading || bmiLoading) {
     return <LoadingSpinner />;
   }
 
   // Calculate stats from real data
-  const totalEmployees = overview?.categoryDistribution.find(c => c.Category === 'EMPLOYEE')?.Count || 0;
-  const totalDependants = overview?.categoryDistribution.find(c => c.Category === 'DEPENDENT')?.Count || 0;
-  const totalPortUsers = overview?.categoryDistribution.find(c => c.Category === 'PORT USER')?.Count || 0;
+  const totalEmployees = overview?.categoryDistribution?.find(c => c.Category === 'EMPLOYEE')?.Count || 0;
+  const totalDependants = overview?.categoryDistribution?.find(c => c.Category === 'DEPENDENT')?.Count || 0;
+  const totalPortUsers = overview?.categoryDistribution?.find(c => c.Category === 'PORT USER')?.Count || 0;
   
   // Calculate total blood pressure readings
-  const totalBPReadings = bloodPressure?.reduce((sum, item) => sum + (item.Count || 0), 0) || 0;
+  const totalBPReadings = bloodPressure?.reduce((sum, item) => sum + (Number(item.Count) || 0), 0) || 0;
   
   // Get normal blood pressure count
   const normalBP = bloodPressure?.find(item => item.BloodPressureCategory === 'NORMAL')?.Count || 0;
-  const hypertensionBP = bloodPressure?.find(item => item.BloodPressureCategory === 'STAGE I HYPERTENSION')?.Count || 0;
   
   // Calculate health coverage percentage
-  const healthCoverage = totalEmployees > 0 ? ((normalBP / totalBPReadings) * 100).toFixed(1) : "94.5";
+  const healthCoverage = totalEmployees > 0 && totalBPReadings > 0 
+    ? ((normalBP / totalBPReadings) * 100).toFixed(1) 
+    : "0";
 
   const statItems = [
     { title: "Total Employees", value: totalEmployees, icon: Users, color: "primary" as const },
@@ -66,21 +79,33 @@ export default function Dashboard() {
     { title: "Health Coverage", value: `${healthCoverage}%`, icon: Award, color: "primary" as const, trend: { value: 2, isPositive: true } },
   ];
 
-  // Category distribution for pie chart
+  // Category distribution for pie chart - ensure we have valid data
   const categoryData = [
     { name: 'EMPLOYEES', value: totalEmployees, color: kpaColors.primary },
     { name: 'DEPENDANTS', value: totalDependants, color: kpaColors.secondary },
     { name: 'PORT USERS', value: totalPortUsers, color: kpaColors.accent },
   ].filter(item => item.value > 0);
 
-  // Blood pressure distribution for additional chart
+  // Blood pressure distribution with proper color mapping
+  const bpColorMap: Record<string, string> = {
+    'NORMAL': kpaColors.success,
+    'PRE-HYPERTENSION': kpaColors.warning,
+    'STAGE I HYPERTENSION': kpaColors.danger,
+    'STAGE II HYPERTENSION': '#9B2C2C',
+    'HYPOTENSION': '#8B4513',
+  };
+
   const bpData = bloodPressure?.map(item => ({
     name: item.BloodPressureCategory,
-    value: item.Count,
-    color: item.BloodPressureCategory === 'NORMAL' ? kpaColors.success :
-           item.BloodPressureCategory === 'PRE-HYPERTENSION' ? kpaColors.warning :
-           kpaColors.danger
-  })) || [];
+    value: Number(item.Count),
+    color: bpColorMap[item.BloodPressureCategory] || kpaColors.accent,
+  })).filter(item => item.value > 0) || [];
+
+  // BMI data for bar chart
+  const bmiData = bmi?.map(item => ({
+    name: item.BMICategory,
+    value: Number(item.Count),
+  })).filter(item => item.value > 0) || [];
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -123,7 +148,7 @@ export default function Dashboard() {
 
       {/* Charts Section */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-        {/* Blood Pressure Distribution */}
+        {/* Blood Pressure Distribution - Pie Chart */}
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${kpaColors.light}`, background: 'white' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Box>
@@ -133,19 +158,41 @@ export default function Dashboard() {
             <Avatar sx={{ bgcolor: kpaColors.light, color: kpaColors.primary }}><Heart /></Avatar>
           </Box>
           <Divider sx={{ mb: 2 }} />
-          <Box sx={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={bpData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name, percent = 0 }) => `${name} (${(percent * 100).toFixed(0)}%)`} labelLine={false}>
-                  {bpData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </Box>
+          {bpData.length > 0 ? (
+            <Box sx={{ height: 350, width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie 
+                    data={bpData} 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius={60} 
+                    outerRadius={100} 
+                    paddingAngle={5} 
+                    dataKey="value" 
+                    label={({ name, percent = 0 }) => `${name} (${(percent * 100).toFixed(0)}%)`} 
+                    labelLine={false}
+                  >
+                    {bpData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </Box>
+          ) : (
+            <Box sx={{ height: 350, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Alert severity="info" sx={{ maxWidth: 400 }}>
+                <AlertTitle>No Data Available</AlertTitle>
+                No blood pressure data found for the selected period.
+              </Alert>
+            </Box>
+          )}
         </Paper>
 
-        {/* Client Categories Distribution */}
+        {/* Client Categories Distribution - Pie Chart */}
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${kpaColors.light}`, background: 'white', height: '100%' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Box>
@@ -155,16 +202,72 @@ export default function Dashboard() {
             <Avatar sx={{ bgcolor: kpaColors.light, color: kpaColors.primary }}><Award /></Avatar>
           </Box>
           <Divider sx={{ mb: 2 }} />
-          <Box sx={{ height: 350, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name, percent = 0 }) => `${name} (${(percent * 100).toFixed(0)}%)`} labelLine={false}>
-                  {categoryData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+          {categoryData.length > 0 ? (
+            <Box sx={{ height: 350, width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie 
+                    data={categoryData} 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius={60} 
+                    outerRadius={100} 
+                    paddingAngle={5} 
+                    dataKey="value" 
+                    label={({ name, percent = 0 }) => `${name} (${(percent * 100).toFixed(0)}%)`} 
+                    labelLine={false}
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </Box>
+          ) : (
+            <Box sx={{ height: 350, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Alert severity="warning" sx={{ maxWidth: 400 }}>
+                <AlertTitle>No Category Data</AlertTitle>
+                No client category data available. Total Employees: {totalEmployees}, Dependants: {totalDependants}, Port Users: {totalPortUsers}
+              </Alert>
+            </Box>
+          )}
+        </Paper>
+      </div>
+
+      {/* BMI Distribution - Bar Chart (Third row) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px', marginBottom: '32px' }}>
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${kpaColors.light}`, background: 'white' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Box>
+              <Typography variant="h6" fontWeight="bold" color={kpaColors.dark}>BMI Distribution</Typography>
+              <Typography variant="body2" color="textSecondary">Employee BMI categories</Typography>
+            </Box>
+            <Avatar sx={{ bgcolor: kpaColors.light, color: kpaColors.primary }}><Activity /></Avatar>
           </Box>
+          <Divider sx={{ mb: 2 }} />
+          {bmiData.length > 0 ? (
+            <Box sx={{ height: 400, width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={bmiData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} interval={0} />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill={kpaColors.primary} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          ) : (
+            <Box sx={{ height: 350, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Alert severity="info">
+                <AlertTitle>No BMI Data</AlertTitle>
+                No BMI data found for the selected period.
+              </Alert>
+            </Box>
+          )}
         </Paper>
       </div>
 
