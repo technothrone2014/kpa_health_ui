@@ -40,24 +40,38 @@ export default function Dashboard() {
 
   // Debug logging
   React.useEffect(() => {
-    console.log("Dashboard Data:", {
-      overview,
-      bloodPressure,
-      bmi,
-      overviewError,
-      bpError,
-      bmiError
-    });
-  }, [overview, bloodPressure, bmi, overviewError, bpError, bmiError]);
+    console.log("=== DASHBOARD DATA DEBUG ===");
+    console.log("Overview:", overview);
+    console.log("Category Distribution:", overview?.categoryDistribution);
+    console.log("Blood Pressure:", bloodPressure);
+    console.log("BMI:", bmi);
+    
+    if (overview?.categoryDistribution) {
+      overview.categoryDistribution.forEach((cat, idx) => {
+        console.log(`Category ${idx}:`, cat);
+      });
+    }
+  }, [overview, bloodPressure, bmi]);
 
   if (overviewLoading || bpLoading || bmiLoading) {
     return <LoadingSpinner />;
   }
 
-  // Calculate stats from real data
-  const totalEmployees = overview?.categoryDistribution?.find(c => c.Category === 'EMPLOYEE')?.Count || 0;
-  const totalDependants = overview?.categoryDistribution?.find(c => c.Category === 'DEPENDENT')?.Count || 0;
-  const totalPortUsers = overview?.categoryDistribution?.find(c => c.Category === 'PORT USER')?.Count || 0;
+  // Calculate stats from real data - handle both string and number counts
+  const categoryDist = overview?.categoryDistribution || [];
+  
+  // Helper to get count (handles string or number)
+  const getCount = (item: any) => {
+    if (!item) return 0;
+    const count = item.Count !== undefined ? item.Count : item.count;
+    return typeof count === 'string' ? parseInt(count, 10) : (count || 0);
+  };
+  
+  const totalEmployees = getCount(categoryDist.find(c => c.Category === 'EMPLOYEE')) || 0;
+  const totalDependants = getCount(categoryDist.find(c => c.Category === 'DEPENDENT')) || 0;
+  const totalPortUsers = getCount(categoryDist.find(c => c.Category === 'PORT USER')) || 0;
+  
+  console.log("Parsed values:", { totalEmployees, totalDependants, totalPortUsers });
   
   // Calculate total blood pressure readings
   const totalBPReadings = bloodPressure?.reduce((sum, item) => sum + (Number(item.Count) || 0), 0) || 0;
@@ -67,7 +81,7 @@ export default function Dashboard() {
   
   // Calculate health coverage percentage
   const healthCoverage = totalEmployees > 0 && totalBPReadings > 0 
-    ? ((normalBP / totalBPReadings) * 100).toFixed(1) 
+    ? ((Number(normalBP) / totalBPReadings) * 100).toFixed(1) 
     : "0";
 
   const statItems = [
@@ -75,7 +89,7 @@ export default function Dashboard() {
     { title: "Total Dependants", value: totalDependants, icon: Shield, color: "success" as const },
     { title: "Port Users", value: totalPortUsers, icon: Building2, color: "secondary" as const },
     { title: "Total Visits", value: overview?.totalVisits || 0, icon: Activity, color: "accent" as const },
-    { title: "Normal BP", value: normalBP, icon: Heart, color: "success" as const, trend: { value: 5, isPositive: true } },
+    { title: "Normal BP", value: Number(normalBP), icon: Heart, color: "success" as const, trend: { value: 5, isPositive: true } },
     { title: "Health Coverage", value: `${healthCoverage}%`, icon: Award, color: "primary" as const, trend: { value: 2, isPositive: true } },
   ];
 
@@ -85,6 +99,8 @@ export default function Dashboard() {
     { name: 'DEPENDANTS', value: totalDependants, color: kpaColors.secondary },
     { name: 'PORT USERS', value: totalPortUsers, color: kpaColors.accent },
   ].filter(item => item.value > 0);
+
+  console.log("Category Data for Pie Chart:", categoryData);
 
   // Blood pressure distribution with proper color mapping
   const bpColorMap: Record<string, string> = {
@@ -122,10 +138,9 @@ export default function Dashboard() {
   // Sample recent activity (replace with real data from an activity endpoint)
   const recentActivities = [
     { id: 1, message: "New employee registered - John Doe", date: subDays(new Date(), 1), type: "employee" },
-    { id: 2, message: "Blood pressure screening completed for 45 employees", date: subDays(new Date(), 2), type: "screening" },
-    { id: 3, message: "BMI data updated for 32 employees", date: subDays(new Date(), 3), type: "update" },
-    { id: 4, message: "New station added - Bandari Clinic", date: subDays(new Date(), 4), type: "station" },
-    { id: 5, message: "Health week report generated", date: subDays(new Date(), 5), type: "report" },
+    { id: 2, message: "Blood pressure screening completed", date: subDays(new Date(), 2), type: "screening" },
+    { id: 3, message: "BMI data updated", date: subDays(new Date(), 3), type: "update" },
+    { id: 4, message: "Health week report generated", date: subDays(new Date(), 4), type: "report" },
   ];
 
   return (
@@ -230,14 +245,17 @@ export default function Dashboard() {
             <Box sx={{ height: 350, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Alert severity="warning" sx={{ maxWidth: 400 }}>
                 <AlertTitle>No Category Data</AlertTitle>
-                No client category data available. Total Employees: {totalEmployees}, Dependants: {totalDependants}, Port Users: {totalPortUsers}
+                <Typography variant="body2">
+                  No client category data available.<br />
+                  Raw data: Employees: {totalEmployees}, Dependants: {totalDependants}, Port Users: {totalPortUsers}
+                </Typography>
               </Alert>
             </Box>
           )}
         </Paper>
       </div>
 
-      {/* BMI Distribution - Bar Chart (Third row) */}
+      {/* BMI Distribution - Bar Chart */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px', marginBottom: '32px' }}>
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${kpaColors.light}`, background: 'white' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -251,10 +269,10 @@ export default function Dashboard() {
           {bmiData.length > 0 ? (
             <Box sx={{ height: 400, width: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={bmiData}>
+                <BarChart data={bmiData} layout="vertical" margin={{ left: 100 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} interval={0} />
-                  <YAxis />
+                  <XAxis type="number" />
+                  <YAxis type="category" dataKey="name" width={120} />
                   <Tooltip />
                   <Bar dataKey="value" fill={kpaColors.primary} />
                 </BarChart>
