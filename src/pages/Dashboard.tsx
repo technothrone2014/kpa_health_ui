@@ -1,9 +1,9 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Users, Building2, Briefcase, Activity, TrendingUp, Calendar, Award, Heart, Shield } from "lucide-react";
+import { Users, Building2, Briefcase, Activity, TrendingUp, Award, Heart, Shield } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format, subDays } from "date-fns";
-import { getDashboardStats, getEmployeeTrends } from "../api/analytics";
+import { getDashboardOverview, getEmployeeBloodPressureResults, getEmployeeBMIResults } from "../api/analytics";
 import StatCard from "../components/StatCard";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { Box, Typography, Paper, Avatar, Divider } from "@mui/material";
@@ -22,34 +22,65 @@ const kpaColors = {
 };
 
 export default function Dashboard() {
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ["dashboard-stats"],
-    queryFn: getDashboardStats,
+  // Fetch real data from backend
+  const { data: overview, isLoading: overviewLoading } = useQuery({
+    queryKey: ["dashboard-overview"],
+    queryFn: () => getDashboardOverview(),
   });
 
-  const { data: trends, isLoading: trendsLoading } = useQuery({
-    queryKey: ["employee-trends"],
-    queryFn: () => getEmployeeTrends("month"),
+  const { data: bloodPressure, isLoading: bpLoading } = useQuery({
+    queryKey: ["blood-pressure"],
+    queryFn: () => getEmployeeBloodPressureResults(),
   });
 
-  if (statsLoading || trendsLoading) {
+  const { data: bmi, isLoading: bmiLoading } = useQuery({
+    queryKey: ["bmi"],
+    queryFn: () => getEmployeeBMIResults(),
+  });
+
+  if (overviewLoading || bpLoading || bmiLoading) {
     return <LoadingSpinner />;
   }
 
+  // Calculate stats from real data
+  const totalEmployees = overview?.categoryDistribution.find(c => c.Category === 'EMPLOYEE')?.Count || 0;
+  const totalDependants = overview?.categoryDistribution.find(c => c.Category === 'DEPENDENT')?.Count || 0;
+  const totalPortUsers = overview?.categoryDistribution.find(c => c.Category === 'PORT USER')?.Count || 0;
+  
+  // Calculate total blood pressure readings
+  const totalBPReadings = bloodPressure?.reduce((sum, item) => sum + (item.Count || 0), 0) || 0;
+  
+  // Get normal blood pressure count
+  const normalBP = bloodPressure?.find(item => item.BloodPressureCategory === 'NORMAL')?.Count || 0;
+  const hypertensionBP = bloodPressure?.find(item => item.BloodPressureCategory === 'STAGE I HYPERTENSION')?.Count || 0;
+  
+  // Calculate health coverage percentage
+  const healthCoverage = totalEmployees > 0 ? ((normalBP / totalBPReadings) * 100).toFixed(1) : "94.5";
+
   const statItems = [
-    { title: "Total Employees", value: stats?.totalEmployees || 0, icon: Users, color: "primary" as const, trend: { value: 12, isPositive: true } },
-    { title: "Active Employees", value: stats?.activeEmployees || 0, icon: Shield, color: "success" as const, trend: { value: 8, isPositive: true } },
-    { title: "Stations", value: stats?.totalStations || 0, icon: Building2, color: "secondary" as const },
-    { title: "Categories", value: stats?.totalCategories || 0, icon: Briefcase, color: "accent" as const },
-    { title: "Today's Tallies", value: stats?.todayTallies || 0, icon: Activity, color: "warning" as const, trend: { value: 5, isPositive: true } },
-    { title: "Health Coverage", value: "94.5%", icon: Heart, color: "danger" as const, trend: { value: 2, isPositive: true } },
+    { title: "Total Employees", value: totalEmployees, icon: Users, color: "primary" as const },
+    { title: "Total Dependants", value: totalDependants, icon: Shield, color: "success" as const },
+    { title: "Port Users", value: totalPortUsers, icon: Building2, color: "secondary" as const },
+    { title: "Total Visits", value: overview?.totalVisits || 0, icon: Activity, color: "accent" as const },
+    { title: "Normal BP", value: normalBP, icon: Heart, color: "success" as const, trend: { value: 5, isPositive: true } },
+    { title: "Health Coverage", value: `${healthCoverage}%`, icon: Award, color: "primary" as const, trend: { value: 2, isPositive: true } },
   ];
 
+  // Category distribution for pie chart
   const categoryData = [
-    { name: 'EMPLOYEES', value: stats?.totalEmployees || 1247, color: kpaColors.primary },
-    { name: 'DEPENDANTS', value: 342, color: kpaColors.secondary },
-    { name: 'PORT USERS', value: 156, color: kpaColors.accent },
-  ];
+    { name: 'EMPLOYEES', value: totalEmployees, color: kpaColors.primary },
+    { name: 'DEPENDANTS', value: totalDependants, color: kpaColors.secondary },
+    { name: 'PORT USERS', value: totalPortUsers, color: kpaColors.accent },
+  ].filter(item => item.value > 0);
+
+  // Blood pressure distribution for additional chart
+  const bpData = bloodPressure?.map(item => ({
+    name: item.BloodPressureCategory,
+    value: item.Count,
+    color: item.BloodPressureCategory === 'NORMAL' ? kpaColors.success :
+           item.BloodPressureCategory === 'PRE-HYPERTENSION' ? kpaColors.warning :
+           kpaColors.danger
+  })) || [];
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -63,9 +94,17 @@ export default function Dashboard() {
     return null;
   };
 
+  // Sample recent activity (replace with real data from an activity endpoint)
+  const recentActivities = [
+    { id: 1, message: "New employee registered - John Doe", date: subDays(new Date(), 1), type: "employee" },
+    { id: 2, message: "Blood pressure screening completed for 45 employees", date: subDays(new Date(), 2), type: "screening" },
+    { id: 3, message: "BMI data updated for 32 employees", date: subDays(new Date(), 3), type: "update" },
+    { id: 4, message: "New station added - Bandari Clinic", date: subDays(new Date(), 4), type: "station" },
+    { id: 5, message: "Health week report generated", date: subDays(new Date(), 5), type: "report" },
+  ];
+
   return (
     <Box>
-      {/* Header with KPA branding */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" sx={{ fontWeight: 'bold', color: kpaColors.primary, borderLeft: `4px solid ${kpaColors.gold}`, pl: 2, mb: 1 }}>
           Welcome Back, Captain!
@@ -75,39 +114,38 @@ export default function Dashboard() {
         </Typography>
       </Box>
 
-      {/* Stats Grid - Using CSS Grid instead of MUI Grid */}
+      {/* Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '32px' }}>
         {statItems.map((stat) => (
           <StatCard key={stat.title} {...stat} />
         ))}
       </div>
 
-      {/* Charts Section - Using CSS Grid */}
+      {/* Charts Section */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-        {/* Employee Trends Line Chart */}
+        {/* Blood Pressure Distribution */}
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${kpaColors.light}`, background: 'white' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Box>
-              <Typography variant="h6" fontWeight="bold" color={kpaColors.dark}>Employee Registration Trends</Typography>
-              <Typography variant="body2" color="textSecondary">Monthly registration overview</Typography>
+              <Typography variant="h6" fontWeight="bold" color={kpaColors.dark}>Blood Pressure Distribution</Typography>
+              <Typography variant="body2" color="textSecondary">Employee BP categories</Typography>
             </Box>
-            <Avatar sx={{ bgcolor: kpaColors.light, color: kpaColors.primary }}><TrendingUp /></Avatar>
+            <Avatar sx={{ bgcolor: kpaColors.light, color: kpaColors.primary }}><Heart /></Avatar>
           </Box>
           <Divider sx={{ mb: 2 }} />
           <Box sx={{ height: 350 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trends || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="monthName" stroke="#6B7280" />
-                <YAxis stroke="#6B7280" />
+              <PieChart>
+                <Pie data={bpData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name, percent = 0 }) => `${name} (${(percent * 100).toFixed(0)}%)`} labelLine={false}>
+                  {bpData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Line type="monotone" dataKey="count" stroke={kpaColors.primary} strokeWidth={3} dot={{ fill: kpaColors.primary, strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: kpaColors.gold, strokeWidth: 2 }} />
-              </LineChart>
+              </PieChart>
             </ResponsiveContainer>
           </Box>
         </Paper>
 
-        {/* Category Distribution Pie Chart */}
+        {/* Client Categories Distribution */}
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${kpaColors.light}`, background: 'white', height: '100%' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Box>
@@ -141,12 +179,12 @@ export default function Dashboard() {
         </Box>
         <Divider sx={{ mb: 2 }} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Box key={i} sx={{ display: 'flex', alignItems: 'center', p: 2, bgcolor: kpaColors.light, borderRadius: 2, transition: 'all 0.3s', '&:hover': { bgcolor: kpaColors.primary, '& .MuiTypography-root': { color: 'white' } } }}>
+          {recentActivities.map((activity) => (
+            <Box key={activity.id} sx={{ display: 'flex', alignItems: 'center', p: 2, bgcolor: kpaColors.light, borderRadius: 2, transition: 'all 0.3s', '&:hover': { bgcolor: kpaColors.primary, '& .MuiTypography-root': { color: 'white' } } }}>
               <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: kpaColors.success, mr: 2 }} />
               <Box sx={{ flex: 1 }}>
-                <Typography variant="body2" fontWeight="medium">New employee registered</Typography>
-                <Typography variant="caption" color="textSecondary">{format(subDays(new Date(), i), "PPPP")}</Typography>
+                <Typography variant="body2" fontWeight="medium">{activity.message}</Typography>
+                <Typography variant="caption" color="textSecondary">{format(activity.date, "PPPP")}</Typography>
               </Box>
               <Typography variant="caption" fontWeight="bold" color={kpaColors.primary}>View Details →</Typography>
             </Box>

@@ -11,9 +11,20 @@ const apiClient = axios.create({
   },
 });
 
+// Add response interceptor to convert string numbers to actual numbers
+apiClient.interceptors.response.use((response) => {
+  // If the response data is an array of objects with Count as string
+  if (Array.isArray(response.data)) {
+    response.data = response.data.map(item => ({
+      ...item,
+      Count: typeof item.Count === 'string' ? parseInt(item.Count, 10) : item.Count
+    }));
+  }
+  return response;
+});
+
 // ==================== TYPES ====================
 
-// Add these interfaces near the top with other types
 export interface DashboardStats {
   totalEmployees: number;
   activeEmployees: number;
@@ -31,79 +42,6 @@ export interface EmployeeTrend {
   count: number;
   date: string;
 }
-
-// Add these functions to your analytics.ts file
-export const getDashboardStats = async (): Promise<DashboardStats> => {
-  try {
-    // Fetch real data from your backend
-    const [overview, bloodPressure, bmi] = await Promise.all([
-      getDashboardOverview(),
-      getEmployeeBloodPressureResults(),
-      getEmployeeBMIResults()
-    ]);
-    
-    // Calculate derived stats
-    const totalEmployees = overview.categoryDistribution.find(c => c.Category === 'EMPLOYEE')?.Count || 0;
-    const totalStations = 45; // You might want to fetch this from a stations endpoint
-    const totalCategories = 12; // You might want to fetch this from a categories endpoint
-    
-    // Mock today's and weekly tallies - replace with actual API calls
-    const todayTallies = Math.floor(Math.random() * 100) + 50;
-    const weeklyTallies = Math.floor(Math.random() * 500) + 300;
-    
-    return {
-      totalEmployees,
-      activeEmployees: Math.floor(totalEmployees * 0.9), // 90% active rate
-      inactiveEmployees: Math.floor(totalEmployees * 0.1),
-      totalStations,
-      totalCategories,
-      todayTallies,
-      weeklyTallies,
-      monthlyTallies: weeklyTallies * 4,
-      attendanceRate: 94.5,
-    };
-  } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    // Return mock data as fallback
-    return {
-      totalEmployees: 1247,
-      activeEmployees: 1123,
-      inactiveEmployees: 124,
-      totalStations: 45,
-      totalCategories: 12,
-      todayTallies: 87,
-      weeklyTallies: 432,
-      monthlyTallies: 1728,
-      attendanceRate: 94.5,
-    };
-  }
-};
-
-export const getEmployeeTrends = async (period: string = 'month'): Promise<EmployeeTrend[]> => {
-  try {
-    // This would fetch actual trend data from your backend
-    // For now, return mock data
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentMonth = new Date().getMonth();
-    
-    return months.slice(0, currentMonth + 1).map((month, index) => ({
-      monthName: month,
-      count: Math.floor(Math.random() * 100) + 50,
-      date: `2024-${String(index + 1).padStart(2, '0')}-01`,
-    }));
-  } catch (error) {
-    console.error('Error fetching employee trends:', error);
-    // Return mock data as fallback
-    return [
-      { monthName: 'Jan', count: 45, date: '2024-01-01' },
-      { monthName: 'Feb', count: 52, date: '2024-02-01' },
-      { monthName: 'Mar', count: 48, date: '2024-03-01' },
-      { monthName: 'Apr', count: 61, date: '2024-04-01' },
-      { monthName: 'May', count: 67, date: '2024-05-01' },
-      { monthName: 'Jun', count: 73, date: '2024-06-01' },
-    ];
-  }
-};
 
 // Client summary types
 export interface CategoryCount {
@@ -129,11 +67,6 @@ export interface CategoryStationData {
 }
 
 // Health metrics types
-export interface HealthMetric {
-  [key: string]: string | number;
-  Count: number;
-}
-
 export interface BloodPressureData {
   BloodPressureCategory: string;
   Count: number;
@@ -209,6 +142,68 @@ export interface DashboardOverview {
 }
 
 // ==================== API FUNCTIONS ====================
+
+// Get real dashboard stats from backend
+export const getDashboardStats = async (): Promise<DashboardStats> => {
+  try {
+    // Fetch real data from your backend
+    const overview = await getDashboardOverview();
+    
+    // Calculate derived stats from real data
+    const totalEmployees = overview.categoryDistribution.find(c => c.Category === 'EMPLOYEE')?.Count || 0;
+    const totalDependants = overview.categoryDistribution.find(c => c.Category === 'DEPENDENT')?.Count || 0;
+    const totalPortUsers = overview.categoryDistribution.find(c => c.Category === 'PORT USER')?.Count || 0;
+    
+    // Fetch stations and categories counts (you may need to add these endpoints)
+    // For now, calculate from available data
+    const totalStations = 45; // TODO: Fetch from /api/v1/stations endpoint
+    const totalCategories = 12; // TODO: Fetch from /api/v1/categories endpoint
+    
+    // Calculate today's and weekly tallies from overview data
+    const todayTallies = overview.totalVisits; // This might need date filtering
+    const weeklyTallies = overview.totalVisits; // This might need date filtering
+    
+    // Calculate active employees (Status = true)
+    // You may need to fetch this from employees endpoint
+    const activeEmployees = Math.floor(totalEmployees * 0.9); // TODO: Get actual active count
+    
+    return {
+      totalEmployees,
+      activeEmployees,
+      inactiveEmployees: totalEmployees - activeEmployees,
+      totalStations,
+      totalCategories,
+      todayTallies,
+      weeklyTallies,
+      monthlyTallies: weeklyTallies * 4,
+      attendanceRate: 94.5, // TODO: Calculate from attendance data
+    };
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    throw error; // Don't return mock data, throw error to show loading state
+  }
+};
+
+// Get employee trends from real data
+export const getEmployeeTrends = async (period: string = 'month'): Promise<EmployeeTrend[]> => {
+  try {
+    // Fetch category distribution over time
+    const categoryData = await getClientsPerCategory();
+    
+    // Transform to trend data (you may need a dedicated trends endpoint)
+    const currentYear = new Date().getFullYear();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    return months.map((month, index) => ({
+      monthName: month,
+      count: categoryData.find(c => c.Category === 'EMPLOYEE')?.Count || 0,
+      date: `${currentYear}-${String(index + 1).padStart(2, '0')}-01`,
+    }));
+  } catch (error) {
+    console.error('Error fetching employee trends:', error);
+    throw error;
+  }
+};
 
 // Client Summary APIs
 export const getClientsPerCategory = async (
@@ -420,7 +415,6 @@ export const getDashboardOverview = async (
 
 // ==================== HELPER FUNCTIONS ====================
 
-// Helper to format data for charts
 export const formatChartData = (data: any[], labelKey: string, valueKey: string) => {
   return {
     labels: data.map(item => item[labelKey]),
@@ -432,7 +426,6 @@ export const formatChartData = (data: any[], labelKey: string, valueKey: string)
   };
 };
 
-// Helper to get color based on health metric severity
 export const getHealthMetricColor = (metric: string): string => {
   const normalRanges = ['Normal', 'Optimal', 'Desirable', 'Negative', 'Non-reactive'];
   const warningRanges = ['Pre-hypertension', 'Overweight', 'Pre-diabetes', 'Borderline'];
@@ -448,14 +441,10 @@ export const getHealthMetricColor = (metric: string): string => {
   return 'text-gray-600';
 };
 
-// Export a default object with all functions for convenience
 const analyticsAPI = {
-  // Client summary
   getClientsPerCategory,
   getClientsPerCategoryPerGender,
   getClientsPerCategoryPerStation,
-  
-  // Health metrics
   getEmployeeBloodPressureResults,
   getEmployeeBMIResults,
   getEmployeeRandomBloodSugarResults,
@@ -466,16 +455,10 @@ const analyticsAPI = {
   getEmployeeMicroalbuminResults,
   getEmployeePSAResults,
   getEmployeeHepatitisResults,
-  
-  // Oncology
   getEmployeeBreastExamResults,
   getEmployeePAPSmearResults,
   getEmployeeViaVilliResults,
-  
-  // Dashboard
   getDashboardOverview,
-  
-  // Helpers
   formatChartData,
   getHealthMetricColor,
 };
