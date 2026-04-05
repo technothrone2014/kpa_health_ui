@@ -43,16 +43,24 @@ function App() {
 
   const drawer = (
     <Box sx={{ backgroundColor: kpaTheme.dark, height: '100%' }}>
+      // Update the logo section in your sidebar (around line 60-70)
       <Box sx={{ p: 3, textAlign: 'center', borderBottom: `1px solid ${kpaTheme.accent}` }}>
         <img 
           src="/KPA Logo.png" 
           alt="Kenya Ports Authority" 
-          style={{ height: 50, width: 'auto' }}
+          style={{ height: 70, width: 'auto', marginBottom: '8px' }}
         />
-        <Typography variant="subtitle2" sx={{ color: kpaTheme.gold, mt: 1 }}>
+        <Typography variant="subtitle2" sx={{ color: kpaTheme.gold, mt: 1, fontSize: '0.75rem' }}>
           EAP Health Week Intelligence
         </Typography>
       </Box>
+
+      // Also update mobile header logo
+      <img 
+        src="/KPA Logo.png" 
+        alt="KPA" 
+        style={{ height: 40, marginRight: 10 }}
+      />
       <List>
         {menuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
