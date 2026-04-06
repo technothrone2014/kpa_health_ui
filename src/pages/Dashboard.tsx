@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
-  Users, Building2, Briefcase, Activity, TrendingUp, Award, Heart, Shield, 
-  RefreshCw, ChevronRight, Calendar, ArrowUp, ArrowDown, Sparkles, Anchor,
-  Ship, Waves, Compass, Wind, Droplets, Navigation, Globe, Star,
-  UserPlus, UsersRound, BriefcaseMedical, Stethoscope, HeartPulse,
-  Droplet, ActivitySquare, Apple, Scale, Thermometer, Pill
+  Users, Shield, Anchor, Activity, HeartPulse, ActivitySquare, Heart,
+  RefreshCw, ChevronRight, Ship, Compass, Navigation, Scale
 } from "lucide-react";
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, BarChart, Bar, Legend
+  PieChart, Pie, Cell, BarChart, Bar, Tooltip, ResponsiveContainer, Legend,
+  CartesianGrid,
+  XAxis,
+  YAxis
 } from "recharts";
 import { format, subDays } from "date-fns";
 import { getDashboardOverview, getEmployeeBloodPressureResults, getEmployeeBMIResults } from "../api/analytics";
@@ -21,20 +20,13 @@ const oceanColors = {
   mid: '#1A4D8C',
   light: '#2B7BA8',
   surface: '#4AA3C2',
-  wave: '#6EC8D9',
-  foam: '#A8E6CF',
-  coral: '#FF6B6B',
   gold: '#FFD700',
-  sand: '#F4D03F',
   navy: '#0A1C40',
-  teal: '#008080',
-  white: '#FFFFFF',
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
 };
 
-// Helper function to format large numbers
 const formatNumber = (num: number): string => {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
@@ -51,13 +43,10 @@ export default function Dashboard() {
     if (hour < 12) setGreeting("Good morning");
     else if (hour < 17) setGreeting("Good afternoon");
     else setGreeting("Good evening");
-    
     setCurrentTime(format(new Date(), "EEEE, MMMM do, yyyy 'at' h:mm a"));
-    
     const timer = setInterval(() => {
       setCurrentTime(format(new Date(), "EEEE, MMMM do, yyyy 'at' h:mm a"));
     }, 60000);
-    
     return () => clearInterval(timer);
   }, []);
   
@@ -101,39 +90,28 @@ export default function Dashboard() {
   const hypertensionBP = bloodPressure?.find(item => item.BloodPressureCategory === 'STAGE I HYPERTENSION')?.Count || 0;
   const preHypertension = bloodPressure?.find(item => item.BloodPressureCategory === 'PRE-HYPERTENSION')?.Count || 0;
 
-  // Primary Stats Cards
-  const primaryStats = [
+  // ALL STATS IN ONE ARRAY for unified grid
+  const allStats = [
     { title: "Total Employees", value: totalEmployees, formattedValue: formatNumber(totalEmployees), icon: Users, iconBg: "from-blue-500 to-cyan-500", description: "Registered employees", trend: "+12%", trendUp: true },
     { title: "Total Dependants", value: totalDependants, formattedValue: formatNumber(totalDependants), icon: Shield, iconBg: "from-emerald-500 to-teal-500", description: "Family members", trend: "+5%", trendUp: true },
     { title: "Port Users", value: totalPortUsers, formattedValue: formatNumber(totalPortUsers), icon: Anchor, iconBg: "from-purple-500 to-pink-500", description: "Active port users", trend: "+3%", trendUp: true },
     { title: "Total Visits", value: overview?.totalVisits || 0, formattedValue: formatNumber(overview?.totalVisits || 0), icon: Activity, iconBg: "from-orange-500 to-red-500", description: "Health visits", trend: "+8%", trendUp: true },
-  ];
-
-  // Blood Pressure Stats Cards
-  const bpStats = [
-    { title: "Normal BP", value: normalBP, formattedValue: normalBP.toLocaleString(), icon: HeartPulse, iconBg: "from-emerald-500 to-green-500", percentage: ((normalBP / totalBPReadings) * 100).toFixed(1), color: oceanColors.success },
-    { title: "Pre-Hypertension", value: preHypertension, formattedValue: preHypertension.toLocaleString(), icon: ActivitySquare, iconBg: "from-amber-500 to-orange-500", percentage: ((preHypertension / totalBPReadings) * 100).toFixed(1), color: oceanColors.warning },
-    { title: "Hypertension", value: hypertensionBP, formattedValue: hypertensionBP.toLocaleString(), icon: Heart, iconBg: "from-red-500 to-rose-500", percentage: ((hypertensionBP / totalBPReadings) * 100).toFixed(1), color: oceanColors.danger },
+    { title: "Normal BP", value: normalBP, formattedValue: normalBP.toLocaleString(), icon: HeartPulse, iconBg: "from-emerald-500 to-green-500", description: `${((normalBP / totalBPReadings) * 100).toFixed(1)}% of readings`, trend: "Healthy", trendUp: true },
+    { title: "Pre-Hypertension", value: preHypertension, formattedValue: preHypertension.toLocaleString(), icon: ActivitySquare, iconBg: "from-amber-500 to-orange-500", description: `${((preHypertension / totalBPReadings) * 100).toFixed(1)}% of readings`, trend: "Monitor", trendUp: false },
+    { title: "Hypertension", value: hypertensionBP, formattedValue: hypertensionBP.toLocaleString(), icon: Heart, iconBg: "from-red-500 to-rose-500", description: `${((hypertensionBP / totalBPReadings) * 100).toFixed(1)}% of readings`, trend: "Alert", trendUp: false },
   ];
 
   const categoryData = [
-    { name: 'EMPLOYEES', value: totalEmployees, color: oceanColors.deep, icon: '👥' },
-    { name: 'DEPENDANTS', value: totalDependants, color: oceanColors.mid, icon: '👨‍👩‍👧' },
-    { name: 'PORT USERS', value: totalPortUsers, color: oceanColors.surface, icon: '⚓' },
+    { name: 'EMPLOYEES', value: totalEmployees, color: oceanColors.deep },
+    { name: 'DEPENDANTS', value: totalDependants, color: oceanColors.mid },
+    { name: 'PORT USERS', value: totalPortUsers, color: oceanColors.surface },
   ].filter(item => item.value > 0);
-
-  const bpColorMap: Record<string, string> = {
-    'NORMAL': oceanColors.success,
-    'PRE-HYPERTENSION': oceanColors.warning,
-    'STAGE I HYPERTENSION': oceanColors.danger,
-    'STAGE II HYPERTENSION': '#9B2C2C',
-    'HYPOTENSION': '#8B4513',
-  };
 
   const bpData = bloodPressure?.map(item => ({
     name: item.BloodPressureCategory,
     value: Number(item.Count),
-    color: bpColorMap[item.BloodPressureCategory] || oceanColors.surface,
+    color: item.BloodPressureCategory === 'NORMAL' ? oceanColors.success :
+           item.BloodPressureCategory === 'PRE-HYPERTENSION' ? oceanColors.warning : oceanColors.danger,
   })).filter(item => item.value > 0) || [];
 
   const bmiData = bmi?.map(item => ({
@@ -141,8 +119,7 @@ export default function Dashboard() {
     value: Number(item.Count),
   })).filter(item => item.value > 0) || [];
 
-  const PIE_COLORS = [oceanColors.deep, oceanColors.mid, oceanColors.surface, oceanColors.wave, oceanColors.gold];
-  const BP_PIE_COLORS = [oceanColors.success, oceanColors.warning, oceanColors.danger, '#9B2C2C', '#8B4513'];
+  const PIE_COLORS = [oceanColors.deep, oceanColors.mid, oceanColors.surface, oceanColors.gold];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0B2F9E] via-[#1A4D8C] to-[#2B7BA8]" style={{ fontFamily: 'Verdana, Geneva, sans-serif' }}>
@@ -154,10 +131,9 @@ export default function Dashboard() {
         </svg>
       </div>
 
-      {/* Hero Section - Ship Captain's Bridge */}
+      {/* Hero Section */}
       <div className="relative mx-6 mt-6 mb-8 overflow-hidden rounded-3xl shadow-2xl">
         <div className="absolute inset-0 bg-gradient-to-r from-[#0A1C40] via-[#0B2F9E] to-[#1A4D8C]"></div>
-        
         <div className="relative px-8 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="space-y-3">
@@ -195,9 +171,9 @@ export default function Dashboard() {
 
       <div className="px-6 pb-8">
         
-        {/* Primary Stats - 4 Column Grid (Android-style icon grid) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
-          {primaryStats.map((stat, idx) => (
+        {/* UNIFIED 4-COLUMN GRID - All stats evenly distributed */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 mb-8">
+          {allStats.map((stat, idx) => (
             <div 
               key={stat.title}
               className="group relative overflow-hidden bg-white/10 backdrop-blur-md rounded-2xl p-5 hover:bg-white/20 transition-all duration-500 hover:scale-105 cursor-pointer border border-white/20"
@@ -208,7 +184,9 @@ export default function Dashboard() {
                   <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${stat.iconBg} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                     <stat.icon size={28} className="text-white" />
                   </div>
-                  <span className={`text-sm font-semibold px-2 py-1 rounded-lg ${stat.trendUp ? 'text-green-300 bg-green-500/20' : 'text-red-300 bg-red-500/20'}`}>
+                  <span className={`text-sm font-semibold px-2 py-1 rounded-lg ${
+                    stat.trendUp ? 'text-green-300 bg-green-500/20' : 'text-red-300 bg-red-500/20'
+                  }`}>
                     {stat.trend}
                   </span>
                 </div>
@@ -220,37 +198,10 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Blood Pressure Stats - 3 Column Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-          {bpStats.map((stat, idx) => (
-            <div 
-              key={stat.title}
-              className="group relative overflow-hidden rounded-2xl p-5 transition-all duration-500 hover:scale-105 cursor-pointer"
-              style={{ backgroundColor: `${stat.color}20`, border: `1px solid ${stat.color}40` }}
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${stat.iconBg} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                    <stat.icon size={28} className="text-white" />
-                  </div>
-                  <span className="text-sm font-semibold text-white/80">{stat.percentage}%</span>
-                </div>
-                <p className="text-3xl lg:text-4xl font-bold text-white">{stat.formattedValue}</p>
-                <p className="text-white/80 text-sm mt-1 font-medium">{stat.title}</p>
-                <p className="text-white/50 text-xs mt-1">of {totalBPReadings.toLocaleString()} readings</p>
-                <div className="mt-3 w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
-                  <div className="h-full bg-white rounded-full transition-all duration-700" style={{ width: `${stat.percentage}%` }}></div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
         {/* Charts Row - 2 Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           
-          {/* Blood Pressure Distribution - Pie Chart */}
+          {/* Blood Pressure Distribution */}
           <div className="group bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] border border-white/20">
             <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
               <div className="flex items-center gap-3">
@@ -279,7 +230,7 @@ export default function Dashboard() {
                       labelLine={{ strokeWidth: 1, stroke: 'rgba(255,255,255,0.3)' }}
                     >
                       {bpData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={BP_PIE_COLORS[index % BP_PIE_COLORS.length]} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
                       ))}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
@@ -294,7 +245,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Client Categories - Pie Chart */}
+          {/* Client Categories */}
           <div className="group bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] border border-white/20">
             <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
               <div className="flex items-center gap-3">
@@ -339,7 +290,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* BMI Distribution - Full Width Bar Chart */}
+        {/* BMI Distribution */}
         <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 mb-8 border border-white/20">
           <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
             <div className="flex items-center gap-3">
@@ -377,7 +328,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Activity - Ship's Log */}
+        {/* Ship's Log */}
         <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 border border-white/20">
           <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
             <div className="flex items-center gap-3">
@@ -391,7 +342,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="p-6">
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 { message: "New crew member health screening completed", date: subDays(new Date(), 1), icon: "🩺", bg: "from-emerald-500 to-green-500" },
                 { message: "Blood pressure data synchronized with port authority", date: subDays(new Date(), 2), icon: "❤️", bg: "from-blue-500 to-cyan-500" },
@@ -406,10 +357,10 @@ export default function Dashboard() {
                     <span className="text-xl">{activity.icon}</span>
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-white group-hover:text-[#FFD700] transition-colors">{activity.message}</p>
-                    <p className="text-sm text-white/50">{format(activity.date, "PPP 'at' h:mm a")}</p>
+                    <p className="font-semibold text-white group-hover:text-[#FFD700] transition-colors line-clamp-1">{activity.message}</p>
+                    <p className="text-sm text-white/50">{format(activity.date, "PPP")}</p>
                   </div>
-                  <ChevronRight size={20} className="text-white/30 group-hover:text-[#FFD700] group-hover:translate-x-1 transition-all" />
+                  <ChevronRight size={20} className="text-white/30 group-hover:text-[#FFD700] group-hover:translate-x-1 transition-all flex-shrink-0" />
                 </div>
               ))}
             </div>
@@ -417,7 +368,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* CSS Animations */}
       <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0px); }
@@ -427,11 +377,13 @@ export default function Dashboard() {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .animate-spin { animation: spin 1s linear infinite; }
+        .line-clamp-1 {
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
       `}</style>
     </div>
