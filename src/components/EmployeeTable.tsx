@@ -6,6 +6,19 @@ interface EmployeeTableProps {
   employees: Employee[];
 }
 
+const oceanColors = {
+  primary: '#0B2F9E',
+  secondary: '#1A4D8C',
+  accent: '#00A3E0',
+  gold: '#FFD700',
+  dark: '#0A1C40',
+  light: '#E8F0FE',
+  success: '#10B981',
+  danger: '#EF4444',
+  foam: '#F0F8FF',
+  white: '#FFFFFF',
+};
+
 export default function EmployeeTable({ employees }: EmployeeTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -35,97 +48,51 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
   const totalPages = Math.ceil(sortedEmployees.length / itemsPerPage);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div>
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead style={{ background: oceanColors.dark }}>
             <tr>
-              <th
-                onClick={() => handleSort("Id")}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                ID
-              </th>
-              <th
-                onClick={() => handleSort("FullName")}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                Full Name
-              </th>
-              <th
-                onClick={() => handleSort("IDNumber")}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                ID Number
-              </th>
-              <th
-                onClick={() => handleSort("CategoryTitle")}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                Category
-              </th>
-              <th
-                onClick={() => handleSort("StationTitle")}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                Station
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              <th onClick={() => handleSort("Id")} style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }}>ID</th>
+              <th onClick={() => handleSort("FullName")} style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }}>Full Name</th>
+              <th onClick={() => handleSort("IDNumber")} style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }}>ID Number</th>
+              <th onClick={() => handleSort("CategoryTitle")} style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }}>Category</th>
+              <th onClick={() => handleSort("StationTitle")} style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }}>Station</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600' }}>Status</th>
+              <th style={{ padding: '16px', textAlign: 'right', color: oceanColors.gold, fontWeight: '600' }}>Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {currentEmployees.map((employee) => (
-              <tr key={employee.Id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {employee.Id}
+              <tr key={employee.Id} style={{ borderBottom: `1px solid ${oceanColors.secondary}40`, transition: 'background 0.3s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                <td style={{ padding: '16px', color: 'white' }}>{employee.Id}</td>
+                <td style={{ padding: '16px' }}>
+                  <div style={{ fontWeight: '500', color: 'white' }}>{employee.FullName}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{employee.FullName}</div>
-                  {/* Remove or comment out FirstName and LastName if they don't exist */}
-                  {/* <div className="text-sm text-gray-500">{employee.FirstName} {employee.LastName}</div> */}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {employee.IDNumber}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {employee.CategoryTitle}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {employee.StationTitle}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    employee.Status === true
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}>
+                <td style={{ padding: '16px', color: 'rgba(255,255,255,0.7)' }}>{employee.IDNumber}</td>
+                <td style={{ padding: '16px', color: 'rgba(255,255,255,0.7)' }}>{employee.CategoryTitle}</td>
+                <td style={{ padding: '16px', color: 'rgba(255,255,255,0.7)' }}>{employee.StationTitle}</td>
+                <td style={{ padding: '16px' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    background: employee.Status === true ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
+                    color: employee.Status === true ? oceanColors.success : oceanColors.danger,
+                    border: `1px solid ${employee.Status === true ? oceanColors.success : oceanColors.danger}40`
+                  }}>
                     {employee.Status === true ? "Active" : "Inactive"}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="relative group">
-                    {/* Add aria-label for accessibility */}
-                    <button 
-                      className="text-gray-400 hover:text-gray-600"
-                      aria-label="Actions menu"
-                    >
-                      <MoreVertical className="h-5 w-5" />
+                <td style={{ padding: '16px', textAlign: 'right' }}>
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <button style={{ color: oceanColors.foam, background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}>
+                      <MoreVertical size={18} />
                     </button>
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                      <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </button>
-                      <button className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </button>
-                    </div>
                   </div>
                 </td>
               </tr>
@@ -135,29 +102,53 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
       </div>
 
       {/* Pagination */}
-      <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200">
-        <div className="text-sm text-gray-700">
+      <div style={{
+        padding: '16px 20px',
+        borderTop: `1px solid ${oceanColors.secondary}40`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div style={{ color: oceanColors.foam, fontSize: '14px' }}>
           Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, sortedEmployees.length)} of {sortedEmployees.length} results
         </div>
-        <div className="flex gap-2">
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            aria-label="Previous page"
+            style={{
+              padding: '8px 12px',
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${oceanColors.secondary}40`,
+              borderRadius: '8px',
+              color: oceanColors.white,
+              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              opacity: currentPage === 1 ? 0.5 : 1,
+              transition: 'all 0.3s'
+            }}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft size={16} />
           </button>
-          <span className="px-3 py-1 text-sm text-gray-700">
+          <span style={{ padding: '8px 12px', color: oceanColors.white }}>
             Page {currentPage} of {totalPages}
           </span>
           <button
             onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            aria-label="Next page"
+            style={{
+              padding: '8px 12px',
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${oceanColors.secondary}40`,
+              borderRadius: '8px',
+              color: oceanColors.white,
+              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+              opacity: currentPage === totalPages ? 0.5 : 1,
+              transition: 'all 0.3s'
+            }}
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight size={16} />
           </button>
         </div>
       </div>

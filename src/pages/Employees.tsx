@@ -1,9 +1,25 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Plus, ChevronDown, Download } from "lucide-react";
+import { Search, Plus, ChevronDown, Download, Users, Anchor, Ship, Waves, Filter } from "lucide-react";
 import { getEmployees } from "../api/employees";
 import LoadingSpinner from "../components/LoadingSpinner";
 import EmployeeTable from "../components/EmployeeTable";
+
+// Oceanic Theme Colors
+const oceanColors = {
+  deep: '#0B2F9E',
+  mid: '#1A4D8C',
+  light: '#2B7BA8',
+  surface: '#4AA3C2',
+  wave: '#6EC8D9',
+  foam: '#A8E6CF',
+  gold: '#FFD700',
+  navy: '#0A1C40',
+  white: '#FFFFFF',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+};
 
 export default function Employees() {
   const { data: employees, isLoading, error } = useQuery({
@@ -33,90 +49,268 @@ export default function Employees() {
   }, [employees, searchTerm, statusFilter]);
 
   if (isLoading) return <LoadingSpinner />;
-  if (error) return <div className="text-red-600">Error loading employees</div>;
+  if (error) return (
+    <div style={{ 
+      background: 'rgba(239,68,68,0.1)', 
+      border: `1px solid ${oceanColors.danger}`,
+      borderRadius: '12px',
+      padding: '16px',
+      color: oceanColors.danger,
+      textAlign: 'center'
+    }}>
+      Error loading employees. Please try again.
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
-          <p className="text-gray-600 mt-1">Manage and view all registered employees</p>
+    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+      
+      {/* Header Section with Oceanic Theme */}
+      <div style={{ 
+        background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+        borderRadius: '20px',
+        padding: '24px 32px',
+        marginBottom: '24px',
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.2)'
+      }}>
+        {/* Decorative Waves */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '60px',
+          background: `repeating-linear-gradient(0deg, transparent, transparent 10px, ${oceanColors.surface}20 10px, ${oceanColors.surface}30 20px)`,
+          pointerEvents: 'none'
+        }} />
+        
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.2)'
+            }}>
+              <Users size={28} style={{ color: oceanColors.navy }} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: oceanColors.white, margin: 0 }}>
+                Crew Members
+              </h1>
+              <p style={{ color: oceanColors.foam, margin: '4px 0 0 0', fontSize: '14px' }}>
+                Manage and view all registered port authority employees
+              </p>
+            </div>
+          </div>
+          
+          <button 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 24px',
+              background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
+              border: 'none',
+              borderRadius: '12px',
+              color: oceanColors.navy,
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)';
+            }}
+          >
+            <Plus size={20} />
+            Add Crew Member
+          </button>
         </div>
-        <button className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-          <Plus className="h-5 w-5 mr-2" />
-          Add Employee
-        </button>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+      {/* Filters Card */}
+      <div style={{
+        background: 'rgba(255,255,255,0.1)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: '16px',
+        padding: '20px',
+        marginBottom: '24px',
+        border: '1px solid rgba(255,255,255,0.2)'
+      }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <Search size={18} style={{ 
+              position: 'absolute', 
+              left: '12px', 
+              top: '50%', 
+              transform: 'translateY(-50%)',
+              color: oceanColors.foam
+            }} />
             <input
               type="text"
               placeholder="Search by name, ID number, or station..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              style={{
+                width: '100%',
+                padding: '12px 12px 12px 40px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '12px',
+                color: oceanColors.white,
+                fontSize: '14px',
+                outline: 'none',
+                transition: 'all 0.3s ease'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = oceanColors.gold;
+                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+                e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+              }}
             />
           </div>
-          <div className="flex gap-2">
+          
+          <div style={{ display: 'flex', gap: '12px' }}>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 20px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '12px',
+                color: oceanColors.white,
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
             >
-              <ChevronDown className="h-5 w-5 mr-2" />
+              <Filter size={18} />
               Filters
+              <ChevronDown size={16} style={{ transform: showFilters ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }} />
             </button>
-            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center">
-              <Download className="h-5 w-5 mr-2" />
+            
+            <button
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 20px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '12px',
+                color: oceanColors.white,
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+            >
+              <Download size={18} />
               Export
             </button>
           </div>
         </div>
 
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="flex gap-4">
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  value="all"
-                  checked={statusFilter === "all"}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="form-radio text-red-600"
-                />
-                <span className="ml-2">All</span>
-              </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  value="active"
-                  checked={statusFilter === "active"}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="form-radio text-red-600"
-                />
-                <span className="ml-2">Active</span>
-              </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  value="inactive"
-                  checked={statusFilter === "inactive"}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="form-radio text-red-600"
-                />
-                <span className="ml-2">Inactive</span>
-              </label>
-            </div>
+          <div style={{
+            marginTop: '16px',
+            paddingTop: '16px',
+            borderTop: '1px solid rgba(255,255,255,0.1)',
+            display: 'flex',
+            gap: '24px',
+            flexWrap: 'wrap'
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: oceanColors.white, cursor: 'pointer' }}>
+              <input
+                type="radio"
+                value="all"
+                checked={statusFilter === "all"}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                style={{ accentColor: oceanColors.gold }}
+              />
+              <span>All</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: oceanColors.white, cursor: 'pointer' }}>
+              <input
+                type="radio"
+                value="active"
+                checked={statusFilter === "active"}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                style={{ accentColor: oceanColors.success }}
+              />
+              <span>Active</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: oceanColors.white, cursor: 'pointer' }}>
+              <input
+                type="radio"
+                value="inactive"
+                checked={statusFilter === "inactive"}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                style={{ accentColor: oceanColors.danger }}
+              />
+              <span>Inactive</span>
+            </label>
           </div>
         )}
       </div>
 
       {/* Employee Table */}
-      <EmployeeTable employees={filteredEmployees} />
+      <div style={{
+        background: 'rgba(255,255,255,0.05)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: '16px',
+        overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.1)'
+      }}>
+        <EmployeeTable employees={filteredEmployees} />
+      </div>
+      
+      {/* Footer Stats */}
+      <div style={{
+        marginTop: '20px',
+        padding: '16px 20px',
+        background: 'rgba(255,255,255,0.05)',
+        borderRadius: '12px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px',
+        border: '1px solid rgba(255,255,255,0.1)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Ship size={16} style={{ color: oceanColors.foam }} />
+          <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
+            Total Crew: {filteredEmployees.length} members
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Anchor size={16} style={{ color: oceanColors.gold }} />
+          <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
+            Kenya Ports Authority - EAP Health Week
+          </span>
+          <Waves size={16} style={{ color: oceanColors.surface }} />
+        </div>
+      </div>
     </div>
   );
 }
