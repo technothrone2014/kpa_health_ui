@@ -12,79 +12,258 @@ import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
 import DataUsageIcon from '@mui/icons-material/DataUsage';
+import AnchorIcon from '@mui/icons-material/Anchor';
+import WavesIcon from '@mui/icons-material/Waves';
+import CompassCalibrationIcon from '@mui/icons-material/CompassCalibration';
 import { useState } from "react";
 
 const queryClient = new QueryClient();
 
-// KPA Color Theme
-const kpaTheme = {
-  primary: '#0033A0',    // KPA Deep Blue
-  secondary: '#0055B8',  // KPA Bright Blue
-  accent: '#00A3E0',     // KPA Light Blue
-  gold: '#FFD700',       // KPA Gold accent
-  dark: '#002266',       // Dark Navy
-  light: '#E8F0FE',      // Light blue background
+// Oceanic Theme Colors
+const oceanTheme = {
+  deep: '#0B2F9E',
+  mid: '#1A4D8C',
+  light: '#2B7BA8',
+  surface: '#4AA3C2',
+  wave: '#6EC8D9',
+  foam: '#A8E6CF',
+  gold: '#FFD700',
+  navy: '#0A1C40',
+  white: '#FFFFFF',
 };
 
 function App() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [activePath, setActivePath] = useState("/");
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'Employees', icon: <PeopleIcon />, path: '/employees' },
-    { text: 'Data Correction', icon: <DataUsageIcon />, path: '/data-correction' },
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/', nauticalIcon: '🧭' },
+    { text: 'Employees', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨‍✈️' },
+    { text: 'Data Correction', icon: <DataUsageIcon />, path: '/data-correction', nauticalIcon: '⚓' },
   ];
 
   const drawer = (
-    <Box sx={{ backgroundColor: kpaTheme.dark, height: '100%' }}>
-      // Update the logo section in your sidebar (around line 60-70)
-      <Box sx={{ p: 3, textAlign: 'center', borderBottom: `1px solid ${kpaTheme.accent}` }}>
-        <img 
-          src="/KPA Logo.png" 
-          alt="Kenya Ports Authority" 
-          style={{ height: 70, width: 'auto', marginBottom: '8px' }}
-        />
-        <Typography variant="subtitle2" sx={{ color: kpaTheme.gold, mt: 1, fontSize: '0.75rem' }}>
-          EAP Health Week Intelligence
-        </Typography>
+    <Box sx={{ 
+      height: '100%', 
+      background: `linear-gradient(180deg, ${oceanTheme.navy} 0%, ${oceanTheme.deep} 50%, ${oceanTheme.mid} 100%)`,
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Ocean Wave Overlay */}
+      <Box sx={{ 
+        position: 'absolute', 
+        bottom: 0, 
+        left: 0, 
+        right: 0, 
+        height: '100px',
+        background: `repeating-linear-gradient(0deg, transparent, transparent 10px, ${oceanTheme.surface}10 10px, ${oceanTheme.surface}20 20px)`,
+        pointerEvents: 'none'
+      }} />
+      
+      {/* Animated Wave Lines */}
+      <Box sx={{ 
+        position: 'absolute', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0,
+        background: `radial-gradient(circle at 20% 50%, ${oceanTheme.foam}05 0%, transparent 50%)`,
+        pointerEvents: 'none'
+      }} />
+      
+      {/* Sidebar Header with Ship Wheel */}
+      <Box sx={{ 
+        p: 3, 
+        textAlign: 'center', 
+        borderBottom: `2px solid ${oceanTheme.gold}30`,
+        position: 'relative',
+        background: `linear-gradient(135deg, ${oceanTheme.navy}80, ${oceanTheme.deep}80)`,
+      }}>
+        {/* Animated Ship Wheel */}
+        <Box sx={{ 
+          position: 'absolute',
+          top: -30,
+          right: -30,
+          width: 100,
+          height: 100,
+          borderRadius: '50%',
+          border: `2px solid ${oceanTheme.gold}20`,
+          opacity: 0.3,
+          animation: 'spin 20s linear infinite',
+        }} />
+        
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center',
+          gap: 1 
+        }}>
+          <Box sx={{ 
+            width: 70, 
+            height: 70, 
+            background: `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            animation: 'float 3s ease-in-out infinite'
+          }}>
+            <AnchorIcon sx={{ fontSize: 40, color: oceanTheme.navy }} />
+          </Box>
+          <Typography 
+            variant="subtitle1" 
+            sx={{ 
+              color: oceanTheme.gold, 
+              mt: 1,
+              fontWeight: 'bold',
+              fontSize: '0.9rem',
+              letterSpacing: '1px'
+            }}
+          >
+            KPA Health Intelligence
+          </Typography>
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              color: oceanTheme.foam,
+              fontSize: '0.7rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5
+            }}
+          >
+            <WavesIcon sx={{ fontSize: 12 }} /> EAP Health Week <WavesIcon sx={{ fontSize: 12 }} />
+          </Typography>
+        </Box>
       </Box>
 
-      // Also update mobile header logo
-      <img 
-        src="/KPA Logo.png" 
-        alt="KPA" 
-        style={{ height: 40, marginRight: 10 }}
-      />
-      <List>
+      {/* Navigation Menu */}
+      <List sx={{ px: 2, py: 3, position: 'relative', zIndex: 1 }}>
         {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
+          <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
             <ListItemButton 
               component={Link} 
               to={item.path}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => {
+                setActivePath(item.path);
+                setMobileOpen(false);
+              }}
               sx={{
+                borderRadius: '12px',
+                py: 1.5,
+                px: 2,
+                transition: 'all 0.3s ease',
+                background: activePath === item.path 
+                  ? `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`
+                  : 'transparent',
                 '&:hover': {
-                  backgroundColor: kpaTheme.primary,
+                  background: `linear-gradient(135deg, ${oceanTheme.gold}40, #FFA50040)`,
+                  transform: 'translateX(8px)',
                 },
-                '&.active': {
-                  backgroundColor: kpaTheme.primary,
-                }
+                '& .MuiListItemIcon-root': {
+                  minWidth: 40,
+                },
+                position: 'relative',
+                overflow: 'hidden'
               }}
             >
-              <ListItemIcon sx={{ color: kpaTheme.gold }}>
-                {item.icon}
+              {/* Hover Wave Effect */}
+              <Box sx={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 2,
+                background: `linear-gradient(90deg, transparent, ${oceanTheme.gold}, transparent)`,
+                transform: 'scaleX(0)',
+                transition: 'transform 0.3s ease',
+                '&:hover': {
+                  transform: 'scaleX(1)',
+                }
+              }} />
+              
+              <ListItemIcon sx={{ 
+                color: activePath === item.path ? oceanTheme.navy : oceanTheme.foam,
+                transition: 'all 0.3s ease'
+              }}>
+                <Box sx={{ position: 'relative' }}>
+                  {item.icon}
+                  <Box sx={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    fontSize: '10px',
+                    opacity: 0.7
+                  }}>
+                    {item.nauticalIcon}
+                  </Box>
+                </Box>
               </ListItemIcon>
-              <ListItemText primary={item.text} sx={{ color: 'white' }} />
+              <ListItemText 
+                primary={item.text} 
+                sx={{ 
+                  '& .MuiTypography-root': { 
+                    color: activePath === item.path ? oceanTheme.navy : oceanTheme.white,
+                    fontWeight: activePath === item.path ? 'bold' : 'normal',
+                    transition: 'all 0.3s ease'
+                  } 
+                }} 
+              />
+              
+              {/* Active Indicator */}
+              {activePath === item.path && (
+                <Box sx={{
+                  position: 'absolute',
+                  right: 16,
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: oceanTheme.navy,
+                  animation: 'pulse 2s infinite'
+                }} />
+              )}
             </ListItemButton>
           </ListItem>
         ))}
       </List>
+
+      {/* Decorative Compass Rose */}
+      <Box sx={{ 
+        position: 'absolute', 
+        bottom: 20, 
+        left: '50%', 
+        transform: 'translateX(-50%)',
+        textAlign: 'center',
+        opacity: 0.3
+      }}>
+        <CompassCalibrationIcon sx={{ color: oceanTheme.foam, fontSize: 40, animation: 'spin 60s linear infinite' }} />
+        <Typography variant="caption" sx={{ color: oceanTheme.foam, display: 'block', mt: 1 }}>
+          Kenya Ports Authority
+        </Typography>
+      </Box>
+
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes spin {
+          from { transform: translateX(-50%) rotate(0deg); }
+          to { transform: translateX(-50%) rotate(360deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.2); }
+        }
+      `}</style>
     </Box>
   );
 
@@ -101,40 +280,8 @@ function App() {
               display: { xs: 'none', sm: 'block' }
             }}
           >
-            <Box sx={{ width: 280, position: 'fixed', height: '100vh', backgroundColor: kpaTheme.dark }}>
-              <Box sx={{ p: 3, textAlign: 'center', borderBottom: `1px solid ${kpaTheme.accent}` }}>
-                <img 
-                  src="/KPA Logo.png" 
-                  alt="Kenya Ports Authority" 
-                  style={{ height: 60, width: 'auto' }}
-                />
-                <Typography variant="subtitle2" sx={{ color: kpaTheme.gold, mt: 1 }}>
-                  EAP Health Week Intelligence
-                </Typography>
-              </Box>
-              <List>
-                {menuItems.map((item) => (
-                  <ListItem key={item.text} disablePadding>
-                    <ListItemButton 
-                      component={Link} 
-                      to={item.path}
-                      sx={{
-                        '&:hover': {
-                          backgroundColor: kpaTheme.primary,
-                        },
-                        '&.active': {
-                          backgroundColor: kpaTheme.primary,
-                        }
-                      }}
-                    >
-                      <ListItemIcon sx={{ color: kpaTheme.gold }}>
-                        {item.icon}
-                      </ListItemIcon>
-                      <ListItemText primary={item.text} sx={{ color: 'white' }} />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
+            <Box sx={{ width: 280, position: 'fixed', height: '100vh' }}>
+              {drawer}
             </Box>
           </Box>
 
@@ -151,15 +298,16 @@ function App() {
 
           {/* Main content */}
           <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
-            {/* Mobile App Bar */}
+            {/* Mobile App Bar - Oceanic Theme */}
             <AppBar 
               position="sticky" 
               sx={{ 
-                backgroundColor: kpaTheme.primary,
+                background: `linear-gradient(135deg, ${oceanTheme.deep}, ${oceanTheme.mid})`,
                 mb: 3,
                 display: { xs: 'block', sm: 'none' },
-                boxShadow: 'none',
-                borderBottom: `2px solid ${kpaTheme.gold}`
+                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                borderRadius: '16px',
+                borderBottom: `2px solid ${oceanTheme.gold}`
               }}
             >
               <Toolbar>
@@ -168,18 +316,33 @@ function App() {
                   aria-label="open drawer"
                   edge="start"
                   onClick={handleDrawerToggle}
-                  sx={{ mr: 2 }}
+                  sx={{ 
+                    mr: 2,
+                    '&:hover': {
+                      background: 'rgba(255,255,255,0.2)',
+                      transform: 'rotate(90deg)',
+                      transition: 'transform 0.3s ease'
+                    }
+                  }}
                 >
                   <MenuIcon />
                 </IconButton>
-                <img 
-                  src="/KPA Logo.png" 
-                  alt="KPA" 
-                  style={{ height: 35, marginRight: 10 }}
-                />
-                <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontSize: '0.9rem' }}>
-                  EAP Health Week
+                <Box sx={{ 
+                  width: 40, 
+                  height: 40, 
+                  background: `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`,
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mr: 1
+                }}>
+                  <AnchorIcon sx={{ color: oceanTheme.navy, fontSize: 24 }} />
+                </Box>
+                <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontSize: '0.9rem', fontWeight: 'bold' }}>
+                  KPA Health Week
                 </Typography>
+                <WavesIcon sx={{ color: oceanTheme.foam, fontSize: 20 }} />
               </Toolbar>
             </AppBar>
 
