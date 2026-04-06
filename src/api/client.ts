@@ -1,7 +1,7 @@
 // kpa_health_ui/src/api/client.ts
 import axios from 'axios';
 
-// Remove /api/v1 from base URL since it's already in the endpoint paths
+// Set base URL without /api/v1 - just the root domain
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://kpa-health-api.onrender.com';
 
 const api = axios.create({
