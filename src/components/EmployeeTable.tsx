@@ -15,8 +15,9 @@ const oceanColors = {
   light: '#E8F0FE',
   success: '#10B981',
   danger: '#EF4444',
-  foam: '#F0F8FF',
   white: '#FFFFFF',
+  textDark: '#1F2937',
+  textLight: '#6B7280',
 };
 
 export default function EmployeeTable({ employees }: EmployeeTableProps) {
@@ -51,29 +52,36 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
     <div>
       <div className="overflow-x-auto">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead style={{ background: oceanColors.dark }}>
-            <tr>
-              <th onClick={() => handleSort("Id")} style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }}>ID</th>
-              <th onClick={() => handleSort("FullName")} style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }}>Full Name</th>
-              <th onClick={() => handleSort("IDNumber")} style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }}>ID Number</th>
-              <th onClick={() => handleSort("CategoryTitle")} style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }}>Category</th>
-              <th onClick={() => handleSort("StationTitle")} style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }}>Station</th>
+          <thead>
+            <tr style={{ background: oceanColors.dark }}>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => handleSort("Id")}>ID</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => handleSort("FullName")}>Full Name</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => handleSort("IDNumber")}>ID Number</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => handleSort("CategoryTitle")}>Category</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => handleSort("StationTitle")}>Station</th>
               <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600' }}>Status</th>
               <th style={{ padding: '16px', textAlign: 'right', color: oceanColors.gold, fontWeight: '600' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {currentEmployees.map((employee) => (
-              <tr key={employee.Id} style={{ borderBottom: `1px solid ${oceanColors.secondary}40`, transition: 'background 0.3s' }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                <td style={{ padding: '16px', color: 'white' }}>{employee.Id}</td>
+            {currentEmployees.map((employee, index) => (
+              <tr 
+                key={employee.Id} 
+                style={{ 
+                  borderBottom: `1px solid ${oceanColors.secondary}30`,
+                  backgroundColor: index % 2 === 0 ? oceanColors.white : '#F9FAFB',
+                  transition: 'background 0.3s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = oceanColors.light}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? oceanColors.white : '#F9FAFB'}
+              >
+                <td style={{ padding: '16px', color: oceanColors.textDark, fontSize: '14px' }}>{employee.Id}</td>
                 <td style={{ padding: '16px' }}>
-                  <div style={{ fontWeight: '500', color: 'white' }}>{employee.FullName}</div>
+                  <div style={{ fontWeight: '500', color: oceanColors.textDark, fontSize: '14px' }}>{employee.FullName}</div>
                 </td>
-                <td style={{ padding: '16px', color: 'rgba(255,255,255,0.7)' }}>{employee.IDNumber}</td>
-                <td style={{ padding: '16px', color: 'rgba(255,255,255,0.7)' }}>{employee.CategoryTitle}</td>
-                <td style={{ padding: '16px', color: 'rgba(255,255,255,0.7)' }}>{employee.StationTitle}</td>
+                <td style={{ padding: '16px', color: oceanColors.textLight, fontSize: '14px' }}>{employee.IDNumber}</td>
+                <td style={{ padding: '16px', color: oceanColors.textLight, fontSize: '14px' }}>{employee.CategoryTitle}</td>
+                <td style={{ padding: '16px', color: oceanColors.textLight, fontSize: '14px' }}>{employee.StationTitle}</td>
                 <td style={{ padding: '16px' }}>
                   <span style={{
                     display: 'inline-block',
@@ -81,16 +89,32 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
                     borderRadius: '20px',
                     fontSize: '12px',
                     fontWeight: '600',
-                    background: employee.Status === true ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
+                    backgroundColor: employee.Status === true ? `${oceanColors.success}15` : `${oceanColors.danger}15`,
                     color: employee.Status === true ? oceanColors.success : oceanColors.danger,
-                    border: `1px solid ${employee.Status === true ? oceanColors.success : oceanColors.danger}40`
+                    border: `1px solid ${employee.Status === true ? oceanColors.success : oceanColors.danger}30`
                   }}>
                     {employee.Status === true ? "Active" : "Inactive"}
                   </span>
                 </td>
                 <td style={{ padding: '16px', textAlign: 'right' }}>
                   <div style={{ position: 'relative', display: 'inline-block' }}>
-                    <button style={{ color: oceanColors.foam, background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}>
+                    <button style={{ 
+                      color: oceanColors.textLight, 
+                      background: 'none', 
+                      border: 'none', 
+                      cursor: 'pointer', 
+                      padding: '8px',
+                      borderRadius: '8px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = oceanColors.light;
+                      e.currentTarget.style.color = oceanColors.primary;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = oceanColors.textLight;
+                    }}>
                       <MoreVertical size={18} />
                     </button>
                   </div>
@@ -104,14 +128,16 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
       {/* Pagination */}
       <div style={{
         padding: '16px 20px',
-        borderTop: `1px solid ${oceanColors.secondary}40`,
+        borderTop: `1px solid ${oceanColors.secondary}20`,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
-        gap: '12px'
+        gap: '12px',
+        backgroundColor: oceanColors.white,
+        borderRadius: '0 0 12px 12px'
       }}>
-        <div style={{ color: oceanColors.foam, fontSize: '14px' }}>
+        <div style={{ color: oceanColors.textLight, fontSize: '14px' }}>
           Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, sortedEmployees.length)} of {sortedEmployees.length} results
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -120,10 +146,10 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
             disabled={currentPage === 1}
             style={{
               padding: '8px 12px',
-              background: 'rgba(255,255,255,0.05)',
-              border: `1px solid ${oceanColors.secondary}40`,
+              backgroundColor: oceanColors.white,
+              border: `1px solid ${oceanColors.secondary}30`,
               borderRadius: '8px',
-              color: oceanColors.white,
+              color: currentPage === 1 ? oceanColors.textLight : oceanColors.primary,
               cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
               opacity: currentPage === 1 ? 0.5 : 1,
               transition: 'all 0.3s'
@@ -131,7 +157,7 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
           >
             <ChevronLeft size={16} />
           </button>
-          <span style={{ padding: '8px 12px', color: oceanColors.white }}>
+          <span style={{ padding: '8px 12px', color: oceanColors.textDark, fontSize: '14px' }}>
             Page {currentPage} of {totalPages}
           </span>
           <button
@@ -139,10 +165,10 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
             disabled={currentPage === totalPages}
             style={{
               padding: '8px 12px',
-              background: 'rgba(255,255,255,0.05)',
-              border: `1px solid ${oceanColors.secondary}40`,
+              backgroundColor: oceanColors.white,
+              border: `1px solid ${oceanColors.secondary}30`,
               borderRadius: '8px',
-              color: oceanColors.white,
+              color: currentPage === totalPages ? oceanColors.textLight : oceanColors.primary,
               cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
               opacity: currentPage === totalPages ? 0.5 : 1,
               transition: 'all 0.3s'
