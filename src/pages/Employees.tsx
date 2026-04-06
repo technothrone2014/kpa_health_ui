@@ -19,6 +19,10 @@ const oceanColors = {
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
+  textDark: '#1F2937',
+  textLight: '#6B7280',
+  primary: '#1A4D8C',
+  secondary: '#4AA3C2',
 };
 
 export default function Employees() {
@@ -75,7 +79,6 @@ export default function Employees() {
         overflow: 'hidden',
         boxShadow: '0 10px 25px -5px rgba(0,0,0,0.2)'
       }}>
-        {/* Decorative Waves */}
         <div style={{
           position: 'absolute',
           bottom: 0,
@@ -142,12 +145,12 @@ export default function Employees() {
 
       {/* Filters Card */}
       <div style={{
-        background: 'rgba(255,255,255,0.1)',
-        backdropFilter: 'blur(8px)',
+        background: 'rgba(255,255,255,0.95)',
         borderRadius: '16px',
         padding: '20px',
         marginBottom: '24px',
-        border: '1px solid rgba(255,255,255,0.2)'
+        border: `1px solid ${oceanColors.secondary}20`,
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
       }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ flex: 1, position: 'relative' }}>
@@ -156,7 +159,7 @@ export default function Employees() {
               left: '12px', 
               top: '50%', 
               transform: 'translateY(-50%)',
-              color: oceanColors.foam
+              color: oceanColors.textLight
             }} />
             <input
               type="text"
@@ -166,21 +169,21 @@ export default function Employees() {
               style={{
                 width: '100%',
                 padding: '12px 12px 12px 40px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.2)',
+                backgroundColor: oceanColors.white,
+                border: `1px solid ${oceanColors.secondary}30`,
                 borderRadius: '12px',
-                color: oceanColors.white,
+                color: oceanColors.textDark,
                 fontSize: '14px',
                 outline: 'none',
                 transition: 'all 0.3s ease'
               }}
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = oceanColors.gold;
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                e.currentTarget.style.boxShadow = `0 0 0 3px ${oceanColors.gold}20`;
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
-                e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                e.currentTarget.style.borderColor = `${oceanColors.secondary}30`;
+                e.currentTarget.style.boxShadow = 'none';
               }}
             />
           </div>
@@ -193,15 +196,22 @@ export default function Employees() {
                 alignItems: 'center',
                 gap: '8px',
                 padding: '12px 20px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.2)',
+                backgroundColor: oceanColors.white,
+                border: `1px solid ${oceanColors.secondary}30`,
                 borderRadius: '12px',
-                color: oceanColors.white,
+                color: oceanColors.textDark,
                 cursor: 'pointer',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.3s ease',
+                fontWeight: '500'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = oceanColors.light;
+                e.currentTarget.style.borderColor = oceanColors.primary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = oceanColors.white;
+                e.currentTarget.style.borderColor = `${oceanColors.secondary}30`;
+              }}
             >
               <Filter size={18} />
               Filters
@@ -214,15 +224,22 @@ export default function Employees() {
                 alignItems: 'center',
                 gap: '8px',
                 padding: '12px 20px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.2)',
+                backgroundColor: oceanColors.white,
+                border: `1px solid ${oceanColors.secondary}30`,
                 borderRadius: '12px',
-                color: oceanColors.white,
+                color: oceanColors.textDark,
                 cursor: 'pointer',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.3s ease',
+                fontWeight: '500'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = oceanColors.light;
+                e.currentTarget.style.borderColor = oceanColors.primary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = oceanColors.white;
+                e.currentTarget.style.borderColor = `${oceanColors.secondary}30`;
+              }}
             >
               <Download size={18} />
               Export
@@ -234,22 +251,22 @@ export default function Employees() {
           <div style={{
             marginTop: '16px',
             paddingTop: '16px',
-            borderTop: '1px solid rgba(255,255,255,0.1)',
+            borderTop: `1px solid ${oceanColors.secondary}20`,
             display: 'flex',
             gap: '24px',
             flexWrap: 'wrap'
           }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: oceanColors.white, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: oceanColors.textDark, cursor: 'pointer' }}>
               <input
                 type="radio"
                 value="all"
                 checked={statusFilter === "all"}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                style={{ accentColor: oceanColors.gold }}
+                style={{ accentColor: oceanColors.primary }}
               />
               <span>All</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: oceanColors.white, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: oceanColors.textDark, cursor: 'pointer' }}>
               <input
                 type="radio"
                 value="active"
@@ -259,7 +276,7 @@ export default function Employees() {
               />
               <span>Active</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: oceanColors.white, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: oceanColors.textDark, cursor: 'pointer' }}>
               <input
                 type="radio"
                 value="inactive"
@@ -275,11 +292,11 @@ export default function Employees() {
 
       {/* Employee Table */}
       <div style={{
-        background: 'rgba(255,255,255,0.05)',
-        backdropFilter: 'blur(8px)',
+        backgroundColor: oceanColors.white,
         borderRadius: '16px',
         overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.1)'
+        border: `1px solid ${oceanColors.secondary}20`,
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
       }}>
         <EmployeeTable employees={filteredEmployees} />
       </div>
@@ -288,27 +305,28 @@ export default function Employees() {
       <div style={{
         marginTop: '20px',
         padding: '16px 20px',
-        background: 'rgba(255,255,255,0.05)',
+        background: oceanColors.white,
         borderRadius: '12px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
         gap: '12px',
-        border: '1px solid rgba(255,255,255,0.1)'
+        border: `1px solid ${oceanColors.secondary}20`,
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Ship size={16} style={{ color: oceanColors.foam }} />
-          <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
+          <Ship size={16} style={{ color: oceanColors.primary }} />
+          <span style={{ color: oceanColors.textDark, fontSize: '14px' }}>
             Total Crew: {filteredEmployees.length} members
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Anchor size={16} style={{ color: oceanColors.gold }} />
-          <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
+          <span style={{ color: oceanColors.textLight, fontSize: '14px' }}>
             Kenya Ports Authority - EAP Health Week
           </span>
-          <Waves size={16} style={{ color: oceanColors.surface }} />
+          <Waves size={16} style={{ color: oceanColors.primary }} />
         </div>
       </div>
     </div>
