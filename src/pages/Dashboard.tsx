@@ -2,33 +2,34 @@ import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Users, Building2, Briefcase, Activity, TrendingUp, Award, Heart, Shield, 
-  RefreshCw, ChevronRight, Calendar, ArrowUp, ArrowDown, Sparkles,
-  Droplets, Thermometer, Wind, Eye, Gauge, CloudSun, Sun, Moon
+  RefreshCw, ChevronRight, Calendar, ArrowUp, ArrowDown, Sparkles, Anchor,
+  Ship, Waves, Compass, Wind, Droplets, Navigation, Globe, Star
 } from "lucide-react";
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, BarChart, Bar, Legend, AreaChart, Area
+  PieChart, Pie, Cell, BarChart, Bar, Legend
 } from "recharts";
 import { format, subDays } from "date-fns";
 import { getDashboardOverview, getEmployeeBloodPressureResults, getEmployeeBMIResults } from "../api/analytics";
 import LoadingSpinner from "../components/LoadingSpinner";
 
-// KPA Theme Colors - Enhanced with gradients
-const kpaColors = {
-  primary: '#0033A0',
-  primaryLight: '#1a47b0',
-  primaryDark: '#002266',
-  secondary: '#0055B8',
-  accent: '#00A3E0',
+// Oceanic Theme Colors
+const oceanColors = {
+  deep: '#0B2F9E',
+  mid: '#1A4D8C',
+  light: '#2B7BA8',
+  surface: '#4AA3C2',
+  wave: '#6EC8D9',
+  foam: '#A8E6CF',
+  coral: '#FF6B6B',
   gold: '#FFD700',
-  goldLight: '#FFED4A',
-  dark: '#002266',
-  light: '#E8F0FE',
+  sand: '#F4D03F',
+  navy: '#0A1C40',
+  teal: '#008080',
+  white: '#FFFFFF',
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
-  glass: 'rgba(255, 255, 255, 0.95)',
-  glassDark: 'rgba(0, 51, 160, 0.95)',
 };
 
 // Helper function to format large numbers
@@ -99,22 +100,22 @@ export default function Dashboard() {
   const preHypertension = bloodPressure?.find(item => item.BloodPressureCategory === 'PRE-HYPERTENSION')?.Count || 0;
 
   const statCards = [
-    { title: "Total Employees", value: totalEmployees, formattedValue: formatNumber(totalEmployees), icon: Users, gradient: "from-blue-500 to-indigo-600", description: "Registered employees", trend: "+12%" },
-    { title: "Total Dependants", value: totalDependants, formattedValue: formatNumber(totalDependants), icon: Shield, gradient: "from-cyan-500 to-blue-600", description: "Family members", trend: "+5%" },
-    { title: "Port Users", value: totalPortUsers, formattedValue: formatNumber(totalPortUsers), icon: Building2, gradient: "from-sky-500 to-blue-500", description: "Active port users", trend: "+3%" },
-    { title: "Total Visits", value: overview?.totalVisits || 0, formattedValue: formatNumber(overview?.totalVisits || 0), icon: Activity, gradient: "from-teal-500 to-green-600", description: "Health visits", trend: "+8%" },
+    { title: "Total Employees", value: totalEmployees, formattedValue: formatNumber(totalEmployees), icon: Users, description: "Registered employees", trend: "+12%" },
+    { title: "Total Dependants", value: totalDependants, formattedValue: formatNumber(totalDependants), icon: Shield, description: "Family members", trend: "+5%" },
+    { title: "Port Users", value: totalPortUsers, formattedValue: formatNumber(totalPortUsers), icon: Anchor, description: "Active port users", trend: "+3%" },
+    { title: "Total Visits", value: overview?.totalVisits || 0, formattedValue: formatNumber(overview?.totalVisits || 0), icon: Activity, description: "Health visits", trend: "+8%" },
   ];
 
   const categoryData = [
-    { name: 'EMPLOYEES', value: totalEmployees, color: kpaColors.primary, icon: '👥' },
-    { name: 'DEPENDANTS', value: totalDependants, color: kpaColors.secondary, icon: '👨‍👩‍👧' },
-    { name: 'PORT USERS', value: totalPortUsers, color: kpaColors.accent, icon: '⚓' },
+    { name: 'EMPLOYEES', value: totalEmployees, color: oceanColors.deep, icon: '👥' },
+    { name: 'DEPENDANTS', value: totalDependants, color: oceanColors.mid, icon: '👨‍👩‍👧' },
+    { name: 'PORT USERS', value: totalPortUsers, color: oceanColors.surface, icon: '⚓' },
   ].filter(item => item.value > 0);
 
   const bpColorMap: Record<string, string> = {
-    'NORMAL': kpaColors.success,
-    'PRE-HYPERTENSION': kpaColors.warning,
-    'STAGE I HYPERTENSION': kpaColors.danger,
+    'NORMAL': oceanColors.success,
+    'PRE-HYPERTENSION': oceanColors.warning,
+    'STAGE I HYPERTENSION': oceanColors.danger,
     'STAGE II HYPERTENSION': '#9B2C2C',
     'HYPOTENSION': '#8B4513',
   };
@@ -122,7 +123,7 @@ export default function Dashboard() {
   const bpData = bloodPressure?.map(item => ({
     name: item.BloodPressureCategory,
     value: Number(item.Count),
-    color: bpColorMap[item.BloodPressureCategory] || kpaColors.accent,
+    color: bpColorMap[item.BloodPressureCategory] || oceanColors.surface,
   })).filter(item => item.value > 0) || [];
 
   const bmiData = bmi?.map(item => ({
@@ -130,55 +131,62 @@ export default function Dashboard() {
     value: Number(item.Count),
   })).filter(item => item.value > 0) || [];
 
-  // Chart colors for pie charts
-  const PIE_COLORS = [kpaColors.primary, kpaColors.secondary, kpaColors.accent, kpaColors.gold, kpaColors.success];
-  const BP_PIE_COLORS = [kpaColors.success, kpaColors.warning, kpaColors.danger, '#9B2C2C', '#8B4513'];
+  const PIE_COLORS = [oceanColors.deep, oceanColors.mid, oceanColors.surface, oceanColors.wave, oceanColors.gold];
+  const BP_PIE_COLORS = [oceanColors.success, oceanColors.warning, oceanColors.danger, '#9B2C2C', '#8B4513'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200" style={{ fontFamily: 'Verdana, Geneva, sans-serif' }}>
+    <div className="min-h-screen bg-gradient-to-br from-[#0B2F9E] via-[#1A4D8C] to-[#2B7BA8]" style={{ fontFamily: 'Verdana, Geneva, sans-serif' }}>
       
-      {/* Animated Background Decor */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-        <div className="absolute top-40 right-10 w-72 h-72 bg-cyan-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-20 left-1/2 w-72 h-72 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+      {/* Ocean Wave Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-20">
+        <svg className="absolute bottom-0 w-full" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
+          <path fill="#A8E6CF" fillOpacity="0.3" d="M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,261.3C672,256,768,224,864,208C960,192,1056,192,1152,197.3C1248,203,1344,213,1392,218.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+        </svg>
       </div>
 
-      {/* Hero Section with Glossy Effect */}
-      <div className="relative mx-6 mt-6 mb-8 overflow-hidden bg-gradient-to-r from-[#0033A0] via-[#0044CC] to-[#0055B8] rounded-3xl shadow-2xl">
-        <div className="absolute inset-0 bg-white/10 backdrop-blur-3xl"></div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 rounded-full -mr-32 -mt-32 blur-2xl"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/20 rounded-full -ml-32 -mb-32 blur-2xl"></div>
+      {/* Hero Section - Ship Captain's Bridge */}
+      <div className="relative mx-6 mt-6 mb-8 overflow-hidden rounded-3xl shadow-2xl">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0A1C40] via-[#0B2F9E] to-[#1A4D8C]"></div>
+        
+        {/* Ship Deck Pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute top-0 left-0 w-full h-full" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #fff 0px, #fff 2px, transparent 2px, transparent 8px)' }}></div>
+        </div>
         
         <div className="relative px-8 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm shadow-lg">
-                  <span className="text-3xl">⚓</span>
+                <div className="w-16 h-16 bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-2xl flex items-center justify-center shadow-2xl animate-float">
+                  <Ship size={32} className="text-[#0A1C40]" />
                 </div>
                 <div>
-                  <p className="text-white/80 text-sm font-medium tracking-wide">{currentTime}</p>
-                  <h1 className="text-4xl lg:text-5xl font-bold text-white tracking-tight">{greeting}, Captain!</h1>
+                  <p className="text-[#A8E6CF]/80 text-sm font-medium tracking-wide flex items-center gap-2">
+                    <Compass size={14} />
+                    {currentTime}
+                  </p>
+                  <h1 className="text-4xl lg:text-5xl font-bold text-white tracking-tight">
+                    {greeting}, Captain! <span className="text-[#FFD700]">⚓</span>
+                  </h1>
                 </div>
               </div>
               <p className="text-white/80 text-base max-w-2xl leading-relaxed">
-                Welcome to your EAP Health Week Intelligence Dashboard. Track employee health metrics, 
-                monitor wellness programs, and gain insights into your organization's health status.
+                Welcome aboard the EAP Health Week Intelligence Dashboard. Navigate through employee health metrics, 
+                monitor wellness programs, and chart your organization's health course.
               </p>
             </div>
             
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="group flex items-center gap-3 px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl text-white font-semibold transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl"
+              className="group flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl text-white font-semibold transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl border border-white/20"
             >
               <RefreshCw size={20} className={refreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'} />
               Refresh Data
             </button>
           </div>
           
-          {/* Stats Cards Row */}
+          {/* Stats Cards - Nautical Compass Design */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-8">
             {statCards.map((stat, idx) => (
               <div 
@@ -186,13 +194,13 @@ export default function Dashboard() {
                 className="group relative overflow-hidden bg-white/10 backdrop-blur-md rounded-2xl p-5 hover:bg-white/20 transition-all duration-500 hover:scale-105 cursor-pointer border border-white/20"
                 style={{ animationDelay: `${idx * 100}ms` }}
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-500"></div>
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-[#FFD700]/20 to-[#FFA500]/20 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
                 <div className="relative">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                      <stat.icon size={24} className="text-white" />
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                      <stat.icon size={24} className="text-[#0A1C40]" />
                     </div>
-                    <span className="text-sm font-semibold text-green-300 bg-green-500/20 px-2 py-1 rounded-lg">{stat.trend}</span>
+                    <span className="text-sm font-semibold text-[#A8E6CF] bg-[#A8E6CF]/20 px-2 py-1 rounded-lg">{stat.trend}</span>
                   </div>
                   <p className="text-3xl lg:text-4xl font-bold text-white">{stat.formattedValue}</p>
                   <p className="text-white/80 text-sm mt-1 font-medium">{stat.title}</p>
@@ -206,17 +214,20 @@ export default function Dashboard() {
 
       <div className="px-6 pb-8">
         
-        {/* Health Metrics Overview - Glossy Cards */}
+        {/* Health Metrics - Ocean Depth Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="group relative overflow-hidden bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 cursor-pointer">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20 group-hover:scale-150 transition-transform duration-500"></div>
             <div className="relative p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="text-white/80 text-sm font-medium">Normal BP</p>
+                  <p className="text-white/80 text-sm font-medium flex items-center gap-2">
+                    <Droplets size={14} />
+                    Normal BP
+                  </p>
                   <p className="text-4xl font-bold text-white">{normalBP.toLocaleString()}</p>
                 </div>
-                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
                   <Heart size={28} className="text-white" />
                 </div>
               </div>
@@ -233,14 +244,17 @@ export default function Dashboard() {
           </div>
 
           <div className="group relative overflow-hidden bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 cursor-pointer">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20 group-hover:scale-150 transition-transform duration-500"></div>
             <div className="relative p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="text-white/80 text-sm font-medium">Pre-Hypertension</p>
+                  <p className="text-white/80 text-sm font-medium flex items-center gap-2">
+                    <Wind size={14} />
+                    Pre-Hypertension
+                  </p>
                   <p className="text-4xl font-bold text-white">{preHypertension.toLocaleString()}</p>
                 </div>
-                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
                   <Activity size={28} className="text-white" />
                 </div>
               </div>
@@ -257,14 +271,17 @@ export default function Dashboard() {
           </div>
 
           <div className="group relative overflow-hidden bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 cursor-pointer">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20 group-hover:scale-150 transition-transform duration-500"></div>
             <div className="relative p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="text-white/80 text-sm font-medium">Hypertension</p>
+                  <p className="text-white/80 text-sm font-medium flex items-center gap-2">
+                    <Navigation size={14} />
+                    Hypertension
+                  </p>
                   <p className="text-4xl font-bold text-white">{hypertensionBP.toLocaleString()}</p>
                 </div>
-                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
                   <TrendingUp size={28} className="text-white" />
                 </div>
               </div>
@@ -281,21 +298,20 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Charts Row - Glossy Cards */}
+        {/* Charts Row - Ocean Themed Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           
-          {/* Blood Pressure Distribution */}
-          <div className="group bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-[1.02]">
+          {/* Blood Pressure Distribution - Sea Chart */}
+          <div className="group bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] border border-white/20">
             <div className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full -mr-20 -mt-20 group-hover:scale-150 transition-transform duration-700"></div>
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-5 border-b border-gray-200">
+              <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0033A0] to-[#0055B8] flex items-center justify-center shadow-lg">
-                    <Heart size={22} className="text-white" />
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
+                    <Heart size={22} className="text-[#0A1C40]" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-800 text-lg">Blood Pressure Distribution</h3>
-                    <p className="text-sm text-gray-500">Employee BP categories overview</p>
+                    <h3 className="font-bold text-white text-lg">Blood Pressure Distribution</h3>
+                    <p className="text-white/70 text-sm">Employee BP categories overview</p>
                   </div>
                 </div>
               </div>
@@ -311,38 +327,37 @@ export default function Dashboard() {
                         outerRadius={110} 
                         paddingAngle={3} 
                         dataKey="value" 
-                        label={({ name, percent }) => `${name} (${percent ? (percent * 100).toFixed(0) : 0}%)`}
-                        labelLine={{ strokeWidth: 1, stroke: '#CBD5E1' }}
+                        label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
+                        labelLine={{ strokeWidth: 1, stroke: 'rgba(255,255,255,0.3)' }}
                       >
                         {bpData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={BP_PIE_COLORS[index % BP_PIE_COLORS.length]} stroke="white" strokeWidth={2} />
+                          <Cell key={`cell-${index}`} fill={BP_PIE_COLORS[index % BP_PIE_COLORS.length]} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', border: 'none' }} />
-                      <Legend verticalAlign="bottom" height={50} formatter={(value) => <span className="text-sm text-gray-600">{value}</span>} />
+                      <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
+                      <Legend verticalAlign="bottom" height={50} formatter={(value) => <span className="text-white/80 text-sm">{value}</span>} />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-80 flex items-center justify-center">
-                    <p className="text-gray-400">No blood pressure data available</p>
+                    <p className="text-white/50">No blood pressure data available</p>
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Client Categories Distribution */}
-          <div className="group bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-[1.02]">
+          {/* Client Categories - Port Authority Chart */}
+          <div className="group bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] border border-white/20">
             <div className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-green-500/10 to-teal-500/10 rounded-full -mr-20 -mt-20 group-hover:scale-150 transition-transform duration-700"></div>
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-5 border-b border-gray-200">
+              <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0033A0] to-[#0055B8] flex items-center justify-center shadow-lg">
-                    <Users size={22} className="text-white" />
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
+                    <Anchor size={22} className="text-[#0A1C40]" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-800 text-lg">Client Categories</h3>
-                    <p className="text-sm text-gray-500">Distribution by client type</p>
+                    <h3 className="font-bold text-white text-lg">Port Authority Categories</h3>
+                    <p className="text-white/70 text-sm">Distribution by client type</p>
                   </div>
                 </div>
               </div>
@@ -358,20 +373,20 @@ export default function Dashboard() {
                         outerRadius={110} 
                         paddingAngle={3} 
                         dataKey="value" 
-                        label={({ name, percent }) => `${name}${percent !== undefined ? ` (${(percent * 100).toFixed(0)}%)` : ''}`}
-                        labelLine={{ strokeWidth: 1, stroke: '#CBD5E1' }}
+                        label={({ name, percent = 0 }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        labelLine={{ strokeWidth: 1, stroke: 'rgba(255,255,255,0.3)' }}
                       >
                         {categoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="white" strokeWidth={2} />
+                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', border: 'none' }} />
-                      <Legend verticalAlign="bottom" height={50} formatter={(value) => <span className="text-sm text-gray-600">{value}</span>} />
+                      <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
+                      <Legend verticalAlign="bottom" height={50} formatter={(value) => <span className="text-white/80 text-sm">{value}</span>} />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-80 flex items-center justify-center">
-                    <p className="text-gray-400">No category data available</p>
+                    <p className="text-white/50">No category data available</p>
                   </div>
                 )}
               </div>
@@ -379,16 +394,16 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* BMI Distribution - Full Width Glossy Card */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 mb-8">
-          <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-5 border-b border-gray-200">
+        {/* BMI Distribution - Ocean Depth Chart */}
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 mb-8 border border-white/20">
+          <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0033A0] to-[#0055B8] flex items-center justify-center shadow-lg">
-                <Activity size={22} className="text-white" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
+                <Compass size={22} className="text-[#0A1C40]" />
               </div>
               <div>
-                <h3 className="font-bold text-gray-800 text-lg">BMI Distribution</h3>
-                <p className="text-sm text-gray-500">Employee BMI categories breakdown</p>
+                <h3 className="font-bold text-white text-lg">BMI Navigation Chart</h3>
+                <p className="text-white/70 text-sm">Employee BMI categories breakdown</p>
               </div>
             </div>
           </div>
@@ -397,59 +412,59 @@ export default function Dashboard() {
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={bmiData} margin={{ top: 20, right: 30, left: 40, bottom: 80 }}>
                   <defs>
-                    <linearGradient id="bmiGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#0033A0" />
-                      <stop offset="100%" stopColor="#00A3E0" />
+                    <linearGradient id="bmiOceanGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#FFD700" />
+                      <stop offset="100%" stopColor="#FFA500" />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} interval={0} tick={{ fontSize: 11 }} />
-                  <YAxis tickFormatter={(value) => value.toLocaleString()} />
-                  <Tooltip contentStyle={{ borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', border: 'none' }} />
-                  <Bar dataKey="value" fill="url(#bmiGradient)" radius={[8, 8, 0, 0]} label={{ position: 'top', fill: '#0033A0', fontSize: 12 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} interval={0} tick={{ fontSize: 11, fill: 'white' }} />
+                  <YAxis tickFormatter={(value) => value.toLocaleString()} tick={{ fill: 'white' }} />
+                  <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
+                  <Bar dataKey="value" fill="url(#bmiOceanGradient)" radius={[8, 8, 0, 0]} label={{ position: 'top', fill: '#FFD700', fontSize: 12 }} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-80 flex items-center justify-center">
-                <p className="text-gray-400">No BMI data available</p>
+                <p className="text-white/50">No BMI data available</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Recent Activity - Glossy Card */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500">
-          <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-5 border-b border-gray-200">
+        {/* Recent Activity - Ship's Log */}
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 border border-white/20">
+          <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0033A0] to-[#0055B8] flex items-center justify-center shadow-lg">
-                <Sparkles size={22} className="text-white" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
+                <Navigation size={22} className="text-[#0A1C40]" />
               </div>
               <div>
-                <h3 className="font-bold text-gray-800 text-lg">Recent Activity</h3>
-                <p className="text-sm text-gray-500">Latest updates from your health data</p>
+                <h3 className="font-bold text-white text-lg">Ship's Log</h3>
+                <p className="text-white/70 text-sm">Latest voyages in health data</p>
               </div>
             </div>
           </div>
           <div className="p-6">
             <div className="space-y-4">
               {[
-                { message: "New employee health screening completed", date: subDays(new Date(), 1), icon: "🩺", bg: "from-emerald-500 to-green-500" },
-                { message: "Blood pressure data synchronized", date: subDays(new Date(), 2), icon: "❤️", bg: "from-blue-500 to-cyan-500" },
+                { message: "New crew member health screening completed", date: subDays(new Date(), 1), icon: "🩺", bg: "from-emerald-500 to-green-500" },
+                { message: "Blood pressure data synchronized with port authority", date: subDays(new Date(), 2), icon: "❤️", bg: "from-blue-500 to-cyan-500" },
                 { message: "BMI records updated for 45 employees", date: subDays(new Date(), 3), icon: "📊", bg: "from-purple-500 to-indigo-500" },
-                { message: "Health week report generated", date: subDays(new Date(), 4), icon: "📋", bg: "from-amber-500 to-orange-500" },
+                { message: "Health week report generated for command", date: subDays(new Date(), 4), icon: "📋", bg: "from-amber-500 to-orange-500" },
               ].map((activity, idx) => (
                 <div 
                   key={idx}
-                  className="group flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-white rounded-xl hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-100"
+                  className="group flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-all duration-300 cursor-pointer border border-white/10 hover:border-white/20"
                 >
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${activity.bg} flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300`}>
                     <span className="text-xl">{activity.icon}</span>
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-gray-800 group-hover:text-[#0033A0] transition-colors">{activity.message}</p>
-                    <p className="text-sm text-gray-400">{format(activity.date, "PPP 'at' h:mm a")}</p>
+                    <p className="font-semibold text-white group-hover:text-[#FFD700] transition-colors">{activity.message}</p>
+                    <p className="text-sm text-white/50">{format(activity.date, "PPP 'at' h:mm a")}</p>
                   </div>
-                  <ChevronRight size={20} className="text-gray-300 group-hover:text-[#0033A0] group-hover:translate-x-1 transition-all" />
+                  <ChevronRight size={20} className="text-white/30 group-hover:text-[#FFD700] group-hover:translate-x-1 transition-all" />
                 </div>
               ))}
             </div>
@@ -459,24 +474,16 @@ export default function Dashboard() {
 
       {/* CSS Animations */}
       <style>{`
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
         }
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
         }
         .animate-spin {
           animation: spin 1s linear infinite;
