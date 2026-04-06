@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { 
   Users, Building2, Briefcase, Activity, TrendingUp, Award, Heart, Shield, 
   RefreshCw, ChevronRight, Calendar, ArrowUp, ArrowDown, Sparkles, Anchor,
-  Ship, Waves, Compass, Wind, Droplets, Navigation, Globe, Star
+  Ship, Waves, Compass, Wind, Droplets, Navigation, Globe, Star,
+  UserPlus, UsersRound, BriefcaseMedical, Stethoscope, HeartPulse,
+  Droplet, ActivitySquare, Apple, Scale, Thermometer, Pill
 } from "lucide-react";
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -99,11 +101,19 @@ export default function Dashboard() {
   const hypertensionBP = bloodPressure?.find(item => item.BloodPressureCategory === 'STAGE I HYPERTENSION')?.Count || 0;
   const preHypertension = bloodPressure?.find(item => item.BloodPressureCategory === 'PRE-HYPERTENSION')?.Count || 0;
 
-  const statCards = [
-    { title: "Total Employees", value: totalEmployees, formattedValue: formatNumber(totalEmployees), icon: Users, description: "Registered employees", trend: "+12%" },
-    { title: "Total Dependants", value: totalDependants, formattedValue: formatNumber(totalDependants), icon: Shield, description: "Family members", trend: "+5%" },
-    { title: "Port Users", value: totalPortUsers, formattedValue: formatNumber(totalPortUsers), icon: Anchor, description: "Active port users", trend: "+3%" },
-    { title: "Total Visits", value: overview?.totalVisits || 0, formattedValue: formatNumber(overview?.totalVisits || 0), icon: Activity, description: "Health visits", trend: "+8%" },
+  // Primary Stats Cards
+  const primaryStats = [
+    { title: "Total Employees", value: totalEmployees, formattedValue: formatNumber(totalEmployees), icon: Users, iconBg: "from-blue-500 to-cyan-500", description: "Registered employees", trend: "+12%", trendUp: true },
+    { title: "Total Dependants", value: totalDependants, formattedValue: formatNumber(totalDependants), icon: Shield, iconBg: "from-emerald-500 to-teal-500", description: "Family members", trend: "+5%", trendUp: true },
+    { title: "Port Users", value: totalPortUsers, formattedValue: formatNumber(totalPortUsers), icon: Anchor, iconBg: "from-purple-500 to-pink-500", description: "Active port users", trend: "+3%", trendUp: true },
+    { title: "Total Visits", value: overview?.totalVisits || 0, formattedValue: formatNumber(overview?.totalVisits || 0), icon: Activity, iconBg: "from-orange-500 to-red-500", description: "Health visits", trend: "+8%", trendUp: true },
+  ];
+
+  // Blood Pressure Stats Cards
+  const bpStats = [
+    { title: "Normal BP", value: normalBP, formattedValue: normalBP.toLocaleString(), icon: HeartPulse, iconBg: "from-emerald-500 to-green-500", percentage: ((normalBP / totalBPReadings) * 100).toFixed(1), color: oceanColors.success },
+    { title: "Pre-Hypertension", value: preHypertension, formattedValue: preHypertension.toLocaleString(), icon: ActivitySquare, iconBg: "from-amber-500 to-orange-500", percentage: ((preHypertension / totalBPReadings) * 100).toFixed(1), color: oceanColors.warning },
+    { title: "Hypertension", value: hypertensionBP, formattedValue: hypertensionBP.toLocaleString(), icon: Heart, iconBg: "from-red-500 to-rose-500", percentage: ((hypertensionBP / totalBPReadings) * 100).toFixed(1), color: oceanColors.danger },
   ];
 
   const categoryData = [
@@ -138,20 +148,15 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-[#0B2F9E] via-[#1A4D8C] to-[#2B7BA8]" style={{ fontFamily: 'Verdana, Geneva, sans-serif' }}>
       
       {/* Ocean Wave Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-20">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-10">
         <svg className="absolute bottom-0 w-full" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
-          <path fill="#A8E6CF" fillOpacity="0.3" d="M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,261.3C672,256,768,224,864,208C960,192,1056,192,1152,197.3C1248,203,1344,213,1392,218.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+          <path fill="#A8E6CF" fillOpacity="0.5" d="M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,261.3C672,256,768,224,864,208C960,192,1056,192,1152,197.3C1248,203,1344,213,1392,218.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
         </svg>
       </div>
 
       {/* Hero Section - Ship Captain's Bridge */}
       <div className="relative mx-6 mt-6 mb-8 overflow-hidden rounded-3xl shadow-2xl">
         <div className="absolute inset-0 bg-gradient-to-r from-[#0A1C40] via-[#0B2F9E] to-[#1A4D8C]"></div>
-        
-        {/* Ship Deck Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-0 left-0 w-full h-full" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #fff 0px, #fff 2px, transparent 2px, transparent 8px)' }}></div>
-        </div>
         
         <div className="relative px-8 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
@@ -185,221 +190,161 @@ export default function Dashboard() {
               Refresh Data
             </button>
           </div>
-          
-          {/* Stats Cards - Nautical Compass Design */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-8">
-            {statCards.map((stat, idx) => (
-              <div 
-                key={stat.title}
-                className="group relative overflow-hidden bg-white/10 backdrop-blur-md rounded-2xl p-5 hover:bg-white/20 transition-all duration-500 hover:scale-105 cursor-pointer border border-white/20"
-                style={{ animationDelay: `${idx * 100}ms` }}
-              >
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-[#FFD700]/20 to-[#FFA500]/20 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                      <stat.icon size={24} className="text-[#0A1C40]" />
-                    </div>
-                    <span className="text-sm font-semibold text-[#A8E6CF] bg-[#A8E6CF]/20 px-2 py-1 rounded-lg">{stat.trend}</span>
-                  </div>
-                  <p className="text-3xl lg:text-4xl font-bold text-white">{stat.formattedValue}</p>
-                  <p className="text-white/80 text-sm mt-1 font-medium">{stat.title}</p>
-                  <p className="text-white/50 text-xs mt-1">{stat.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
       <div className="px-6 pb-8">
         
-        {/* Health Metrics - Ocean Depth Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="group relative overflow-hidden bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 cursor-pointer">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20 group-hover:scale-150 transition-transform duration-500"></div>
-            <div className="relative p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <p className="text-white/80 text-sm font-medium flex items-center gap-2">
-                    <Droplets size={14} />
-                    Normal BP
-                  </p>
-                  <p className="text-4xl font-bold text-white">{normalBP.toLocaleString()}</p>
+        {/* Primary Stats - 4 Column Grid (Android-style icon grid) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+          {primaryStats.map((stat, idx) => (
+            <div 
+              key={stat.title}
+              className="group relative overflow-hidden bg-white/10 backdrop-blur-md rounded-2xl p-5 hover:bg-white/20 transition-all duration-500 hover:scale-105 cursor-pointer border border-white/20"
+            >
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-white/5 to-white/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${stat.iconBg} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                    <stat.icon size={28} className="text-white" />
+                  </div>
+                  <span className={`text-sm font-semibold px-2 py-1 rounded-lg ${stat.trendUp ? 'text-green-300 bg-green-500/20' : 'text-red-300 bg-red-500/20'}`}>
+                    {stat.trend}
+                  </span>
                 </div>
-                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
-                  <Heart size={28} className="text-white" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <div className="flex justify-between text-white/80 text-sm mb-2">
-                  <span>of {totalBPReadings.toLocaleString()} readings</span>
-                  <span className="font-bold">{((normalBP / totalBPReadings) * 100).toFixed(1)}%</span>
-                </div>
-                <div className="w-full bg-white/30 rounded-full h-2 overflow-hidden">
-                  <div className="h-full bg-white rounded-full transition-all duration-700" style={{ width: `${(normalBP / totalBPReadings) * 100}%` }}></div>
-                </div>
+                <p className="text-3xl lg:text-4xl font-bold text-white">{stat.formattedValue}</p>
+                <p className="text-white/80 text-sm mt-1 font-medium">{stat.title}</p>
+                <p className="text-white/50 text-xs mt-1">{stat.description}</p>
               </div>
             </div>
-          </div>
-
-          <div className="group relative overflow-hidden bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 cursor-pointer">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20 group-hover:scale-150 transition-transform duration-500"></div>
-            <div className="relative p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <p className="text-white/80 text-sm font-medium flex items-center gap-2">
-                    <Wind size={14} />
-                    Pre-Hypertension
-                  </p>
-                  <p className="text-4xl font-bold text-white">{preHypertension.toLocaleString()}</p>
-                </div>
-                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
-                  <Activity size={28} className="text-white" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <div className="flex justify-between text-white/80 text-sm mb-2">
-                  <span>of {totalBPReadings.toLocaleString()} readings</span>
-                  <span className="font-bold">{((preHypertension / totalBPReadings) * 100).toFixed(1)}%</span>
-                </div>
-                <div className="w-full bg-white/30 rounded-full h-2 overflow-hidden">
-                  <div className="h-full bg-white rounded-full transition-all duration-700" style={{ width: `${(preHypertension / totalBPReadings) * 100}%` }}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="group relative overflow-hidden bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 cursor-pointer">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20 group-hover:scale-150 transition-transform duration-500"></div>
-            <div className="relative p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <p className="text-white/80 text-sm font-medium flex items-center gap-2">
-                    <Navigation size={14} />
-                    Hypertension
-                  </p>
-                  <p className="text-4xl font-bold text-white">{hypertensionBP.toLocaleString()}</p>
-                </div>
-                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
-                  <TrendingUp size={28} className="text-white" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <div className="flex justify-between text-white/80 text-sm mb-2">
-                  <span>of {totalBPReadings.toLocaleString()} readings</span>
-                  <span className="font-bold">{((hypertensionBP / totalBPReadings) * 100).toFixed(1)}%</span>
-                </div>
-                <div className="w-full bg-white/30 rounded-full h-2 overflow-hidden">
-                  <div className="h-full bg-white rounded-full transition-all duration-700" style={{ width: `${(hypertensionBP / totalBPReadings) * 100}%` }}></div>
-                </div>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Charts Row - Ocean Themed Cards */}
+        {/* Blood Pressure Stats - 3 Column Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+          {bpStats.map((stat, idx) => (
+            <div 
+              key={stat.title}
+              className="group relative overflow-hidden rounded-2xl p-5 transition-all duration-500 hover:scale-105 cursor-pointer"
+              style={{ backgroundColor: `${stat.color}20`, border: `1px solid ${stat.color}40` }}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${stat.iconBg} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                    <stat.icon size={28} className="text-white" />
+                  </div>
+                  <span className="text-sm font-semibold text-white/80">{stat.percentage}%</span>
+                </div>
+                <p className="text-3xl lg:text-4xl font-bold text-white">{stat.formattedValue}</p>
+                <p className="text-white/80 text-sm mt-1 font-medium">{stat.title}</p>
+                <p className="text-white/50 text-xs mt-1">of {totalBPReadings.toLocaleString()} readings</p>
+                <div className="mt-3 w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
+                  <div className="h-full bg-white rounded-full transition-all duration-700" style={{ width: `${stat.percentage}%` }}></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Charts Row - 2 Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           
-          {/* Blood Pressure Distribution - Sea Chart */}
+          {/* Blood Pressure Distribution - Pie Chart */}
           <div className="group bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] border border-white/20">
-            <div className="relative overflow-hidden">
-              <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
-                    <Heart size={22} className="text-[#0A1C40]" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-white text-lg">Blood Pressure Distribution</h3>
-                    <p className="text-white/70 text-sm">Employee BP categories overview</p>
-                  </div>
+            <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
+                  <HeartPulse size={22} className="text-[#0A1C40]" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-lg">Blood Pressure Distribution</h3>
+                  <p className="text-white/70 text-sm">Employee BP categories overview</p>
                 </div>
               </div>
-              <div className="p-6">
-                {bpData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={340}>
-                    <PieChart>
-                      <Pie 
-                        data={bpData} 
-                        cx="50%" 
-                        cy="50%" 
-                        innerRadius={70} 
-                        outerRadius={110} 
-                        paddingAngle={3} 
-                        dataKey="value" 
-                        label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
-                        labelLine={{ strokeWidth: 1, stroke: 'rgba(255,255,255,0.3)' }}
-                      >
-                        {bpData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={BP_PIE_COLORS[index % BP_PIE_COLORS.length]} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
-                      <Legend verticalAlign="bottom" height={50} formatter={(value) => <span className="text-white/80 text-sm">{value}</span>} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-80 flex items-center justify-center">
-                    <p className="text-white/50">No blood pressure data available</p>
-                  </div>
-                )}
-              </div>
+            </div>
+            <div className="p-6">
+              {bpData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={340}>
+                  <PieChart>
+                    <Pie 
+                      data={bpData} 
+                      cx="50%" 
+                      cy="50%" 
+                      innerRadius={70} 
+                      outerRadius={110} 
+                      paddingAngle={3} 
+                      dataKey="value" 
+                      label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
+                      labelLine={{ strokeWidth: 1, stroke: 'rgba(255,255,255,0.3)' }}
+                    >
+                      {bpData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={BP_PIE_COLORS[index % BP_PIE_COLORS.length]} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
+                    <Legend verticalAlign="bottom" height={50} formatter={(value) => <span className="text-white/80 text-sm">{value}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-80 flex items-center justify-center">
+                  <p className="text-white/50">No blood pressure data available</p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Client Categories - Port Authority Chart */}
+          {/* Client Categories - Pie Chart */}
           <div className="group bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] border border-white/20">
-            <div className="relative overflow-hidden">
-              <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
-                    <Anchor size={22} className="text-[#0A1C40]" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-white text-lg">Port Authority Categories</h3>
-                    <p className="text-white/70 text-sm">Distribution by client type</p>
-                  </div>
+            <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
+                  <Anchor size={22} className="text-[#0A1C40]" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-lg">Port Authority Categories</h3>
+                  <p className="text-white/70 text-sm">Distribution by client type</p>
                 </div>
               </div>
-              <div className="p-6">
-                {categoryData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={340}>
-                    <PieChart>
-                      <Pie 
-                        data={categoryData} 
-                        cx="50%" 
-                        cy="50%" 
-                        innerRadius={70} 
-                        outerRadius={110} 
-                        paddingAngle={3} 
-                        dataKey="value" 
-                        label={({ name, percent = 0 }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                        labelLine={{ strokeWidth: 1, stroke: 'rgba(255,255,255,0.3)' }}
-                      >
-                        {categoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
-                      <Legend verticalAlign="bottom" height={50} formatter={(value) => <span className="text-white/80 text-sm">{value}</span>} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-80 flex items-center justify-center">
-                    <p className="text-white/50">No category data available</p>
-                  </div>
-                )}
-              </div>
+            </div>
+            <div className="p-6">
+              {categoryData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={340}>
+                  <PieChart>
+                    <Pie 
+                      data={categoryData} 
+                      cx="50%" 
+                      cy="50%" 
+                      innerRadius={70} 
+                      outerRadius={110} 
+                      paddingAngle={3} 
+                      dataKey="value" 
+                      label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
+                      labelLine={{ strokeWidth: 1, stroke: 'rgba(255,255,255,0.3)' }}
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
+                    <Legend verticalAlign="bottom" height={50} formatter={(value) => <span className="text-white/80 text-sm">{value}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-80 flex items-center justify-center">
+                  <p className="text-white/50">No category data available</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* BMI Distribution - Ocean Depth Chart */}
+        {/* BMI Distribution - Full Width Bar Chart */}
         <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 mb-8 border border-white/20">
           <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
-                <Compass size={22} className="text-[#0A1C40]" />
+                <Scale size={22} className="text-[#0A1C40]" />
               </div>
               <div>
                 <h3 className="font-bold text-white text-lg">BMI Navigation Chart</h3>
