@@ -88,7 +88,6 @@ export default function Dashboard() {
   const hypertensionBP = bloodPressure?.find(item => item.BloodPressureCategory === 'STAGE I HYPERTENSION')?.Count || 0;
   const preHypertension = bloodPressure?.find(item => item.BloodPressureCategory === 'PRE-HYPERTENSION')?.Count || 0;
 
-  // ALL STATS IN ONE ARRAY for unified grid
   const allStats = [
     { title: "Total Employees", value: totalEmployees, formattedValue: formatNumber(totalEmployees), icon: Users, iconBg: "from-blue-500 to-cyan-500", description: "Registered employees", trend: "+12%", trendUp: true },
     { title: "Total Dependants", value: totalDependants, formattedValue: formatNumber(totalDependants), icon: Shield, iconBg: "from-emerald-500 to-teal-500", description: "Family members", trend: "+5%", trendUp: true },
@@ -120,36 +119,28 @@ export default function Dashboard() {
   const PIE_COLORS = [oceanColors.deep, oceanColors.mid, oceanColors.surface, oceanColors.gold];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0B2F9E] via-[#1A4D8C] to-[#2B7BA8]" style={{ fontFamily: 'Verdana, Geneva, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0B2F9E, #1A4D8C, #2B7BA8)', fontFamily: 'Verdana, Geneva, sans-serif' }}>
       
-      {/* Ocean Wave Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-10">
-        <svg className="absolute bottom-0 w-full" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
-          <path fill="#A8E6CF" fillOpacity="0.5" d="M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,261.3C672,256,768,224,864,208C960,192,1056,192,1152,197.3C1248,203,1344,213,1392,218.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
-        </svg>
-      </div>
-
       {/* Hero Section */}
-      <div className="relative mx-6 mt-6 mb-8 overflow-hidden rounded-3xl shadow-2xl">
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0A1C40] via-[#0B2F9E] to-[#1A4D8C]"></div>
-        <div className="relative px-8 py-8">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-16 h-16 bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-2xl flex items-center justify-center shadow-2xl animate-float">
-                  <Ship size={32} className="text-[#0A1C40]" />
+      <div style={{ position: 'relative', margin: '24px 24px 32px 24px', overflow: 'hidden', borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #0A1C40, #0B2F9E, #1A4D8C)' }}></div>
+        <div style={{ position: 'relative', padding: '32px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '24px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ width: '64px', height: '64px', background: 'linear-gradient(135deg, #FFD700, #FFA500)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', animation: 'float 3s ease-in-out infinite' }}>
+                  <Ship size={32} style={{ color: '#0A1C40' }} />
                 </div>
                 <div>
-                  <p className="text-[#A8E6CF]/80 text-sm font-medium tracking-wide flex items-center gap-2">
-                    <Compass size={14} />
-                    {currentTime}
+                  <p style={{ color: '#A8E6CF', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Compass size={14} /> {currentTime}
                   </p>
-                  <h1 className="text-4xl lg:text-5xl font-bold text-white tracking-tight">
-                    {greeting}, Captain! <span className="text-[#FFD700]">⚓</span>
+                  <h1 style={{ fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 'bold', color: 'white' }}>
+                    {greeting}, Captain! <span style={{ color: '#FFD700' }}>⚓</span>
                   </h1>
                 </div>
               </div>
-              <p className="text-white/80 text-base max-w-2xl leading-relaxed">
+              <p style={{ color: 'rgba(255,255,255,0.8)', maxWidth: '600px', lineHeight: '1.625' }}>
                 Welcome aboard the EAP Health Week Intelligence Dashboard. Navigate through employee health metrics, 
                 monitor wellness programs, and chart your organization's health course.
               </p>
@@ -158,66 +149,114 @@ export default function Dashboard() {
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="group flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl text-white font-semibold transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl border border-white/20"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 24px',
+                background: 'rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(4px)',
+                borderRadius: '12px',
+                color: 'white',
+                fontWeight: '600',
+                border: '1px solid rgba(255,255,255,0.2)',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                opacity: refreshing ? 0.5 : 1
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
             >
-              <RefreshCw size={20} className={refreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'} />
+              <RefreshCw size={20} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
               Refresh Data
             </button>
           </div>
         </div>
       </div>
 
-      <div className="px-6 pb-8">
+      <div style={{ padding: '0 24px 32px 24px' }}>
         
-        {/* DEBUG: Grid Info - Remove after confirming grid works */}
-        <div className="text-white/50 text-xs text-center mb-2">
-          Grid: 2 cols (mobile) → 2 cols (sm) → 3 cols (md) → 4 cols (lg) | Items: {allStats.length}
-        </div>
-        
-        {/* UNIFIED 4-COLUMN GRID - All stats evenly distributed */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 mb-8">
-          {allStats.map((stat, idx) => (
+        {/* UNIFIED GRID - Using inline styles to guarantee grid layout */}
+        <div style={{ 
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '20px',
+          marginBottom: '32px'
+        }}>
+          {allStats.map((stat) => (
             <div 
               key={stat.title}
-              className="group relative overflow-hidden bg-white/10 backdrop-blur-md rounded-2xl p-5 hover:bg-white/20 transition-all duration-500 hover:scale-105 cursor-pointer border border-white/20"
+              style={{
+                position: 'relative',
+                overflow: 'hidden',
+                background: 'rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(8px)',
+                borderRadius: '16px',
+                padding: '20px',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                border: '1px solid rgba(255,255,255,0.2)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                e.currentTarget.style.transform = 'scale(1.02)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
             >
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-white/5 to-white/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${stat.iconBg} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                    <stat.icon size={28} className="text-white" />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ 
+                    width: '56px', 
+                    height: '56px', 
+                    background: `linear-gradient(135deg, ${stat.iconBg.split(' ')[1]}, ${stat.iconBg.split(' ')[3]})`,
+                    borderRadius: '12px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
+                  }}>
+                    <stat.icon size={28} style={{ color: 'white' }} />
                   </div>
-                  <span className={`text-sm font-semibold px-2 py-1 rounded-lg whitespace-nowrap ${
-                    stat.trendUp ? 'text-green-300 bg-green-500/20' : 'text-red-300 bg-red-500/20'
-                  }`}>
+                  <span style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '600',
+                    padding: '4px 8px',
+                    borderRadius: '8px',
+                    whiteSpace: 'nowrap',
+                    background: stat.trendUp ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
+                    color: stat.trendUp ? '#6EE7B7' : '#FCA5A5'
+                  }}>
                     {stat.trend}
                   </span>
                 </div>
-                <p className="text-3xl lg:text-4xl font-bold text-white">{stat.formattedValue}</p>
-                <p className="text-white/80 text-sm mt-1 font-medium">{stat.title}</p>
-                <p className="text-white/50 text-xs mt-1 line-clamp-2">{stat.description}</p>
+                <p style={{ fontSize: 'clamp(24px, 3vw, 32px)', fontWeight: 'bold', color: 'white' }}>{stat.formattedValue}</p>
+                <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px', marginTop: '4px', fontWeight: '500' }}>{stat.title}</p>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '4px' }}>{stat.description}</p>
               </div>
             </div>
           ))}
         </div>
 
         {/* Charts Row - 2 Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', marginBottom: '32px' }}>
           
           {/* Blood Pressure Distribution */}
-          <div className="group bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] border border-white/20">
-            <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
-                  <HeartPulse size={22} className="text-[#0A1C40]" />
+          <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
+            <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #FFD700, #FFA500)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+                  <HeartPulse size={22} style={{ color: '#0A1C40' }} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-lg">Blood Pressure Distribution</h3>
-                  <p className="text-white/70 text-sm">Employee BP categories overview</p>
+                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>Blood Pressure Distribution</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Employee BP categories overview</p>
                 </div>
               </div>
             </div>
-            <div className="p-6">
+            <div style={{ padding: '24px' }}>
               {bpData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={340}>
                   <PieChart>
@@ -237,31 +276,31 @@ export default function Dashboard() {
                       ))}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
-                    <Legend verticalAlign="bottom" height={50} formatter={(value) => <span className="text-white/80 text-sm">{value}</span>} />
+                    <Legend verticalAlign="bottom" height={50} formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.8)' }}>{value}</span>} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-80 flex items-center justify-center">
-                  <p className="text-white/50">No blood pressure data available</p>
+                <div style={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.5)' }}>No blood pressure data available</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Client Categories */}
-          <div className="group bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] border border-white/20">
-            <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
-                  <Anchor size={22} className="text-[#0A1C40]" />
+          <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
+            <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #FFD700, #FFA500)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+                  <Anchor size={22} style={{ color: '#0A1C40' }} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-lg">Port Authority Categories</h3>
-                  <p className="text-white/70 text-sm">Distribution by client type</p>
+                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>Port Authority Categories</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Distribution by client type</p>
                 </div>
               </div>
             </div>
-            <div className="p-6">
+            <div style={{ padding: '24px' }}>
               {categoryData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={340}>
                   <PieChart>
@@ -281,12 +320,12 @@ export default function Dashboard() {
                       ))}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
-                    <Legend verticalAlign="bottom" height={50} formatter={(value) => <span className="text-white/80 text-sm">{value}</span>} />
+                    <Legend verticalAlign="bottom" height={50} formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.8)' }}>{value}</span>} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-80 flex items-center justify-center">
-                  <p className="text-white/50">No category data available</p>
+                <div style={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.5)' }}>No category data available</p>
                 </div>
               )}
             </div>
@@ -294,19 +333,19 @@ export default function Dashboard() {
         </div>
 
         {/* BMI Distribution */}
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 mb-8 border border-white/20">
-          <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
-                <Scale size={22} className="text-[#0A1C40]" />
+        <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', marginBottom: '32px', border: '1px solid rgba(255,255,255,0.2)' }}>
+          <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #FFD700, #FFA500)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+                <Scale size={22} style={{ color: '#0A1C40' }} />
               </div>
               <div>
-                <h3 className="font-bold text-white text-lg">BMI Navigation Chart</h3>
-                <p className="text-white/70 text-sm">Employee BMI categories breakdown</p>
+                <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>BMI Navigation Chart</h3>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Employee BMI categories breakdown</p>
               </div>
             </div>
           </div>
-          <div className="p-6">
+          <div style={{ padding: '24px' }}>
             {bmiData.length > 0 ? (
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={bmiData} margin={{ top: 20, right: 30, left: 40, bottom: 80 }}>
@@ -324,46 +363,64 @@ export default function Dashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-80 flex items-center justify-center">
-                <p className="text-white/50">No BMI data available</p>
+              <div style={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <p style={{ color: 'rgba(255,255,255,0.5)' }}>No BMI data available</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Ship's Log */}
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-500 border border-white/20">
-          <div className="bg-gradient-to-r from-[#0A1C40]/50 to-[#1A4D8C]/50 px-6 py-5 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-lg">
-                <Navigation size={22} className="text-[#0A1C40]" />
+        <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
+          <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #FFD700, #FFA500)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+                <Navigation size={22} style={{ color: '#0A1C40' }} />
               </div>
               <div>
-                <h3 className="font-bold text-white text-lg">Ship's Log</h3>
-                <p className="text-white/70 text-sm">Latest voyages in health data</p>
+                <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>Ship's Log</h3>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Latest voyages in health data</p>
               </div>
             </div>
           </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div style={{ padding: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
               {[
-                { message: "New crew member health screening completed", date: subDays(new Date(), 1), icon: "🩺", bg: "from-emerald-500 to-green-500" },
-                { message: "Blood pressure data synchronized with port authority", date: subDays(new Date(), 2), icon: "❤️", bg: "from-blue-500 to-cyan-500" },
-                { message: "BMI records updated for 45 employees", date: subDays(new Date(), 3), icon: "📊", bg: "from-purple-500 to-indigo-500" },
-                { message: "Health week report generated for command", date: subDays(new Date(), 4), icon: "📋", bg: "from-amber-500 to-orange-500" },
+                { message: "New crew member health screening completed", date: subDays(new Date(), 1), icon: "🩺", bg: "linear-gradient(135deg, #10B981, #059669)" },
+                { message: "Blood pressure data synchronized with port authority", date: subDays(new Date(), 2), icon: "❤️", bg: "linear-gradient(135deg, #3B82F6, #06B6D4)" },
+                { message: "BMI records updated for 45 employees", date: subDays(new Date(), 3), icon: "📊", bg: "linear-gradient(135deg, #8B5CF6, #6366F1)" },
+                { message: "Health week report generated for command", date: subDays(new Date(), 4), icon: "📋", bg: "linear-gradient(135deg, #F59E0B, #EA580C)" },
               ].map((activity, idx) => (
                 <div 
                   key={idx}
-                  className="group flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-all duration-300 cursor-pointer border border-white/10 hover:border-white/20"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    padding: '16px',
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s',
+                    border: '1px solid rgba(255,255,255,0.05)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
+                  }}
                 >
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${activity.bg} flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300`}>
-                    <span className="text-xl">{activity.icon}</span>
+                  <div style={{ width: '48px', height: '48px', background: activity.bg, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                    <span style={{ fontSize: '24px' }}>{activity.icon}</span>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-white group-hover:text-[#FFD700] transition-colors line-clamp-1">{activity.message}</p>
-                    <p className="text-sm text-white/50">{format(activity.date, "PPP")}</p>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: '600', color: 'white' }}>{activity.message}</p>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{format(activity.date, "PPP")}</p>
                   </div>
-                  <ChevronRight size={20} className="text-white/30 group-hover:text-[#FFD700] group-hover:translate-x-1 transition-all flex-shrink-0" />
+                  <ChevronRight size={20} style={{ color: 'rgba(255,255,255,0.3)' }} />
                 </div>
               ))}
             </div>
@@ -379,23 +436,6 @@ export default function Dashboard() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
-        }
-        .animate-float { animation: float 3s ease-in-out infinite; }
-        .animate-spin { animation: spin 1s linear infinite; }
-        .line-clamp-1 {
-          display: -webkit-box;
-          -webkit-line-clamp: 1;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-        .line-clamp-2 {
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-        .whitespace-nowrap {
-          white-space: nowrap;
         }
       `}</style>
     </div>
