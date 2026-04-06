@@ -6,9 +6,7 @@ import {
 } from "lucide-react";
 import { 
   PieChart, Pie, Cell, BarChart, Bar, Tooltip, ResponsiveContainer, Legend,
-  CartesianGrid,
-  XAxis,
-  YAxis
+  CartesianGrid, XAxis, YAxis
 } from "recharts";
 import { format, subDays } from "date-fns";
 import { getDashboardOverview, getEmployeeBloodPressureResults, getEmployeeBMIResults } from "../api/analytics";
@@ -171,6 +169,11 @@ export default function Dashboard() {
 
       <div className="px-6 pb-8">
         
+        {/* DEBUG: Grid Info - Remove after confirming grid works */}
+        <div className="text-white/50 text-xs text-center mb-2">
+          Grid: 2 cols (mobile) → 2 cols (sm) → 3 cols (md) → 4 cols (lg) | Items: {allStats.length}
+        </div>
+        
         {/* UNIFIED 4-COLUMN GRID - All stats evenly distributed */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 mb-8">
           {allStats.map((stat, idx) => (
@@ -184,7 +187,7 @@ export default function Dashboard() {
                   <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${stat.iconBg} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                     <stat.icon size={28} className="text-white" />
                   </div>
-                  <span className={`text-sm font-semibold px-2 py-1 rounded-lg ${
+                  <span className={`text-sm font-semibold px-2 py-1 rounded-lg whitespace-nowrap ${
                     stat.trendUp ? 'text-green-300 bg-green-500/20' : 'text-red-300 bg-red-500/20'
                   }`}>
                     {stat.trend}
@@ -192,7 +195,7 @@ export default function Dashboard() {
                 </div>
                 <p className="text-3xl lg:text-4xl font-bold text-white">{stat.formattedValue}</p>
                 <p className="text-white/80 text-sm mt-1 font-medium">{stat.title}</p>
-                <p className="text-white/50 text-xs mt-1">{stat.description}</p>
+                <p className="text-white/50 text-xs mt-1 line-clamp-2">{stat.description}</p>
               </div>
             </div>
           ))}
@@ -384,6 +387,15 @@ export default function Dashboard() {
           -webkit-line-clamp: 1;
           -webkit-box-orient: vertical;
           overflow: hidden;
+        }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        .whitespace-nowrap {
+          white-space: nowrap;
         }
       `}</style>
     </div>
