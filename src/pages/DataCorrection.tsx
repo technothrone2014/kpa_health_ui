@@ -1,7 +1,25 @@
 import React, { useState } from "react";
-import { AlertCircle, CheckCircle, Save, RefreshCw } from "lucide-react";
+import { AlertCircle, CheckCircle, Save, RefreshCw, Anchor, Ship, Waves, Clock, Calendar, User, MapPin, Settings, Shield } from "lucide-react";
 import { runCorrection } from "../api/dataCorrection";
 import toast from "react-hot-toast";
+
+// Oceanic Theme Colors
+const oceanColors = {
+  deep: '#0B2F9E',
+  mid: '#1A4D8C',
+  light: '#2B7BA8',
+  surface: '#4AA3C2',
+  wave: '#6EC8D9',
+  foam: '#A8E6CF',
+  gold: '#FFD700',
+  navy: '#0A1C40',
+  white: '#FFFFFF',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  textDark: '#1F2937',
+  textLight: '#6B7280',
+};
 
 interface CorrectionForm {
   year: number;
@@ -66,32 +84,112 @@ export default function DataCorrection() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Data Correction Tool</h1>
-        <p className="text-gray-600 mt-1">
-          Correct station assignments for tallies and clients based on date and time
-        </p>
+    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      
+      {/* Header Section */}
+      <div style={{ 
+        background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+        borderRadius: '20px',
+        padding: '24px 32px',
+        marginBottom: '24px',
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.2)'
+      }}>
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '60px',
+          background: `repeating-linear-gradient(0deg, transparent, transparent 10px, ${oceanColors.surface}20 10px, ${oceanColors.surface}30 20px)`,
+          pointerEvents: 'none'
+        }} />
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
+            borderRadius: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.2)'
+          }}>
+            <Settings size={28} style={{ color: oceanColors.navy }} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: oceanColors.white, margin: 0 }}>
+              Data Correction Tool
+            </h1>
+            <p style={{ color: oceanColors.foam, margin: '4px 0 0 0', fontSize: '14px' }}>
+              Correct station assignments for tallies and clients based on date and time
+            </p>
+          </div>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-6 space-y-6">
+      {/* Form Card */}
+      <form onSubmit={handleSubmit} style={{
+        background: oceanColors.white,
+        borderRadius: '20px',
+        padding: '32px',
+        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+        border: `1px solid ${oceanColors.wave}20`
+      }}>
+        
         {/* Date Section */}
-        <div>
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Date Selection</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div style={{ marginBottom: '28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Calendar size={20} style={{ color: oceanColors.gold }} />
+            </div>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Date Selection</h3>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: oceanColors.textDark, marginBottom: '6px' }}>
+                Year
+              </label>
               <input
                 type="number"
                 name="year"
                 value={form.year}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: `1px solid ${oceanColors.surface}30`,
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.3s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = oceanColors.gold;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${oceanColors.gold}20`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = `${oceanColors.surface}30`;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: oceanColors.textDark, marginBottom: '6px' }}>
+                Month
+              </label>
               <input
                 type="number"
                 name="month"
@@ -99,12 +197,30 @@ export default function DataCorrection() {
                 max="12"
                 value={form.month}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: `1px solid ${oceanColors.surface}30`,
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.3s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = oceanColors.gold;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${oceanColors.gold}20`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = `${oceanColors.surface}30`;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Day</label>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: oceanColors.textDark, marginBottom: '6px' }}>
+                Day
+              </label>
               <input
                 type="number"
                 name="day"
@@ -112,7 +228,23 @@ export default function DataCorrection() {
                 max="31"
                 value={form.day}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: `1px solid ${oceanColors.surface}30`,
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.3s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = oceanColors.gold;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${oceanColors.gold}20`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = `${oceanColors.surface}30`;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
                 required
               />
             </div>
@@ -120,40 +252,111 @@ export default function DataCorrection() {
         </div>
 
         {/* Assignment Section */}
-        <div>
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Assignment Details</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div style={{ marginBottom: '28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Anchor size={20} style={{ color: oceanColors.gold }} />
+            </div>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Assignment Details</h3>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">User ID</label>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: oceanColors.textDark, marginBottom: '6px' }}>
+                <User size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
+                User ID
+              </label>
               <input
                 type="number"
                 name="userId"
                 value={form.userId}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: `1px solid ${oceanColors.surface}30`,
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.3s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = oceanColors.gold;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${oceanColors.gold}20`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = `${oceanColors.surface}30`;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Station ID</label>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: oceanColors.textDark, marginBottom: '6px' }}>
+                <MapPin size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
+                Station ID
+              </label>
               <input
                 type="number"
                 name="stationId"
                 value={form.stationId}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: `1px solid ${oceanColors.surface}30`,
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.3s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = oceanColors.gold;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${oceanColors.gold}20`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = `${oceanColors.surface}30`;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
                 required
               />
             </div>
           </div>
         </div>
 
-        {/* Time Filter (Optional) */}
-        <div>
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Time Filter (Optional)</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Time Filter Section */}
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Clock size={20} style={{ color: oceanColors.gold }} />
+            </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Before Hour (0-23)</label>
+              <h3 style={{ fontSize: '18px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Time Filter</h3>
+              <p style={{ fontSize: '13px', color: oceanColors.textLight, margin: '4px 0 0 0' }}>Optional - Leave empty to correct all records for the selected date</p>
+            </div>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: oceanColors.textDark, marginBottom: '6px' }}>
+                Before Hour (0-23)
+              </label>
               <input
                 type="number"
                 name="beforeHour"
@@ -161,11 +364,29 @@ export default function DataCorrection() {
                 max="23"
                 value={form.beforeHour || ""}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: `1px solid ${oceanColors.light}30`,
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.3s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = oceanColors.gold;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${oceanColors.gold}20`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = `${oceanColors.light}30`;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Before Minute (0-59)</label>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: oceanColors.textDark, marginBottom: '6px' }}>
+                Before Minute (0-59)
+              </label>
               <input
                 type="number"
                 name="beforeMinute"
@@ -173,38 +394,96 @@ export default function DataCorrection() {
                 max="59"
                 value={form.beforeMinute || ""}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: `1px solid ${oceanColors.light}30`,
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.3s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = oceanColors.gold;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${oceanColors.gold}20`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = `${oceanColors.light}30`;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
             </div>
           </div>
-          <p className="text-sm text-gray-500 mt-2">
-            Leave empty to correct all records for the selected date
-          </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-3 pt-4">
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '14px 24px',
+              background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
+              border: 'none',
+              borderRadius: '12px',
+              color: oceanColors.navy,
+              fontWeight: '600',
+              fontSize: '14px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.transform = 'scale(1.02)';
+                e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.2)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)';
+            }}
           >
             {loading ? (
               <>
-                <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                <RefreshCw size={20} style={{ animation: 'spin 1s linear infinite' }} />
                 Processing...
               </>
             ) : (
               <>
-                <Save className="h-5 w-5 mr-2" />
+                <Save size={20} />
                 Run Correction
               </>
             )}
           </button>
+          
           <button
             type="button"
             onClick={handleReset}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            style={{
+              padding: '14px 24px',
+              background: oceanColors.white,
+              border: `1px solid ${oceanColors.wave}30`,
+              borderRadius: '12px',
+              color: oceanColors.textDark,
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = oceanColors.light;
+              e.currentTarget.style.borderColor = oceanColors.surface;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = oceanColors.white;
+              e.currentTarget.style.borderColor = `${oceanColors.wave}30`;
+            }}
           >
             Reset Form
           </button>
@@ -212,30 +491,41 @@ export default function DataCorrection() {
 
         {/* Result Display */}
         {result && (
-          <div className={`p-4 rounded-lg ${
-            result.success 
-              ? "bg-green-50 border border-green-200" 
-              : "bg-red-50 border border-red-200"
-          }`}>
-            <div className="flex items-start">
+          <div style={{
+            padding: '20px',
+            borderRadius: '12px',
+            background: result.success ? `${oceanColors.success}10` : `${oceanColors.danger}10`,
+            border: `1px solid ${result.success ? oceanColors.success : oceanColors.danger}30`
+          }}>
+            <div style={{ display: 'flex', gap: '12px' }}>
               {result.success ? (
-                <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 mr-2" />
+                <CheckCircle size={24} style={{ color: oceanColors.success, flexShrink: 0 }} />
               ) : (
-                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 mr-2" />
+                <AlertCircle size={24} style={{ color: oceanColors.danger, flexShrink: 0 }} />
               )}
-              <div>
-                <p className={`font-medium ${
-                  result.success ? "text-green-800" : "text-red-800"
-                }`}>
+              <div style={{ flex: 1 }}>
+                <p style={{ 
+                  fontWeight: '600', 
+                  fontSize: '16px',
+                  marginBottom: '8px',
+                  color: result.success ? oceanColors.success : oceanColors.danger
+                }}>
                   {result.success ? "Success" : "Error"}
                 </p>
-                <p className={`text-sm mt-1 ${
-                  result.success ? "text-green-700" : "text-red-700"
-                }`}>
+                <p style={{ fontSize: '14px', color: oceanColors.textDark, marginBottom: '12px' }}>
                   {result.message}
                 </p>
                 {result.params && (
-                  <pre className="mt-2 text-xs bg-white p-2 rounded border border-gray-200 overflow-x-auto">
+                  <pre style={{
+                    marginTop: '12px',
+                    padding: '12px',
+                    background: oceanColors.white,
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    overflow: 'auto',
+                    border: `1px solid ${oceanColors.light}20`,
+                    color: oceanColors.textDark
+                  }}>
                     {JSON.stringify(result.params, null, 2)}
                   </pre>
                 )}
@@ -244,6 +534,33 @@ export default function DataCorrection() {
           </div>
         )}
       </form>
+
+      {/* Footer Note */}
+      <div style={{
+        marginTop: '20px',
+        padding: '16px 20px',
+        background: oceanColors.white,
+        borderRadius: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '12px',
+        border: `1px solid ${oceanColors.light}20`,
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+      }}>
+        <Shield size={18} style={{ color: oceanColors.surface }} />
+        <span style={{ color: oceanColors.textLight, fontSize: '13px' }}>
+          This operation updates both Tallies and Clients tables. Please verify before running.
+        </span>
+        <Waves size={18} style={{ color: oceanColors.surface }} />
+      </div>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
