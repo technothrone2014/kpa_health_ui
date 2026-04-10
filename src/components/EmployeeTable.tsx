@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { ChevronLeft, ChevronRight, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, MoreVertical, Edit, Trash2, Eye } from "lucide-react";
 import { Employee } from "../types/Employee";
+import PatientProfile from "./PatientProfile";
 
 interface EmployeeTableProps {
   employees: Employee[];
@@ -25,6 +26,7 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
   const [itemsPerPage] = useState(10);
   const [sortField, setSortField] = useState<keyof Employee>("FullName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [selectedPatient, setSelectedPatient] = useState<Employee | null>(null);
 
   const handleSort = (field: keyof Employee) => {
     if (sortField === field) {
@@ -70,10 +72,12 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
                 style={{ 
                   borderBottom: `1px solid ${oceanColors.secondary}30`,
                   backgroundColor: index % 2 === 0 ? oceanColors.white : '#F9FAFB',
-                  transition: 'background 0.3s'
+                  transition: 'background 0.3s',
+                  cursor: 'pointer'
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = oceanColors.light}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? oceanColors.white : '#F9FAFB'}
+                onClick={() => setSelectedPatient(employee)}
               >
                 <td style={{ padding: '16px', color: oceanColors.textDark, fontSize: '14px' }}>{employee.Id}</td>
                 <td style={{ padding: '16px' }}>
@@ -98,24 +102,34 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
                 </td>
                 <td style={{ padding: '16px', textAlign: 'right' }}>
                   <div style={{ position: 'relative', display: 'inline-block' }}>
-                    <button style={{ 
-                      color: oceanColors.textLight, 
-                      background: 'none', 
-                      border: 'none', 
-                      cursor: 'pointer', 
-                      padding: '8px',
-                      borderRadius: '8px',
-                      transition: 'all 0.3s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = oceanColors.light;
-                      e.currentTarget.style.color = oceanColors.primary;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = oceanColors.textLight;
-                    }}>
-                      <MoreVertical size={18} />
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedPatient(employee);
+                      }}
+                      style={{ 
+                        color: oceanColors.textLight, 
+                        background: 'none', 
+                        border: 'none', 
+                        cursor: 'pointer', 
+                        padding: '8px',
+                        borderRadius: '8px',
+                        transition: 'all 0.3s',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = oceanColors.light;
+                        e.currentTarget.style.color = oceanColors.primary;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = oceanColors.textLight;
+                      }}
+                    >
+                      <Eye size={16} />
+                      <span style={{ fontSize: '12px' }}>View</span>
                     </button>
                   </div>
                 </td>
@@ -178,6 +192,14 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
           </button>
         </div>
       </div>
+
+      {/* Patient Profile Modal */}
+      {selectedPatient && (
+        <PatientProfile 
+          patient={selectedPatient} 
+          onClose={() => setSelectedPatient(null)} 
+        />
+      )}
     </div>
   );
 }
