@@ -16,6 +16,7 @@ import AnchorIcon from '@mui/icons-material/Anchor';
 import WavesIcon from '@mui/icons-material/Waves';
 import CompassCalibrationIcon from '@mui/icons-material/CompassCalibration';
 import { useState } from "react";
+import AdvancedAnalytics from './components/AdvancedAnalytics';
 
 const queryClient = new QueryClient();
 
@@ -351,6 +352,7 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/employees" element={<Employees />} />
               <Route path="/data-correction" element={<DataCorrection />} />
+              <Route path="/analytics" element={<AdvancedAnalytics />} />
             </Routes>
           </Box>
         </Box>
