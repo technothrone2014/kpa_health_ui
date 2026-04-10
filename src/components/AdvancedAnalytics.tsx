@@ -149,7 +149,7 @@ export default function AdvancedAnalytics() {
               alignItems: 'center',
               gap: '8px',
               padding: '8px 16px',
-              background: oceanColors.light,
+              background: oceanColors.mid,
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer'
