@@ -9,6 +9,7 @@ import {
 import { format } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
 import * as XLSX from 'xlsx';
+import api from '../api/client'; // Import the API client
 
 // Oceanic Theme Colors
 const oceanColors = {
@@ -64,23 +65,28 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
   const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'history'>('overview');
   const [isExporting, setIsExporting] = useState(false);
 
-  // Fetch patient's tallies/visits
-  const { data: visits, isLoading: visitsLoading } = useQuery({
+  // Fetch patient's tallies/visits - Using API client
+  const { data: visits, isLoading: visitsLoading, error: visitsError } = useQuery({
     queryKey: ['patient-visits', patient.Id],
     queryFn: async () => {
-      const response = await fetch(`/api/v1/patients/${patient.Id}/visits`);
-      return response.json();
+      const response = await api.get(`/patients/${patient.Id}/visits`);
+      return response.data;
     },
   });
 
-  // Fetch patient's health trends
-  const { data: trends, isLoading: trendsLoading } = useQuery({
+  // Fetch patient's health trends - Using API client
+  const { data: trends, isLoading: trendsLoading, error: trendsError } = useQuery({
     queryKey: ['patient-trends', patient.Id],
     queryFn: async () => {
-      const response = await fetch(`/api/v1/patients/${patient.Id}/trends`);
-      return response.json();
+      const response = await api.get(`/patients/${patient.Id}/trends`);
+      return response.data;
     },
   });
+
+  // Show error if API fails
+  if (visitsError || trendsError) {
+    console.error('API Errors:', { visitsError, trendsError });
+  }
 
   if (visitsLoading || trendsLoading) {
     return (
@@ -106,9 +112,9 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
   // Calculate health metrics
   const totalVisits = visits?.length || 0;
   const abnormalReadings = {
-    bp: visits?.filter((v: any) => v.bpStatus !== 'NORMAL').length || 0,
-    bmi: visits?.filter((v: any) => v.bmiStatus !== 'NORMAL').length || 0,
-    rbs: visits?.filter((v: any) => v.rbsStatus !== 'NORMAL').length || 0,
+    bp: visits?.filter((v: any) => v.bpstatus !== 'NORMAL').length || 0,
+    bmi: visits?.filter((v: any) => v.bmistatus !== 'NORMAL').length || 0,
+    rbs: visits?.filter((v: any) => v.rbsstatus !== 'NORMAL').length || 0,
   };
   
   const abnormalPercentage = {
@@ -127,8 +133,8 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     date: format(new Date(visit.date), 'MMM dd'),
     systolic: visit.systolic,
     diastolic: visit.diastolic,
-    bmi: visit.bmiValue,
-    rbs: visit.rbsValue,
+    bmi: visit.bmivalue,
+    rbs: visit.rbsvalue,
   })).reverse() || [];
 
   // Export function
@@ -139,16 +145,16 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
         'Date': format(new Date(visit.date), 'PPP'),
         'Systolic BP': visit.systolic,
         'Diastolic BP': visit.diastolic,
-        'BP Status': visit.bpStatus,
-        'BMI Value': visit.bmiValue,
-        'BMI Status': visit.bmiStatus,
-        'RBS Value': visit.rbsValue,
-        'RBS Status': visit.rbsStatus,
+        'BP Status': visit.bpstatus,
+        'BMI Value': visit.bmivalue,
+        'BMI Status': visit.bmistatus,
+        'RBS Value': visit.rbsvalue,
+        'RBS Status': visit.rbsstatus,
         'Weight (kg)': visit.weight,
         'Height (cm)': visit.height,
         'Waist (cm)': visit.waist,
         'Hip (cm)': visit.hip,
-        'Waist-Hip Ratio': visit.whRatio,
+        'Waist-Hip Ratio': visit.whratio,
       })) || [];
 
       const ws = XLSX.utils.json_to_sheet(exportData);
@@ -178,6 +184,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
   const bmiStatus = getStatusInfo(abnormalPercentage.bmi, abnormalReadings.bmi > 0);
   const rbsStatus = getStatusInfo(abnormalPercentage.rbs, abnormalReadings.rbs > 0);
 
+  // Rest of your component remains the same...
   return (
     <div style={{
       position: 'fixed',
@@ -273,7 +280,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: `1px solid ${oceanColors.surface}20`, background: '#f8fafc' }}>
+        <div style={{ display: 'flex', borderBottom: `1px solid ${oceanColors.mid}20`, background: '#f8fafc' }}>
           {['overview', 'trends', 'history'].map((tab) => (
             <button
               key={tab}
@@ -321,7 +328,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
           </button>
         </div>
 
-        {/* Content Area */}
+        {/* Content Area - Keep the rest of your existing JSX here */}
         <div style={{ padding: '24px 32px', overflow: 'auto', flex: 1 }}>
           
           {activeTab === 'overview' && (
@@ -488,7 +495,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                     </thead>
                     <tbody>
                       {visits?.slice(0, 5).map((visit: any, idx: number) => (
-                        <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.surface}20` }}>
+                        <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.mid}20` }}>
                           <td style={{ padding: '12px' }}>{format(new Date(visit.date), 'MMM dd, yyyy')}</td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>{visit.systolic}/{visit.diastolic}</td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
@@ -497,38 +504,38 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                               borderRadius: '20px',
                               fontSize: '11px',
                               fontWeight: 'bold',
-                              background: visit.bpStatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
-                              color: visit.bpStatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
+                              background: visit.bpstatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
+                              color: visit.bpstatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
                             }}>
-                              {visit.bpStatus}
+                              {visit.bpstatus}
                             </span>
                           </td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>{visit.bmiValue}</td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>{visit.bmivalue}</td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
                             <span style={{
                               padding: '4px 8px',
                               borderRadius: '20px',
                               fontSize: '11px',
                               fontWeight: 'bold',
-                              background: visit.bmiStatus === 'NORMAL' ? `${oceanColors.success}20` : 
-                                       visit.bmiStatus === 'OVERWEIGHT' ? `${oceanColors.warning}20` : `${oceanColors.danger}20`,
-                              color: visit.bmiStatus === 'NORMAL' ? oceanColors.success : 
-                                     visit.bmiStatus === 'OVERWEIGHT' ? oceanColors.warning : oceanColors.danger
+                              background: visit.bmistatus === 'NORMAL' ? `${oceanColors.success}20` : 
+                                       visit.bmistatus === 'OVERWEIGHT' ? `${oceanColors.warning}20` : `${oceanColors.danger}20`,
+                              color: visit.bmistatus === 'NORMAL' ? oceanColors.success : 
+                                     visit.bmistatus === 'OVERWEIGHT' ? oceanColors.warning : oceanColors.danger
                             }}>
-                              {visit.bmiStatus}
+                              {visit.bmistatus}
                             </span>
                           </td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>{visit.rbsValue}</td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>{visit.rbsvalue}</td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
                             <span style={{
                               padding: '4px 8px',
                               borderRadius: '20px',
                               fontSize: '11px',
                               fontWeight: 'bold',
-                              background: visit.rbsStatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
-                              color: visit.rbsStatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
+                              background: visit.rbsstatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
+                              color: visit.rbsstatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
                             }}>
-                              {visit.rbsStatus}
+                              {visit.rbsstatus}
                             </span>
                           </td>
                         </tr>
@@ -625,7 +632,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                 </thead>
                 <tbody>
                   {visits?.map((visit: any, idx: number) => (
-                    <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.surface}20` }}>
+                    <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.mid}20` }}>
                       <td style={{ padding: '12px' }}>{format(new Date(visit.date), 'PPP')}</td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>{visit.systolic}/{visit.diastolic}</td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
@@ -633,39 +640,39 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                           padding: '4px 8px',
                           borderRadius: '20px',
                           fontSize: '11px',
-                          background: visit.bpStatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
-                          color: visit.bpStatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
+                          background: visit.bpstatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
+                          color: visit.bpstatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
                         }}>
-                          {visit.bpStatus}
+                          {visit.bpstatus}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.bmiValue}</td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.bmivalue}</td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
                         <span style={{
                           padding: '4px 8px',
                           borderRadius: '20px',
                           fontSize: '11px',
-                          background: visit.bmiStatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
-                          color: visit.bmiStatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
+                          background: visit.bmistatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
+                          color: visit.bmistatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
                         }}>
-                          {visit.bmiStatus}
+                          {visit.bmistatus}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.rbsValue}</td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.rbsvalue}</td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
                         <span style={{
                           padding: '4px 8px',
                           borderRadius: '20px',
                           fontSize: '11px',
-                          background: visit.rbsStatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
-                          color: visit.rbsStatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
+                          background: visit.rbsstatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
+                          color: visit.rbsstatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
                         }}>
-                          {visit.rbsStatus}
+                          {visit.rbsstatus}
                         </span>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>{visit.weight} kg</td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>{visit.height} cm</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.whRatio}</td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.whratio}</td>
                     </tr>
                   ))}
                 </tbody>
