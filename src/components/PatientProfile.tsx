@@ -67,6 +67,7 @@ const getStatusColor = (status: string, type: 'bp' | 'bmi' | 'rbs') => {
 export default function PatientProfile({ patient, onClose }: PatientProfileProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'history'>('overview');
   const [isExporting, setIsExporting] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
 
   // Fetch patient's tallies/visits
   const { data: visits, isLoading: visitsLoading, error: visitsError } = useQuery({
@@ -215,8 +216,6 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
       setIsExporting(false);
     }
   };
-
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
 
   return (
     <div style={{
