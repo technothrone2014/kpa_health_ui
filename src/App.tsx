@@ -15,8 +15,12 @@ import DataUsageIcon from '@mui/icons-material/DataUsage';
 import AnchorIcon from '@mui/icons-material/Anchor';
 import WavesIcon from '@mui/icons-material/Waves';
 import CompassCalibrationIcon from '@mui/icons-material/CompassCalibration';
-import { useState } from "react";
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import { useState, useEffect } from "react";
 import AdvancedAnalytics from './components/AdvancedAnalytics';
+import AIAssistant from './components/AIAssistant';
+import aiService from './api/aiService';
 
 const queryClient = new QueryClient();
 
@@ -38,6 +42,21 @@ function App() {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activePath, setActivePath] = useState("/");
+  const [showGlobalAI, setShowGlobalAI] = useState(false);
+  const [aiStatus, setAiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
+
+  // Check AI service health on mount
+  useEffect(() => {
+    const checkAIHealth = async () => {
+      try {
+        const health = await aiService.checkHealth();
+        setAiStatus(health.status === 'ok' ? 'online' : 'offline');
+      } catch (error) {
+        setAiStatus('offline');
+      }
+    };
+    checkAIHealth();
+  }, []);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -47,6 +66,7 @@ function App() {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/', nauticalIcon: '🧭' },
     { text: 'Clients', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨‍✈️' },
     { text: 'Data Correction', icon: <DataUsageIcon />, path: '/data-correction', nauticalIcon: '⚓' },
+    { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics', nauticalIcon: '📊' },
   ];
 
   const drawer = (
@@ -175,21 +195,6 @@ function App() {
                 overflow: 'hidden'
               }}
             >
-              {/* Hover Wave Effect */}
-              <Box sx={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 2,
-                background: `linear-gradient(90deg, transparent, ${oceanTheme.gold}, transparent)`,
-                transform: 'scaleX(0)',
-                transition: 'transform 0.3s ease',
-                '&:hover': {
-                  transform: 'scaleX(1)',
-                }
-              }} />
-              
               <ListItemIcon sx={{ 
                 color: activePath === item.path ? oceanTheme.navy : oceanTheme.foam,
                 transition: 'all 0.3s ease'
@@ -233,6 +238,60 @@ function App() {
             </ListItemButton>
           </ListItem>
         ))}
+        
+        {/* AI Assistant Menu Item */}
+        <ListItem disablePadding sx={{ mb: 1, mt: 2 }}>
+          <ListItemButton 
+            onClick={() => setShowGlobalAI(!showGlobalAI)}
+            sx={{
+              borderRadius: '12px',
+              py: 1.5,
+              px: 2,
+              transition: 'all 0.3s ease',
+              background: showGlobalAI 
+                ? `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`
+                : 'transparent',
+              '&:hover': {
+                background: `linear-gradient(135deg, ${oceanTheme.gold}40, #FFA50040)`,
+                transform: 'translateX(8px)',
+              },
+            }}
+          >
+            <ListItemIcon sx={{ 
+              color: showGlobalAI ? oceanTheme.navy : oceanTheme.foam,
+            }}>
+              <SmartToyIcon />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Unesi AI Assistant" 
+              sx={{ 
+                '& .MuiTypography-root': { 
+                  color: showGlobalAI ? oceanTheme.navy : oceanTheme.white,
+                  fontWeight: showGlobalAI ? 'bold' : 'normal',
+                } 
+              }} 
+            />
+            {aiStatus === 'online' && (
+              <Box sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: oceanTheme.surface,
+                ml: 1,
+                animation: 'pulse 2s infinite'
+              }} />
+            )}
+            {aiStatus === 'offline' && (
+              <Box sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: oceanTheme.deep,
+                ml: 1
+              }} />
+            )}
+          </ListItemButton>
+        </ListItem>
       </List>
 
       {/* Decorative Compass Rose */}
@@ -343,7 +402,24 @@ function App() {
                 <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontSize: '0.9rem', fontWeight: 'bold' }}>
                   KPA Health Week
                 </Typography>
-                <WavesIcon sx={{ color: oceanTheme.foam, fontSize: 20 }} />
+                <button
+                  onClick={() => setShowGlobalAI(!showGlobalAI)}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'white'
+                  }}
+                >
+                  <SmartToyIcon sx={{ fontSize: 18 }} />
+                </button>
+                <WavesIcon sx={{ color: oceanTheme.foam, fontSize: 20, ml: 1 }} />
               </Toolbar>
             </AppBar>
 
@@ -356,6 +432,11 @@ function App() {
             </Routes>
           </Box>
         </Box>
+
+        {/* Global AI Assistant - appears when toggled */}
+        {showGlobalAI && (
+          <AIAssistant onClose={() => setShowGlobalAI(false)} />
+        )}
       </BrowserRouter>
     </QueryClientProvider>
   );

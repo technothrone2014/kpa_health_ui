@@ -4,12 +4,14 @@ import {
   X, Activity, Heart, Scale, Droplets, AlertTriangle, CheckCircle, 
   Calendar, TrendingUp, TrendingDown, FileText, Download, Eye,
   User, Phone, MapPin, Briefcase, Anchor, Clock, Shield,
-  ArrowUp, ArrowDown, Minus, Bell, HeartPulse, Thermometer, Syringe
+  ArrowUp, ArrowDown, Minus, Bell, HeartPulse, Thermometer, Syringe,
+  Bot
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
 import * as XLSX from 'xlsx';
 import api from '../api/client';
+import AIAssistant from './AIAssistant';
 
 // Oceanic Theme Colors
 const oceanColors = {
@@ -214,6 +216,8 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     }
   };
 
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+
   return (
     <div style={{
       position: 'fixed',
@@ -355,6 +359,25 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
             <Download size={16} />
             Export History
           </button>
+          <button
+            onClick={() => setShowAIAssistant(true)}
+            style={{
+              margin: '8px 8px',
+              padding: '8px 16px',
+              background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+              color: 'white',
+              border: `1px solid ${oceanColors.gold}`,
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            <Bot size={16} />
+            Ask Unesi AI
+          </button>
+
         </div>
 
         {/* Content Area */}
@@ -718,6 +741,14 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
               </table>
             </div>
           )}
+
+          {showAIAssistant && (
+            <AIAssistant 
+              patientData={patient} 
+              onClose={() => setShowAIAssistant(false)} 
+            />
+          )}
+
         </div>
       </div>
     </div>
