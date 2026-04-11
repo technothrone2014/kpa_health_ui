@@ -9,7 +9,7 @@ import {
 import { format } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
 import * as XLSX from 'xlsx';
-import api from '../api/client'; // Import the API client
+import api from '../api/client';
 
 // Oceanic Theme Colors
 const oceanColors = {
@@ -44,28 +44,11 @@ interface PatientProfileProps {
   onClose: () => void;
 }
 
-interface HealthReading {
-  id: number;
-  date: string;
-  systolic: number;
-  diastolic: number;
-  bpStatus: string;
-  bmiValue: number;
-  bmiStatus: string;
-  rbsValue: number;
-  rbsStatus: string;
-  weight: number;
-  height: number;
-  waist: number;
-  hip: number;
-  whRatio: number;
-}
-
 export default function PatientProfile({ patient, onClose }: PatientProfileProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'history'>('overview');
   const [isExporting, setIsExporting] = useState(false);
 
-  // Fetch patient's tallies/visits - Using API client
+  // Fetch patient's tallies/visits
   const { data: visits, isLoading: visitsLoading, error: visitsError } = useQuery({
     queryKey: ['patient-visits', patient.Id],
     queryFn: async () => {
@@ -74,7 +57,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     },
   });
 
-  // Fetch patient's health trends - Using API client
+  // Fetch patient's health trends
   const { data: trends, isLoading: trendsLoading, error: trendsError } = useQuery({
     queryKey: ['patient-trends', patient.Id],
     queryFn: async () => {
@@ -83,7 +66,6 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     },
   });
 
-  // Show error if API fails
   if (visitsError || trendsError) {
     console.error('API Errors:', { visitsError, trendsError });
   }
@@ -111,22 +93,71 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
 
   // Calculate health metrics
   const totalVisits = visits?.length || 0;
+  
+  // For BP and RBS: "NORMAL" is good, anything else is abnormal
   const abnormalReadings = {
     bp: visits?.filter((v: any) => v.bpstatus !== 'NORMAL').length || 0,
-    bmi: visits?.filter((v: any) => v.bmistatus !== 'NORMAL').length || 0,
     rbs: visits?.filter((v: any) => v.rbsstatus !== 'NORMAL').length || 0,
   };
   
+  // For BMI: "NORMAL" is good, "OVERWEIGHT" and "OBESE" are concerns
+  const bmiAbnormal = visits?.filter((v: any) => v.bmistatus === 'OVERWEIGHT' || v.bmistatus === 'OBESE').length || 0;
+  const bmiNormal = visits?.filter((v: any) => v.bmistatus === 'NORMAL').length || 0;
+  const bmiUnderweight = visits?.filter((v: any) => v.bmistatus === 'UNDERWEIGHT').length || 0;
+  
   const abnormalPercentage = {
     bp: totalVisits > 0 ? ((abnormalReadings.bp / totalVisits) * 100).toFixed(1) : '0',
-    bmi: totalVisits > 0 ? ((abnormalReadings.bmi / totalVisits) * 100).toFixed(1) : '0',
+    bmi: totalVisits > 0 ? ((bmiAbnormal / totalVisits) * 100).toFixed(1) : '0',
     rbs: totalVisits > 0 ? ((abnormalReadings.rbs / totalVisits) * 100).toFixed(1) : '0',
   };
 
+  // For health status cards - different logic for each metric
+  const getBPStatusInfo = (percentage: string) => {
+    const percent = parseInt(percentage);
+    if (percent === 0) {
+      return { color: oceanColors.success, icon: CheckCircle, text: 'Excellent' };
+    } else if (percent < 30) {
+      return { color: oceanColors.warning, icon: AlertTriangle, text: 'Monitor' };
+    } else {
+      return { color: oceanColors.danger, icon: AlertTriangle, text: 'Critical' };
+    }
+  };
+
+  const getBMIStatusInfo = () => {
+    if (bmiNormal === totalVisits && totalVisits > 0) {
+      return { color: oceanColors.success, icon: CheckCircle, text: 'Excellent - All Normal' };
+    } else if (bmiNormal > 0 && bmiAbnormal === 0 && bmiUnderweight === 0) {
+      return { color: oceanColors.success, icon: CheckCircle, text: 'All Normal' };
+    } else if (bmiAbnormal > 0 || bmiUnderweight > 0) {
+      const percent = parseInt(abnormalPercentage.bmi);
+      if (percent < 30) {
+        return { color: oceanColors.warning, icon: AlertTriangle, text: 'Monitor - Some Concerns' };
+      } else {
+        return { color: oceanColors.danger, icon: AlertTriangle, text: 'Critical - High Risk' };
+      }
+    }
+    return { color: oceanColors.info, icon: CheckCircle, text: 'No Data' };
+  };
+
+  const getRBSStatusInfo = (percentage: string) => {
+    const percent = parseInt(percentage);
+    if (percent === 0) {
+      return { color: oceanColors.success, icon: CheckCircle, text: 'Excellent' };
+    } else if (percent < 30) {
+      return { color: oceanColors.warning, icon: AlertTriangle, text: 'Monitor' };
+    } else {
+      return { color: oceanColors.danger, icon: AlertTriangle, text: 'Critical' };
+    }
+  };
+
+  const bpStatus = getBPStatusInfo(abnormalPercentage.bp);
+  const bmiStatus = getBMIStatusInfo();
+  const rbsStatus = getRBSStatusInfo(abnormalPercentage.rbs);
+
   const hasCriticalAlerts = 
-    parseInt(abnormalPercentage.bp) > 50 || 
-    parseInt(abnormalPercentage.bmi) > 50 || 
-    parseInt(abnormalPercentage.rbs) > 50;
+    bpStatus.text === 'Critical' || 
+    bmiStatus.text === 'Critical - High Risk' || 
+    rbsStatus.text === 'Critical';
 
   // Prepare chart data
   const chartData = visits?.map((visit: any) => ({
@@ -168,23 +199,6 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     }
   };
 
-  // Get status color and icon
-  const getStatusInfo = (percentage: string, isAbnormal: boolean) => {
-    const percent = parseInt(percentage);
-    if (percent === 0) {
-      return { color: oceanColors.success, icon: CheckCircle, text: 'Excellent' };
-    } else if (percent < 30) {
-      return { color: oceanColors.warning, icon: AlertTriangle, text: 'Monitor' };
-    } else {
-      return { color: oceanColors.danger, icon: AlertTriangle, text: 'Critical' };
-    }
-  };
-
-  const bpStatus = getStatusInfo(abnormalPercentage.bp, abnormalReadings.bp > 0);
-  const bmiStatus = getStatusInfo(abnormalPercentage.bmi, abnormalReadings.bmi > 0);
-  const rbsStatus = getStatusInfo(abnormalPercentage.rbs, abnormalReadings.rbs > 0);
-
-  // Rest of your component remains the same...
   return (
     <div style={{
       position: 'fixed',
@@ -328,7 +342,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
           </button>
         </div>
 
-        {/* Content Area - Keep the rest of your existing JSX here */}
+        {/* Content Area */}
         <div style={{ padding: '24px 32px', overflow: 'auto', flex: 1 }}>
           
           {activeTab === 'overview' && (
@@ -349,10 +363,10 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                   <div>
                     <strong style={{ color: oceanColors.danger }}>Critical Health Alert!</strong>
                     <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: oceanColors.textDark }}>
-                      This patient has {abnormalReadings.bp > 0 ? `${abnormalReadings.bp} abnormal BP readings (${abnormalPercentage.bp}%), ` : ''}
-                      {abnormalReadings.bmi > 0 ? `${abnormalReadings.bmi} abnormal BMI readings (${abnormalPercentage.bmi}%), ` : ''}
-                      {abnormalReadings.rbs > 0 ? `${abnormalReadings.rbs} abnormal RBS readings (${abnormalPercentage.rbs}%)` : ''}
-                      requiring immediate attention.
+                      {abnormalReadings.bp > 0 && `${abnormalReadings.bp} abnormal BP readings (${abnormalPercentage.bp}%) `}
+                      {bmiAbnormal > 0 && `${bmiAbnormal} concerning BMI readings (${abnormalPercentage.bmi}%) `}
+                      {abnormalReadings.rbs > 0 && `${abnormalReadings.rbs} abnormal RBS readings (${abnormalPercentage.rbs}%)`}
+                      requiring medical attention.
                     </p>
                   </div>
                 </div>
@@ -387,17 +401,17 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                 </div>
 
                 <div style={{
-                  background: `linear-gradient(135deg, ${oceanColors.warning}30, ${oceanColors.warning}10)`,
+                  background: `linear-gradient(135deg, ${bmiAbnormal > 0 ? oceanColors.warning : oceanColors.success}30, ${bmiAbnormal > 0 ? oceanColors.warning : oceanColors.success}10)`,
                   padding: '20px',
                   borderRadius: '16px',
-                  border: `1px solid ${oceanColors.warning}30`
+                  border: `1px solid ${bmiAbnormal > 0 ? oceanColors.warning : oceanColors.success}30`
                 }}>
-                  <Scale size={24} style={{ color: oceanColors.warning, marginBottom: '8px' }} />
+                  <Scale size={24} style={{ color: bmiAbnormal > 0 ? oceanColors.warning : oceanColors.success, marginBottom: '8px' }} />
                   <p style={{ fontSize: '28px', fontWeight: 'bold', color: oceanColors.textDark, margin: 0 }}>
-                    {abnormalReadings.bmi}
+                    {bmiAbnormal}
                   </p>
                   <p style={{ fontSize: '12px', color: oceanColors.textLight, margin: 0 }}>
-                    Abnormal BMI ({abnormalPercentage.bmi}%)
+                    Concerning BMI ({abnormalPercentage.bmi}%)
                   </p>
                 </div>
 
@@ -417,7 +431,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                 </div>
               </div>
 
-              {/* Health Status Cards */}
+              {/* Health Status Cards - Updated with correct BMI logic */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
                 <div style={{
                   padding: '20px',
@@ -450,7 +464,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                   </div>
                   <h4 style={{ margin: '0 0 4px 0', color: oceanColors.textDark }}>BMI</h4>
                   <p style={{ fontSize: '24px', fontWeight: 'bold', color: bmiStatus.color, margin: 0 }}>
-                    {abnormalReadings.bmi}/{totalVisits}
+                    {bmiNormal} Normal / {bmiAbnormal} Concern
                   </p>
                   <p style={{ fontSize: '12px', color: oceanColors.textLight, margin: '4px 0 0 0' }}>
                     Status: <span style={{ color: bmiStatus.color, fontWeight: 'bold' }}>{bmiStatus.text}</span>
@@ -477,7 +491,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                 </div>
               </div>
 
-              {/* Latest Readings */}
+              {/* Latest Readings - Rest of the component remains the same */}
               <div>
                 <h3 style={{ marginBottom: '16px', color: oceanColors.textDark }}>Latest Health Readings</h3>
                 <div style={{ overflow: 'auto' }}>
@@ -547,6 +561,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
             </div>
           )}
 
+          {/* Trends and History tabs remain the same as before */}
           {activeTab === 'trends' && (
             <div>
               {/* BP Trend Chart */}
