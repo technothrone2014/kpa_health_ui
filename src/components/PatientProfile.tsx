@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   X, Activity, Heart, Scale, Droplets, AlertTriangle, CheckCircle, 
   Calendar, TrendingUp, TrendingDown, FileText, Download, Eye,
   User, Phone, MapPin, Briefcase, Anchor, Clock, Shield,
   ArrowUp, ArrowDown, Minus, Bell, HeartPulse, Thermometer, Syringe,
-  Bot
+  Bot, Sparkles, Brain, Lightbulb, Loader2, Stethoscope, ClipboardList
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
 import * as XLSX from 'xlsx';
 import api from '../api/client';
-import AIAssistant from './AIAssistant';
+import aiService from '../api/aiService';
 
 // Oceanic Theme Colors
 const oceanColors = {
@@ -55,7 +55,6 @@ const getStatusColor = (status: string, type: 'bp' | 'bmi' | 'rbs') => {
     if (status === 'UNDERWEIGHT') return { bg: `${oceanColors.info}20`, color: oceanColors.info, text: 'Underweight' };
     return { bg: `${oceanColors.textLight}20`, color: oceanColors.textLight, text: status };
   } else {
-    // For BP and RBS
     if (status === 'NORMAL') return { bg: `${oceanColors.success}20`, color: oceanColors.success, text: 'Normal' };
     if (status === 'PRE-HYPERTENSION') return { bg: `${oceanColors.warning}20`, color: oceanColors.warning, text: 'Pre-Hypertension' };
     if (status.includes('HYPERTENSION')) return { bg: `${oceanColors.danger}20`, color: oceanColors.danger, text: status };
@@ -65,12 +64,15 @@ const getStatusColor = (status: string, type: 'bp' | 'bmi' | 'rbs') => {
 };
 
 export default function PatientProfile({ patient, onClose }: PatientProfileProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'history'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'history' | 'insights'>('overview');
   const [isExporting, setIsExporting] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [aiInsights, setAiInsights] = useState<string | null>(null);
+  const [isLoadingInsights, setIsLoadingInsights] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
 
   // Fetch patient's tallies/visits
-  const { data: visits, isLoading: visitsLoading, error: visitsError } = useQuery({
+  const { data: visits, isLoading: visitsLoading, error: visitsError, refetch: refetchVisits } = useQuery({
     queryKey: ['patient-visits', patient.Id],
     queryFn: async () => {
       const response = await api.get(`/patients/${patient.Id}/visits`);
@@ -86,6 +88,99 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
       return response.data;
     },
   });
+
+  // Generate AI Insights when insights tab is opened
+  const generateInsights = async () => {
+    if (!visits || visits.length === 0) {
+      setInsightsError("No health data available for analysis");
+      return;
+    }
+
+    setIsLoadingInsights(true);
+    setInsightsError(null);
+    setAiInsights(null);
+
+    try {
+      // Prepare patient data summary for AI
+      const patientSummary = {
+        name: patient.FullName,
+        id: patient.IDNumber,
+        category: patient.CategoryTitle,
+        station: patient.StationTitle,
+        totalVisits: visits.length,
+        bloodPressureReadings: visits.map((v: any) => ({
+          date: v.date,
+          systolic: v.systolic,
+          diastolic: v.diastolic,
+          status: v.bpstatus
+        })),
+        bmiReadings: visits.map((v: any) => ({
+          date: v.date,
+          value: v.bmivalue,
+          status: v.bmistatus
+        })),
+        rbsReadings: visits.map((v: any) => ({
+          date: v.date,
+          value: v.rbsvalue,
+          status: v.rbsstatus
+        })),
+        metrics: {
+          abnormalBP: visits.filter((v: any) => v.bpstatus !== 'NORMAL').length,
+          abnormalBMI: visits.filter((v: any) => v.bmistatus === 'OVERWEIGHT' || v.bmistatus === 'OBESE').length,
+          abnormalRBS: visits.filter((v: any) => v.rbsstatus !== 'NORMAL').length,
+        }
+      };
+
+      const systemPrompt = `You are Unesi, a compassionate and knowledgeable medical AI assistant for Kenya Ports Authority's EAP Health Week. 
+You are analyzing patient health data to provide Sister's Insights - a professional medical summary for nurses and clinical officers.
+
+Patient: ${patientSummary.name} (ID: ${patientSummary.id})
+Category: ${patientSummary.category}
+Station: ${patientSummary.station}
+Total Visits: ${patientSummary.totalVisits}
+
+Health Metrics Summary:
+- Abnormal Blood Pressure Readings: ${patientSummary.metrics.abnormalBP} out of ${patientSummary.totalVisits}
+- Concerning BMI Readings (Overweight/Obese): ${patientSummary.metrics.abnormalBMI} out of ${patientSummary.totalVisits}
+- Abnormal Random Blood Sugar Readings: ${patientSummary.metrics.abnormalRBS} out of ${patientSummary.totalVisits}
+
+Recent Blood Pressure Data: ${JSON.stringify(patientSummary.bloodPressureReadings.slice(-3))}
+Recent BMI Data: ${JSON.stringify(patientSummary.bmiReadings.slice(-3))}
+Recent RBS Data: ${JSON.stringify(patientSummary.rbsReadings.slice(-3))}
+
+Provide a professional "Sister's Insights" report that includes:
+1. Overall Health Assessment - Brief summary of the patient's health status
+2. Key Findings - Notable patterns or concerns in the data
+3. Trends Over Time - Any significant changes or consistent patterns
+4. Recommendations - Actionable follow-up steps for the medical team
+5. Risk Factors - Identify any elevated risk areas
+
+Keep the tone professional yet compassionate. Use clear medical terminology but explain when needed.`;
+
+      const response = await aiService.chat({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Please provide Sister's Insights for patient ${patient.FullName} based on their health records.` }
+        ],
+        temperature: 0.3,
+        max_tokens: 2048,
+      });
+
+      setAiInsights(response.content);
+    } catch (error) {
+      console.error('Failed to generate insights:', error);
+      setInsightsError('Unable to generate AI insights at this time. Please try again later.');
+    } finally {
+      setIsLoadingInsights(false);
+    }
+  };
+
+  // Generate insights when insights tab is activated
+  useEffect(() => {
+    if (activeTab === 'insights' && visits && !aiInsights && !isLoadingInsights && !insightsError) {
+      generateInsights();
+    }
+  }, [activeTab, visits]);
 
   if (visitsError || trendsError) {
     console.error('API Errors:', { visitsError, trendsError });
@@ -210,6 +305,20 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, `${patient.FullName}_Health_History`);
       XLSX.writeFile(wb, `${patient.FullName}_${patient.IDNumber}_Health_History.xlsx`);
+      
+      // Also export insights if available
+      if (aiInsights) {
+        const insightsData = [{
+          'Patient Name': patient.FullName,
+          'Patient ID': patient.IDNumber,
+          'Generated Date': format(new Date(), 'PPP'),
+          'Sister\'s Insights': aiInsights
+        }];
+        const wsInsights = XLSX.utils.json_to_sheet(insightsData);
+        XLSX.utils.book_append_sheet(wb, wsInsights, 'AI_Insights');
+      }
+      
+      XLSX.writeFile(wb, `${patient.FullName}_${patient.IDNumber}_Complete_Health_Report.xlsx`);
     } catch (error) {
       console.error('Export failed:', error);
     } finally {
@@ -274,46 +383,88 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
             <X size={20} />
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
-            <div style={{
-              width: '80px',
-              height: '80px',
-              background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '36px'
-            }}>
-              👨‍⚕️
-            </div>
-            <div>
-              <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', margin: 0 }}>{patient.FullName}</h2>
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
-                <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
-                  <User size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                  ID: {patient.IDNumber}
-                </span>
-                <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
-                  <Phone size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                  {patient.PhoneNumber || 'N/A'}
-                </span>
-                <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
-                  <Briefcase size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                  {patient.CategoryTitle}
-                </span>
-                <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
-                  <Anchor size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                  {patient.StationTitle}
-                </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+              <div style={{
+                width: '80px',
+                height: '80px',
+                background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '36px'
+              }}>
+                👨‍⚕️
               </div>
+              <div>
+                <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', margin: 0 }}>{patient.FullName}</h2>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
+                    <User size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                    ID: {patient.IDNumber}
+                  </span>
+                  <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
+                    <Phone size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                    {patient.PhoneNumber || 'N/A'}
+                  </span>
+                  <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
+                    <Briefcase size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                    {patient.CategoryTitle}
+                  </span>
+                  <span style={{ color: oceanColors.foam, fontSize: '14px' }}>
+                    <Anchor size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                    {patient.StationTitle}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setShowAIAssistant(true)}
+                style={{
+                  padding: '8px 16px',
+                  background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: oceanColors.navy,
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Bot size={16} />
+                Ask Unesi AI
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={isExporting}
+                style={{
+                  padding: '8px 16px',
+                  background: oceanColors.success,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: isExporting ? 'not-allowed' : 'pointer',
+                  opacity: isExporting ? 0.6 : 1
+                }}
+              >
+                <Download size={16} />
+                Export Report
+              </button>
             </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: `1px solid ${oceanColors.mid}20`, background: '#f8fafc' }}>
-          {['overview', 'trends', 'history'].map((tab) => (
+        <div style={{ display: 'flex', borderBottom: `1px solid ${oceanColors.mid}20`, background: '#f8fafc', overflowX: 'auto' }}>
+          {['overview', 'trends', 'history', 'insights'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
@@ -328,55 +479,19 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                 transition: 'all 0.3s',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
+                whiteSpace: 'nowrap'
               }}
             >
               {tab === 'overview' && <Eye size={18} />}
               {tab === 'trends' && <TrendingUp size={18} />}
               {tab === 'history' && <FileText size={18} />}
-              <span style={{ textTransform: 'capitalize' }}>{tab}</span>
+              {tab === 'insights' && <Brain size={18} />}
+              <span style={{ textTransform: 'capitalize' }}>
+                {tab === 'insights' ? "Sister's Insights" : tab}
+              </span>
             </button>
           ))}
-          <div style={{ flex: 1 }} />
-          <button
-            onClick={handleExport}
-            disabled={isExporting}
-            style={{
-              margin: '8px 16px',
-              padding: '8px 16px',
-              background: oceanColors.success,
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              cursor: isExporting ? 'not-allowed' : 'pointer',
-              opacity: isExporting ? 0.6 : 1
-            }}
-          >
-            <Download size={16} />
-            Export History
-          </button>
-          <button
-            onClick={() => setShowAIAssistant(true)}
-            style={{
-              margin: '8px 8px',
-              padding: '8px 16px',
-              background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
-              color: 'white',
-              border: `1px solid ${oceanColors.gold}`,
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              cursor: 'pointer'
-            }}
-          >
-            <Bot size={16} />
-            Ask Unesi AI
-          </button>
-
         </div>
 
         {/* Content Area */}
@@ -528,7 +643,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                 </div>
               </div>
 
-              {/* Latest Readings - FIXED VERSION */}
+              {/* Latest Readings */}
               <div>
                 <h3 style={{ marginBottom: '16px', color: oceanColors.textDark }}>Latest Health Readings</h3>
                 <div style={{ overflow: 'auto' }}>
@@ -741,15 +856,180 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
             </div>
           )}
 
-          {showAIAssistant && (
-            <AIAssistant 
-              patientData={patient} 
-              onClose={() => setShowAIAssistant(false)} 
-            />
-          )}
+          {activeTab === 'insights' && (
+            <div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '24px'
+              }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Brain size={24} style={{ color: oceanColors.gold }} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: oceanColors.textDark, margin: 0 }}>
+                    Sister's Insights
+                  </h3>
+                  <p style={{ fontSize: '13px', color: oceanColors.textLight, margin: '4px 0 0 0' }}>
+                    AI-powered clinical analysis of patient health data
+                  </p>
+                </div>
+              </div>
 
+              {isLoadingInsights && (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '60px',
+                  background: '#f8fafc',
+                  borderRadius: '16px'
+                }}>
+                  <Loader2 size={40} style={{ color: oceanColors.deep, animation: 'spin 1s linear infinite' }} />
+                  <p style={{ marginTop: '16px', color: oceanColors.textLight }}>Unesi is analyzing patient data...</p>
+                </div>
+              )}
+
+              {insightsError && (
+                <div style={{
+                  padding: '20px',
+                  background: `${oceanColors.danger}10`,
+                  borderLeft: `4px solid ${oceanColors.danger}`,
+                  borderRadius: '12px'
+                }}>
+                  <p style={{ color: oceanColors.danger }}>{insightsError}</p>
+                  <button
+                    onClick={generateInsights}
+                    style={{
+                      marginTop: '12px',
+                      padding: '8px 16px',
+                      background: oceanColors.deep,
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
+
+              {aiInsights && !isLoadingInsights && (
+                <div style={{
+                  background: '#f8fafc',
+                  borderRadius: '16px',
+                  padding: '24px',
+                  lineHeight: 1.6
+                }}>
+                  <div style={{
+                    whiteSpace: 'pre-wrap',
+                    fontSize: '14px',
+                    color: oceanColors.textDark,
+                    fontFamily: 'Verdana, Geneva, sans-serif'
+                  }}>
+                    {aiInsights.split('\n').map((paragraph, idx) => (
+                      <p key={idx} style={{ marginBottom: '16px' }}>
+                        {paragraph.startsWith('#') ? (
+                          <strong style={{ fontSize: '16px', color: oceanColors.deep }}>{paragraph.replace(/^#+\s*/, '')}</strong>
+                        ) : paragraph.startsWith('##') ? (
+                          <strong style={{ fontSize: '15px', color: oceanColors.mid }}>{paragraph.replace(/^#+\s*/, '')}</strong>
+                        ) : paragraph}
+                      </p>
+                    ))}
+                  </div>
+                  
+                  <div style={{
+                    marginTop: '24px',
+                    paddingTop: '16px',
+                    borderTop: `1px solid ${oceanColors.mid}20`,
+                    display: 'flex',
+                    gap: '16px',
+                    justifyContent: 'flex-end'
+                  }}>
+                    <button
+                      onClick={generateInsights}
+                      style={{
+                        padding: '8px 16px',
+                        background: 'transparent',
+                        border: `1px solid ${oceanColors.deep}`,
+                        borderRadius: '8px',
+                        color: oceanColors.deep,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <RefreshCw size={14} />
+                      Regenerate Insights
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(aiInsights);
+                        // You can add a toast notification here
+                      }}
+                      style={{
+                        padding: '8px 16px',
+                        background: oceanColors.deep,
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: 'white',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <ClipboardList size={14} />
+                      Copy to Clipboard
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!aiInsights && !isLoadingInsights && !insightsError && (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '60px',
+                  background: '#f8fafc',
+                  borderRadius: '16px'
+                }}>
+                  <Sparkles size={48} style={{ color: oceanColors.textLight, marginBottom: '16px' }} />
+                  <p style={{ color: oceanColors.textLight }}>
+                    Click the insights tab to generate AI-powered clinical analysis
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* AI Assistant Modal */}
+      {showAIAssistant && (
+        <AIAssistant 
+          patientData={patient} 
+          onClose={() => setShowAIAssistant(false)} 
+        />
+      )}
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

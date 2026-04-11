@@ -263,7 +263,7 @@ function App() {
               <SmartToyIcon />
             </ListItemIcon>
             <ListItemText 
-              primary="Unesi AI Assistant" 
+              primary="Sister Unesi AI" 
               sx={{ 
                 '& .MuiTypography-root': { 
                   color: showGlobalAI ? oceanTheme.navy : oceanTheme.white,
