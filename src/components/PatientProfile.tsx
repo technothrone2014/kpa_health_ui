@@ -44,6 +44,24 @@ interface PatientProfileProps {
   onClose: () => void;
 }
 
+// Helper function to get status color for display
+const getStatusColor = (status: string, type: 'bp' | 'bmi' | 'rbs') => {
+  if (type === 'bmi') {
+    if (status === 'NORMAL') return { bg: `${oceanColors.success}20`, color: oceanColors.success, text: 'Normal' };
+    if (status === 'OVERWEIGHT') return { bg: `${oceanColors.warning}20`, color: oceanColors.warning, text: 'Overweight' };
+    if (status === 'OBESE') return { bg: `${oceanColors.danger}20`, color: oceanColors.danger, text: 'Obese' };
+    if (status === 'UNDERWEIGHT') return { bg: `${oceanColors.info}20`, color: oceanColors.info, text: 'Underweight' };
+    return { bg: `${oceanColors.textLight}20`, color: oceanColors.textLight, text: status };
+  } else {
+    // For BP and RBS
+    if (status === 'NORMAL') return { bg: `${oceanColors.success}20`, color: oceanColors.success, text: 'Normal' };
+    if (status === 'PRE-HYPERTENSION') return { bg: `${oceanColors.warning}20`, color: oceanColors.warning, text: 'Pre-Hypertension' };
+    if (status.includes('HYPERTENSION')) return { bg: `${oceanColors.danger}20`, color: oceanColors.danger, text: status };
+    if (status === 'HIGH' || status === 'ELEVATED') return { bg: `${oceanColors.danger}20`, color: oceanColors.danger, text: status };
+    return { bg: `${oceanColors.textLight}20`, color: oceanColors.textLight, text: status };
+  }
+};
+
 export default function PatientProfile({ patient, onClose }: PatientProfileProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'history'>('overview');
   const [isExporting, setIsExporting] = useState(false);
@@ -94,13 +112,11 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
   // Calculate health metrics
   const totalVisits = visits?.length || 0;
   
-  // For BP and RBS: "NORMAL" is good, anything else is abnormal
   const abnormalReadings = {
     bp: visits?.filter((v: any) => v.bpstatus !== 'NORMAL').length || 0,
     rbs: visits?.filter((v: any) => v.rbsstatus !== 'NORMAL').length || 0,
   };
   
-  // For BMI: "NORMAL" is good, "OVERWEIGHT" and "OBESE" are concerns
   const bmiAbnormal = visits?.filter((v: any) => v.bmistatus === 'OVERWEIGHT' || v.bmistatus === 'OBESE').length || 0;
   const bmiNormal = visits?.filter((v: any) => v.bmistatus === 'NORMAL').length || 0;
   const bmiUnderweight = visits?.filter((v: any) => v.bmistatus === 'UNDERWEIGHT').length || 0;
@@ -111,7 +127,6 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     rbs: totalVisits > 0 ? ((abnormalReadings.rbs / totalVisits) * 100).toFixed(1) : '0',
   };
 
-  // For health status cards - different logic for each metric
   const getBPStatusInfo = (percentage: string) => {
     const percent = parseInt(percentage);
     if (percent === 0) {
@@ -431,7 +446,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                 </div>
               </div>
 
-              {/* Health Status Cards - Updated with correct BMI logic */}
+              {/* Health Status Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
                 <div style={{
                   padding: '20px',
@@ -491,7 +506,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                 </div>
               </div>
 
-              {/* Latest Readings - Rest of the component remains the same */}
+              {/* Latest Readings - FIXED VERSION */}
               <div>
                 <h3 style={{ marginBottom: '16px', color: oceanColors.textDark }}>Latest Health Readings</h3>
                 <div style={{ overflow: 'auto' }}>
@@ -508,52 +523,56 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                       </tr>
                     </thead>
                     <tbody>
-                      {visits?.slice(0, 5).map((visit: any, idx: number) => (
-                        <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.mid}20` }}>
-                          <td style={{ padding: '12px' }}>{format(new Date(visit.date), 'MMM dd, yyyy')}</td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>{visit.systolic}/{visit.diastolic}</td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>
-                            <span style={{
-                              padding: '4px 8px',
-                              borderRadius: '20px',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              background: visit.bpstatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
-                              color: visit.bpstatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
-                            }}>
-                              {visit.bpstatus}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>{visit.bmivalue}</td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>
-                            <span style={{
-                              padding: '4px 8px',
-                              borderRadius: '20px',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              background: visit.bmistatus === 'NORMAL' ? `${oceanColors.success}20` : 
-                                       visit.bmistatus === 'OVERWEIGHT' ? `${oceanColors.warning}20` : `${oceanColors.danger}20`,
-                              color: visit.bmistatus === 'NORMAL' ? oceanColors.success : 
-                                     visit.bmistatus === 'OVERWEIGHT' ? oceanColors.warning : oceanColors.danger
-                            }}>
-                              {visit.bmistatus}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>{visit.rbsvalue}</td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>
-                            <span style={{
-                              padding: '4px 8px',
-                              borderRadius: '20px',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              background: visit.rbsstatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
-                              color: visit.rbsstatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
-                            }}>
-                              {visit.rbsstatus}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {visits?.slice(0, 5).map((visit: any, idx: number) => {
+                        const bpColorInfo = getStatusColor(visit.bpstatus, 'bp');
+                        const bmiColorInfo = getStatusColor(visit.bmistatus, 'bmi');
+                        const rbsColorInfo = getStatusColor(visit.rbsstatus, 'rbs');
+                        
+                        return (
+                          <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.mid}20` }}>
+                            <td style={{ padding: '12px' }}>{format(new Date(visit.date), 'MMM dd, yyyy')}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{visit.systolic}/{visit.diastolic}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                              <span style={{
+                                padding: '4px 12px',
+                                borderRadius: '20px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                background: bpColorInfo.bg,
+                                color: bpColorInfo.color
+                              }}>
+                                {bpColorInfo.text}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{visit.bmivalue}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                              <span style={{
+                                padding: '4px 12px',
+                                borderRadius: '20px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                background: bmiColorInfo.bg,
+                                color: bmiColorInfo.color
+                              }}>
+                                {bmiColorInfo.text}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{visit.rbsvalue}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                              <span style={{
+                                padding: '4px 12px',
+                                borderRadius: '20px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                background: rbsColorInfo.bg,
+                                color: rbsColorInfo.color
+                              }}>
+                                {rbsColorInfo.text}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -561,7 +580,6 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
             </div>
           )}
 
-          {/* Trends and History tabs remain the same as before */}
           {activeTab === 'trends' && (
             <div>
               {/* BP Trend Chart */}
@@ -646,50 +664,56 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                   </tr>
                 </thead>
                 <tbody>
-                  {visits?.map((visit: any, idx: number) => (
-                    <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.mid}20` }}>
-                      <td style={{ padding: '12px' }}>{format(new Date(visit.date), 'PPP')}</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.systolic}/{visit.diastolic}</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '20px',
-                          fontSize: '11px',
-                          background: visit.bpstatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
-                          color: visit.bpstatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
-                        }}>
-                          {visit.bpstatus}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.bmivalue}</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '20px',
-                          fontSize: '11px',
-                          background: visit.bmistatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
-                          color: visit.bmistatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
-                        }}>
-                          {visit.bmistatus}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.rbsvalue}</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '20px',
-                          fontSize: '11px',
-                          background: visit.rbsstatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
-                          color: visit.rbsstatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
-                        }}>
-                          {visit.rbsstatus}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.weight} kg</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.height} cm</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>{visit.whratio}</td>
-                    </tr>
-                  ))}
+                  {visits?.map((visit: any, idx: number) => {
+                    const bpColorInfo = getStatusColor(visit.bpstatus, 'bp');
+                    const bmiColorInfo = getStatusColor(visit.bmistatus, 'bmi');
+                    const rbsColorInfo = getStatusColor(visit.rbsstatus, 'rbs');
+                    
+                    return (
+                      <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.mid}20` }}>
+                        <td style={{ padding: '12px' }}>{format(new Date(visit.date), 'PPP')}</td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.systolic}/{visit.diastolic}</td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '4px 12px',
+                            borderRadius: '20px',
+                            fontSize: '11px',
+                            background: bpColorInfo.bg,
+                            color: bpColorInfo.color
+                          }}>
+                            {bpColorInfo.text}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.bmivalue}</td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '4px 12px',
+                            borderRadius: '20px',
+                            fontSize: '11px',
+                            background: bmiColorInfo.bg,
+                            color: bmiColorInfo.color
+                          }}>
+                            {bmiColorInfo.text}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.rbsvalue}</td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '4px 12px',
+                            borderRadius: '20px',
+                            fontSize: '11px',
+                            background: rbsColorInfo.bg,
+                            color: rbsColorInfo.color
+                          }}>
+                            {rbsColorInfo.text}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.weight} kg</td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.height} cm</td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.whratio}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
