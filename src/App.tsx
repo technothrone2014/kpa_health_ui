@@ -45,7 +45,7 @@ function App() {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/', nauticalIcon: '🧭' },
-    { text: 'Employees', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨‍✈️' },
+    { text: 'Clients', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨‍✈️' },
     { text: 'Data Correction', icon: <DataUsageIcon />, path: '/data-correction', nauticalIcon: '⚓' },
   ];
 
