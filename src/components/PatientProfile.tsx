@@ -5,13 +5,15 @@ import {
   Calendar, TrendingUp, TrendingDown, FileText, Download, Eye,
   User, Phone, MapPin, Briefcase, Anchor, Clock, Shield,
   ArrowUp, ArrowDown, Minus, Bell, HeartPulse, Thermometer, Syringe,
-  Bot, Sparkles, Brain, Lightbulb, Loader2, Stethoscope, ClipboardList
+  Bot, Sparkles, Brain, Lightbulb, Loader2, Stethoscope, ClipboardList,
+  RefreshCw
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
 import * as XLSX from 'xlsx';
 import api from '../api/client';
 import aiService from '../api/aiService';
+import AIAssistant from './AIAssistant';
 
 // Oceanic Theme Colors
 const oceanColors = {
