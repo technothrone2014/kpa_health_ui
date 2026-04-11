@@ -103,12 +103,12 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     setAiInsights(null);
 
     try {
-      // Prepare patient data summary for AI
+      // Prepare patient data summary for AI - MASK PERSONAL INFO
       const patientSummary = {
-        name: patient.FullName,
-        id: patient.IDNumber,
+        id: patient.IDNumber,  // Use ID number (Chk No) instead of name
         category: patient.CategoryTitle,
         station: patient.StationTitle,
+        gender: patient.GenderTitle,
         totalVisits: visits.length,
         bloodPressureReadings: visits.map((v: any) => ({
           date: v.date,
@@ -133,36 +133,50 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
         }
       };
 
-      const systemPrompt = `You are Unesi, a compassionate and knowledgeable medical AI assistant for Kenya Ports Authority's EAP Health Week. 
-You are analyzing patient health data to provide Sister's Insights - a professional medical summary for nurses and clinical officers.
+      const systemPrompt = `You are Unesi, a professional medical AI assistant for Kenya Ports Authority's EAP Health Week. 
+  You are analyzing patient health data to provide "Sister's Insights" - a clinical summary for nurses and medical officers.
 
-Patient: ${patientSummary.name} (ID: ${patientSummary.id})
-Category: ${patientSummary.category}
-Station: ${patientSummary.station}
-Total Visits: ${patientSummary.totalVisits}
+  Patient Reference: CHK-${patientSummary.id}
+  Category: ${patientSummary.category}
+  Station: ${patientSummary.station}
+  Total Clinical Visits: ${patientSummary.totalVisits}
 
-Health Metrics Summary:
-- Abnormal Blood Pressure Readings: ${patientSummary.metrics.abnormalBP} out of ${patientSummary.totalVisits}
-- Concerning BMI Readings (Overweight/Obese): ${patientSummary.metrics.abnormalBMI} out of ${patientSummary.totalVisits}
-- Abnormal Random Blood Sugar Readings: ${patientSummary.metrics.abnormalRBS} out of ${patientSummary.totalVisits}
+  Health Metrics Summary:
+  - Abnormal Blood Pressure Readings: ${patientSummary.metrics.abnormalBP} out of ${patientSummary.totalVisits} visits
+  - Concerning BMI Readings (Overweight/Obese): ${patientSummary.metrics.abnormalBMI} out of ${patientSummary.totalVisits} visits
+  - Abnormal Random Blood Sugar Readings: ${patientSummary.metrics.abnormalRBS} out of ${patientSummary.totalVisits} visits
 
-Recent Blood Pressure Data: ${JSON.stringify(patientSummary.bloodPressureReadings.slice(-3))}
-Recent BMI Data: ${JSON.stringify(patientSummary.bmiReadings.slice(-3))}
-Recent RBS Data: ${JSON.stringify(patientSummary.rbsReadings.slice(-3))}
+  Recent Clinical Data:
+  Blood Pressure: ${JSON.stringify(patientSummary.bloodPressureReadings.slice(-3))}
+  BMI: ${JSON.stringify(patientSummary.bmiReadings.slice(-3))}
+  RBS: ${JSON.stringify(patientSummary.rbsReadings.slice(-3))}
 
-Provide a professional "Sister's Insights" report that includes:
-1. Overall Health Assessment - Brief summary of the patient's health status
-2. Key Findings - Notable patterns or concerns in the data
-3. Trends Over Time - Any significant changes or consistent patterns
-4. Recommendations - Actionable follow-up steps for the medical team
-5. Risk Factors - Identify any elevated risk areas
+  Provide a professional "Sister's Insights" clinical report that includes:
 
-Keep the tone professional yet compassionate. Use clear medical terminology but explain when needed.`;
+  1. CLINICAL SUMMARY - Brief objective assessment of the patient's health status based on available data
+
+  2. KEY CLINICAL FINDINGS - Notable patterns, abnormalities, or concerns identified in the data
+
+  3. TREND ANALYSIS - Observed changes or consistent patterns over the visit history
+
+  4. CLINICAL RECOMMENDATIONS - Evidence-based suggestions for follow-up care
+
+  5. RISK ASSESSMENT - Identify any elevated risk factors requiring attention
+
+  Important Guidelines:
+  - Use the patient reference CHK-${patientSummary.id} only, not their name
+  - Maintain professional, objective clinical language
+  - Base all observations solely on the provided data
+  - Include appropriate medical disclaimers
+  - Do not make definitive diagnoses; use suggestive language like "may indicate", "suggests", "requires investigation"
+  - Focus on actionable insights for the clinical team
+
+  Format the response with clear section headers for easy reading by medical staff.`;
 
       const response = await aiService.chat({
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Please provide Sister's Insights for patient ${patient.FullName} based on their health records.` }
+          { role: 'user', content: `Please provide Sister's Insights for patient CHK-${patientSummary.id} (${patientSummary.category}) based on their ${patientSummary.totalVisits} clinical visits.` }
         ],
         temperature: 0.3,
         max_tokens: 2048,
@@ -860,33 +874,82 @@ Keep the tone professional yet compassionate. Use clear medical terminology but 
 
           {activeTab === 'insights' && (
             <div>
+              {/* Header with Patient Reference - Masked */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '16px',
                 marginBottom: '24px'
               }}>
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Brain size={24} style={{ color: oceanColors.gold }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Brain size={24} style={{ color: oceanColors.gold }} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: oceanColors.textDark, margin: 0 }}>
+                      Sister's Insights
+                    </h3>
+                    <p style={{ fontSize: '13px', color: oceanColors.textLight, margin: '4px 0 0 0' }}>
+                      AI-powered clinical analysis | Patient: CHK-{patient.IDNumber} | {patient.CategoryTitle}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: oceanColors.textDark, margin: 0 }}>
-                    Sister's Insights
-                  </h3>
-                  <p style={{ fontSize: '13px', color: oceanColors.textLight, margin: '4px 0 0 0' }}>
-                    AI-powered clinical analysis of patient health data
-                  </p>
+                
+                {/* Patient Context Badges - Professional */}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{
+                    padding: '4px 12px',
+                    background: oceanColors.light,
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    color: oceanColors.deep,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <User size={12} />
+                    {patient.GenderTitle || 'Gender N/A'}
+                  </div>
+                  <div style={{
+                    padding: '4px 12px',
+                    background: oceanColors.light,
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    color: oceanColors.deep,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Anchor size={12} />
+                    {patient.StationTitle || 'Station N/A'}
+                  </div>
+                  <div style={{
+                    padding: '4px 12px',
+                    background: oceanColors.light,
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    color: oceanColors.deep,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <ClipboardList size={12} />
+                    {totalVisits} Visit(s)
+                  </div>
                 </div>
               </div>
 
+              {/* Loading State */}
               {isLoadingInsights && (
                 <div style={{
                   display: 'flex',
@@ -898,10 +961,11 @@ Keep the tone professional yet compassionate. Use clear medical terminology but 
                   borderRadius: '16px'
                 }}>
                   <Loader2 size={40} style={{ color: oceanColors.deep, animation: 'spin 1s linear infinite' }} />
-                  <p style={{ marginTop: '16px', color: oceanColors.textLight }}>Unesi is analyzing patient data...</p>
+                  <p style={{ marginTop: '16px', color: oceanColors.textLight }}>Unesi is analyzing clinical data...</p>
                 </div>
               )}
 
+              {/* Error State */}
               {insightsError && (
                 <div style={{
                   padding: '20px',
@@ -909,7 +973,10 @@ Keep the tone professional yet compassionate. Use clear medical terminology but 
                   borderLeft: `4px solid ${oceanColors.danger}`,
                   borderRadius: '12px'
                 }}>
-                  <p style={{ color: oceanColors.danger }}>{insightsError}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <AlertTriangle size={20} style={{ color: oceanColors.danger }} />
+                    <p style={{ color: oceanColors.danger, margin: 0 }}>{insightsError}</p>
+                  </div>
                   <button
                     onClick={generateInsights}
                     style={{
@@ -919,45 +986,131 @@ Keep the tone professional yet compassionate. Use clear medical terminology but 
                       color: 'white',
                       border: 'none',
                       borderRadius: '8px',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
                     }}
                   >
+                    <RefreshCw size={14} />
                     Try Again
                   </button>
                 </div>
               )}
 
+              {/* AI Insights Display */}
               {aiInsights && !isLoadingInsights && (
                 <div style={{
                   background: '#f8fafc',
                   borderRadius: '16px',
                   padding: '24px',
-                  lineHeight: 1.6
+                  lineHeight: 1.6,
+                  border: `1px solid ${oceanColors.mid}20`
                 }}>
+                  {/* Professional Disclaimer */}
+                  <div style={{
+                    background: `${oceanColors.info}10`,
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    marginBottom: '20px',
+                    fontSize: '12px',
+                    color: oceanColors.textLight,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    borderLeft: `3px solid ${oceanColors.info}`
+                  }}>
+                    <Sparkles size={14} />
+                    <span>AI-generated clinical insights based on available data. Not a substitute for professional medical judgment.</span>
+                  </div>
+
                   <div style={{
                     whiteSpace: 'pre-wrap',
                     fontSize: '14px',
                     color: oceanColors.textDark,
                     fontFamily: 'Verdana, Geneva, sans-serif'
                   }}>
-                    {aiInsights.split('\n').map((paragraph, idx) => (
-                      <p key={idx} style={{ marginBottom: '16px' }}>
-                        {paragraph.startsWith('#') ? (
-                          <strong style={{ fontSize: '16px', color: oceanColors.deep }}>{paragraph.replace(/^#+\s*/, '')}</strong>
-                        ) : paragraph.startsWith('##') ? (
-                          <strong style={{ fontSize: '15px', color: oceanColors.mid }}>{paragraph.replace(/^#+\s*/, '')}</strong>
-                        ) : paragraph}
-                      </p>
-                    ))}
+                    {aiInsights.split('\n').map((paragraph, idx) => {
+                      // Handle markdown-style headers
+                      if (paragraph.startsWith('# ')) {
+                        return (
+                          <h4 key={idx} style={{
+                            fontSize: '18px',
+                            fontWeight: 'bold',
+                            color: oceanColors.deep,
+                            marginTop: '20px',
+                            marginBottom: '12px',
+                            borderLeft: `3px solid ${oceanColors.gold}`,
+                            paddingLeft: '12px'
+                          }}>
+                            {paragraph.replace(/^#+\s*/, '')}
+                          </h4>
+                        );
+                      } else if (paragraph.startsWith('## ')) {
+                        return (
+                          <h5 key={idx} style={{
+                            fontSize: '16px',
+                            fontWeight: '600',
+                            color: oceanColors.mid,
+                            marginTop: '16px',
+                            marginBottom: '8px'
+                          }}>
+                            {paragraph.replace(/^#+\s*/, '')}
+                          </h5>
+                        );
+                      } else if (paragraph.startsWith('### ')) {
+                        return (
+                          <h6 key={idx} style={{
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: oceanColors.surface,
+                            marginTop: '12px',
+                            marginBottom: '6px'
+                          }}>
+                            {paragraph.replace(/^#+\s*/, '')}
+                          </h6>
+                        );
+                      } else if (paragraph.trim().startsWith('- ') || paragraph.trim().startsWith('• ')) {
+                        return (
+                          <li key={idx} style={{
+                            marginLeft: '20px',
+                            marginBottom: '8px',
+                            color: oceanColors.textDark
+                          }}>
+                            {paragraph.replace(/^[-•]\s*/, '')}
+                          </li>
+                        );
+                      } else if (paragraph.trim().match(/^\d+\./)) {
+                        return (
+                          <li key={idx} style={{
+                            marginLeft: '20px',
+                            marginBottom: '8px',
+                            color: oceanColors.textDark
+                          }}>
+                            {paragraph}
+                          </li>
+                        );
+                      } else if (paragraph.trim() === '') {
+                        return <div key={idx} style={{ height: '8px' }} />;
+                      } else {
+                        return (
+                          <p key={idx} style={{ marginBottom: '12px', lineHeight: 1.6 }}>
+                            {paragraph}
+                          </p>
+                        );
+                      }
+                    })}
                   </div>
                   
+                  {/* Action Buttons */}
                   <div style={{
                     marginTop: '24px',
                     paddingTop: '16px',
                     borderTop: `1px solid ${oceanColors.mid}20`,
                     display: 'flex',
                     gap: '16px',
-                    justifyContent: 'flex-end'
+                    justifyContent: 'flex-end',
+                    flexWrap: 'wrap'
                   }}>
                     <button
                       onClick={generateInsights}
@@ -970,7 +1123,14 @@ Keep the tone professional yet compassionate. Use clear medical terminology but 
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px'
+                        gap: '8px',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = oceanColors.light;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
                       }}
                     >
                       <RefreshCw size={14} />
@@ -979,7 +1139,7 @@ Keep the tone professional yet compassionate. Use clear medical terminology but 
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(aiInsights);
-                        // You can add a toast notification here
+                        // Optional: Add toast notification
                       }}
                       style={{
                         padding: '8px 16px',
@@ -990,7 +1150,14 @@ Keep the tone professional yet compassionate. Use clear medical terminology but 
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px'
+                        gap: '8px',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = oceanColors.mid;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = oceanColors.deep;
                       }}
                     >
                       <ClipboardList size={14} />
@@ -1000,21 +1167,45 @@ Keep the tone professional yet compassionate. Use clear medical terminology but 
                 </div>
               )}
 
+              {/* Empty State - First Time */}
               {!aiInsights && !isLoadingInsights && !insightsError && (
                 <div style={{
                   textAlign: 'center',
                   padding: '60px',
                   background: '#f8fafc',
-                  borderRadius: '16px'
+                  borderRadius: '16px',
+                  border: `1px dashed ${oceanColors.mid}30`
                 }}>
                   <Sparkles size={48} style={{ color: oceanColors.textLight, marginBottom: '16px' }} />
-                  <p style={{ color: oceanColors.textLight }}>
-                    Click the insights tab to generate AI-powered clinical analysis
+                  <p style={{ color: oceanColors.textLight, marginBottom: '8px' }}>
+                    Click below to generate AI-powered clinical analysis
                   </p>
+                  <p style={{ fontSize: '12px', color: oceanColors.textLight }}>
+                    Unesi will analyze {totalVisits} health records for patient CHK-{patient.IDNumber}
+                  </p>
+                  <button
+                    onClick={generateInsights}
+                    style={{
+                      marginTop: '20px',
+                      padding: '10px 24px',
+                      background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Brain size={18} />
+                    Generate Sister's Insights
+                  </button>
                 </div>
               )}
             </div>
           )}
+          
         </div>
       </div>
 
