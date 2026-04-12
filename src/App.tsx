@@ -4,7 +4,7 @@ import Employees from "./pages/Employees";
 import DataCorrection from "./pages/DataCorrection";
 import Dashboard from "./pages/Dashboard";
 import { 
-  AppBar, Toolbar, Container, Typography, Box, IconButton, Drawer, 
+  AppBar, Toolbar, Typography, Box, IconButton, Drawer, 
   List, ListItem, ListItemButton, ListItemIcon, ListItemText, 
   useMediaQuery, useTheme 
 } from "@mui/material";
@@ -17,10 +17,14 @@ import WavesIcon from '@mui/icons-material/Waves';
 import CompassCalibrationIcon from '@mui/icons-material/CompassCalibration';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { useState, useEffect } from "react";
 import AdvancedAnalytics from './components/AdvancedAnalytics';
 import AIAssistant from './components/AIAssistant';
 import aiService from './api/aiService';
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import LoadingSpinner from "./components/LoadingSpinner";
+import Login from "./pages/Login";
 
 const queryClient = new QueryClient();
 
@@ -35,15 +39,33 @@ const oceanTheme = {
   gold: '#FFD700',
   navy: '#0A1C40',
   white: '#FFFFFF',
+  danger: '#EF4444',
 };
 
-function App() {
+// Protected Route wrapper
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+  
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+  
+  return <>{children}</>;
+}
+
+// Main App Content (requires auth context)
+function AppContent() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activePath, setActivePath] = useState("/");
   const [showGlobalAI, setShowGlobalAI] = useState(false);
   const [aiStatus, setAiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
+  const { user, logout, isAuthenticated } = useAuth();
 
   // Check AI service health on mount
   useEffect(() => {
@@ -60,6 +82,10 @@ function App() {
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleLogout = async () => {
+    await logout();
   };
 
   const menuItems = [
@@ -164,6 +190,18 @@ function App() {
           </Typography>
         </Box>
       </Box>
+
+      {/* User Info */}
+      {isAuthenticated && user && (
+        <Box sx={{ p: 2, borderBottom: `1px solid ${oceanTheme.gold}30`, mb: 2 }}>
+          <Typography sx={{ color: oceanTheme.white, fontSize: '14px', fontWeight: 'bold' }}>
+            {user.FirstName} {user.LastName}
+          </Typography>
+          <Typography sx={{ color: oceanTheme.foam, fontSize: '12px' }}>
+            {user.Email}
+          </Typography>
+        </Box>
+      )}
 
       {/* Navigation Menu */}
       <List sx={{ px: 2, py: 3, position: 'relative', zIndex: 1 }}>
@@ -286,7 +324,7 @@ function App() {
                 width: 8,
                 height: 8,
                 borderRadius: '50%',
-                background: oceanTheme.deep,
+                background: oceanTheme.danger,
                 ml: 1
               }} />
             )}
@@ -297,7 +335,7 @@ function App() {
       {/* Decorative Compass Rose */}
       <Box sx={{ 
         position: 'absolute', 
-        bottom: 20, 
+        bottom: 80, 
         left: '50%', 
         transform: 'translateX(-50%)',
         textAlign: 'center',
@@ -309,7 +347,25 @@ function App() {
         </Typography>
       </Box>
 
-      {/* CSS Animations */}
+      {/* Logout Button */}
+      <Box sx={{ position: 'absolute', bottom: 20, left: 0, right: 0, px: 2 }}>
+        <ListItem disablePadding>
+          <ListItemButton onClick={handleLogout} sx={{
+            borderRadius: '12px',
+            py: 1.5,
+            px: 2,
+            '&:hover': {
+              background: `linear-gradient(135deg, ${oceanTheme.danger}40, ${oceanTheme.danger}20)`,
+            }
+          }}>
+            <ListItemIcon sx={{ color: oceanTheme.foam }}>
+              <LogoutIcon />
+            </ListItemIcon>
+            <ListItemText primary="Logout" sx={{ '& .MuiTypography-root': { color: oceanTheme.white } }} />
+          </ListItemButton>
+        </ListItem>
+      </Box>
+
       <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0px); }
@@ -328,115 +384,144 @@ function App() {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
-          {/* Desktop Sidebar */}
-          <Box
-            component="nav"
-            sx={{
-              width: { sm: 280 },
-              flexShrink: { sm: 0 },
-              display: { xs: 'none', sm: 'block' }
+    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
+      {/* Desktop Sidebar - Only show when authenticated */}
+      {isAuthenticated && (
+        <Box
+          component="nav"
+          sx={{
+            width: { sm: 280 },
+            flexShrink: { sm: 0 },
+            display: { xs: 'none', sm: 'block' }
+          }}
+        >
+          <Box sx={{ width: 280, position: 'fixed', height: '100vh' }}>
+            {drawer}
+          </Box>
+        </Box>
+      )}
+
+      {/* Mobile drawer */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{ keepMounted: true }}
+        sx={{ display: { xs: 'block', sm: 'none' } }}
+      >
+        {drawer}
+      </Drawer>
+
+      {/* Main content */}
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
+        {/* Mobile App Bar - Oceanic Theme (only when authenticated) */}
+        {isAuthenticated && (
+          <AppBar 
+            position="sticky" 
+            sx={{ 
+              background: `linear-gradient(135deg, ${oceanTheme.deep}, ${oceanTheme.mid})`,
+              mb: 3,
+              display: { xs: 'block', sm: 'none' },
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+              borderRadius: '16px',
+              borderBottom: `2px solid ${oceanTheme.gold}`
             }}
           >
-            <Box sx={{ width: 280, position: 'fixed', height: '100vh' }}>
-              {drawer}
-            </Box>
-          </Box>
-
-          {/* Mobile drawer */}
-          <Drawer
-            variant="temporary"
-            open={mobileOpen}
-            onClose={handleDrawerToggle}
-            ModalProps={{ keepMounted: true }}
-            sx={{ display: { xs: 'block', sm: 'none' } }}
-          >
-            {drawer}
-          </Drawer>
-
-          {/* Main content */}
-          <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
-            {/* Mobile App Bar - Oceanic Theme */}
-            <AppBar 
-              position="sticky" 
-              sx={{ 
-                background: `linear-gradient(135deg, ${oceanTheme.deep}, ${oceanTheme.mid})`,
-                mb: 3,
-                display: { xs: 'block', sm: 'none' },
-                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-                borderRadius: '16px',
-                borderBottom: `2px solid ${oceanTheme.gold}`
-              }}
-            >
-              <Toolbar>
-                <IconButton
-                  color="inherit"
-                  aria-label="open drawer"
-                  edge="start"
-                  onClick={handleDrawerToggle}
-                  sx={{ 
-                    mr: 2,
-                    '&:hover': {
-                      background: 'rgba(255,255,255,0.2)',
-                      transform: 'rotate(90deg)',
-                      transition: 'transform 0.3s ease'
-                    }
-                  }}
-                >
-                  <MenuIcon />
-                </IconButton>
-                <Box sx={{ 
-                  width: 40, 
-                  height: 40, 
-                  background: `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`,
-                  borderRadius: '12px',
+            <Toolbar>
+              <IconButton
+                color="inherit"
+                aria-label="open drawer"
+                edge="start"
+                onClick={handleDrawerToggle}
+                sx={{ 
+                  mr: 2,
+                  '&:hover': {
+                    background: 'rgba(255,255,255,0.2)',
+                    transform: 'rotate(90deg)',
+                    transition: 'transform 0.3s ease'
+                  }
+                }}
+              >
+                <MenuIcon />
+              </IconButton>
+              <Box sx={{ 
+                width: 40, 
+                height: 40, 
+                background: `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`,
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mr: 1
+              }}>
+                <AnchorIcon sx={{ color: oceanTheme.navy, fontSize: 24 }} />
+              </Box>
+              <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontSize: '0.9rem', fontWeight: 'bold' }}>
+                KPA Health Week
+              </Typography>
+              <button
+                onClick={() => setShowGlobalAI(!showGlobalAI)}
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  width: '32px',
+                  height: '32px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  mr: 1
-                }}>
-                  <AnchorIcon sx={{ color: oceanTheme.navy, fontSize: 24 }} />
-                </Box>
-                <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontSize: '0.9rem', fontWeight: 'bold' }}>
-                  KPA Health Week
-                </Typography>
-                <button
-                  onClick={() => setShowGlobalAI(!showGlobalAI)}
-                  style={{
-                    background: 'rgba(255,255,255,0.2)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: 'white'
-                  }}
-                >
-                  <SmartToyIcon sx={{ fontSize: 18 }} />
-                </button>
-                <WavesIcon sx={{ color: oceanTheme.foam, fontSize: 20, ml: 1 }} />
-              </Toolbar>
-            </AppBar>
-
-            {/* Routes */}
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/employees" element={<Employees />} />
-              <Route path="/data-correction" element={<DataCorrection />} />
-              <Route path="/analytics" element={<AdvancedAnalytics />} />
-            </Routes>
-          </Box>
-        </Box>
-
-        {/* Global AI Assistant - appears when toggled */}
-        {showGlobalAI && (
-          <AIAssistant onClose={() => setShowGlobalAI(false)} />
+                  cursor: 'pointer',
+                  color: 'white'
+                }}
+              >
+                <SmartToyIcon sx={{ fontSize: 18 }} />
+              </button>
+              <WavesIcon sx={{ color: oceanTheme.foam, fontSize: 20, ml: 1 }} />
+            </Toolbar>
+          </AppBar>
         )}
+
+        {/* Routes */}
+        <Routes>
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/employees" element={
+            <ProtectedRoute>
+              <Employees />
+            </ProtectedRoute>
+          } />
+          <Route path="/data-correction" element={
+            <ProtectedRoute>
+              <DataCorrection />
+            </ProtectedRoute>
+          } />
+          <Route path="/analytics" element={
+            <ProtectedRoute>
+              <AdvancedAnalytics />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </Box>
+
+      {/* Global AI Assistant - appears when toggled */}
+      {showGlobalAI && (
+        <AIAssistant onClose={() => setShowGlobalAI(false)} />
+      )}
+    </Box>
+  );
+}
+
+// Main App component with AuthProvider
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );
