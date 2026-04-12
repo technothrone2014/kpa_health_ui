@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
+import api from '../api/client';  // Add this import
 
 const oceanColors = {
   deep: '#0B2F9E',
@@ -45,7 +46,7 @@ export default function AdvancedAnalytics() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [exportFormat, setExportFormat] = useState<'json' | 'csv' | 'xlsx'>('json');
 
-  // Fetch trends with filters
+  // Fetch trends with filters - FIXED to use api client
   const { data: trends, refetch: refetchTrends, isLoading: trendsLoading } = useQuery({
     queryKey: ['health-trends', filters],
     queryFn: async () => {
@@ -54,12 +55,12 @@ export default function AdvancedAnalytics() {
       if (filters.endDate) params.append('endDate', filters.endDate);
       if (filters.category !== 'all') params.append('category', filters.category);
       if (filters.station !== 'all') params.append('station', filters.station);
-      const response = await fetch(`/api/v1/analytics/trends?${params}`);
-      return response.json();
+      const response = await api.get(`/analytics/trends?${params}`);
+      return response.data;
     },
   });
 
-  // Fetch high-risk patients
+  // Fetch high-risk patients - FIXED to use api client
   const { data: highRiskPatients, refetch: refetchHighRisk } = useQuery({
     queryKey: ['high-risk', filters.condition, filters.consecutiveTests, filters.threshold],
     queryFn: async () => {
@@ -67,23 +68,21 @@ export default function AdvancedAnalytics() {
       params.append('condition', filters.condition);
       params.append('consecutiveCount', filters.consecutiveTests.toString());
       params.append('threshold', filters.threshold.toString());
-      const response = await fetch(`/api/v1/analytics/high-risk-patients?${params}`);
-      return response.json();
+      const response = await api.get(`/analytics/high-risk-patients?${params}`);
+      return response.data;
     },
   });
 
-  // AI Query handler
+  // AI Query handler - FIXED to use api client
   const handleAiQuery = async () => {
     if (!aiQuery.trim()) return;
     setIsAiLoading(true);
     try {
-      const response = await fetch('/api/v1/analytics/ai-query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: aiQuery, userId: 'current-user' })
+      const response = await api.post('/analytics/ai-query', { 
+        query: aiQuery, 
+        userId: 'current-user' 
       });
-      const data = await response.json();
-      setAiResponse(data);
+      setAiResponse(response.data);
     } catch (error) {
       console.error('AI Query failed:', error);
     } finally {
@@ -91,16 +90,34 @@ export default function AdvancedAnalytics() {
     }
   };
 
-  // Export handler
+  // Export handler - FIXED to use api client
   const handleExport = async () => {
     const params = new URLSearchParams();
     params.append('format', exportFormat);
     if (filters.startDate) params.append('startDate', filters.startDate);
     if (filters.endDate) params.append('endDate', filters.endDate);
     
-    window.open(`/api/v1/analytics/export?${params}`, '_blank');
+    // Use api client for export
+    try {
+      const response = await api.get(`/analytics/export?${params}`, {
+        responseType: 'blob'
+      });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `health_report_${Date.now()}.${exportFormat === 'xlsx' ? 'xlsx' : exportFormat}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
   };
 
+  // Rest of the component remains the same...
   return (
     <div style={{ padding: '24px' }}>
       {/* Header */}
@@ -133,7 +150,7 @@ export default function AdvancedAnalytics() {
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Filter Bar - Keep as is */}
       <div style={{
         background: 'white',
         borderRadius: '16px',
@@ -245,7 +262,7 @@ export default function AdvancedAnalytics() {
         )}
       </div>
 
-      {/* Two Column Layout */}
+      {/* Two Column Layout - Keep as is */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', marginBottom: '24px' }}>
         
         {/* Health Trends Chart */}
@@ -266,7 +283,7 @@ export default function AdvancedAnalytics() {
                     <th style={{ padding: '8px', textAlign: 'center' }}>Pre-HTN</th>
                     <th style={{ padding: '8px', textAlign: 'center' }}>Hypertension</th>
                     <th style={{ padding: '8px', textAlign: 'center' }}>Total</th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody>
                   {trends?.map((day: any) => (
@@ -348,7 +365,7 @@ export default function AdvancedAnalytics() {
         </div>
       </div>
 
-      {/* AI Natural Language Query Section */}
+      {/* AI Natural Language Query Section - Keep as is */}
       <div style={{
         background: `linear-gradient(135deg, ${oceanColors.navy}, ${oceanColors.deep})`,
         borderRadius: '16px',

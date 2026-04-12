@@ -909,7 +909,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <div style={{
                     padding: '4px 12px',
-                    background: oceanColors.light,
+                    background: oceanColors.gold,
                     borderRadius: '20px',
                     fontSize: '12px',
                     color: oceanColors.deep,
@@ -922,7 +922,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                   </div>
                   <div style={{
                     padding: '4px 12px',
-                    background: oceanColors.light,
+                    background: oceanColors.gold,
                     borderRadius: '20px',
                     fontSize: '12px',
                     color: oceanColors.deep,
@@ -935,7 +935,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                   </div>
                   <div style={{
                     padding: '4px 12px',
-                    background: oceanColors.light,
+                    background: oceanColors.gold,
                     borderRadius: '20px',
                     fontSize: '12px',
                     color: oceanColors.deep,
