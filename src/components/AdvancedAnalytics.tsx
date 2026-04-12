@@ -5,9 +5,9 @@ import {
   Users, Activity, Heart, Scale, FileText, X, ChevronDown,
   BarChart3, PieChart, LineChart, FileSpreadsheet, FileJson
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, subMonths, subYears } from 'date-fns';
 import * as XLSX from 'xlsx';
-import api from '../api/client';  // Add this import
+import api from '../api/client';
 
 const oceanColors = {
   deep: '#0B2F9E',
@@ -29,10 +29,22 @@ interface FilterState {
   threshold: number;
 }
 
+// Date presets for quick selection
+const datePresets = [
+  { label: 'All Data (2021-Present)', start: '2021-03-01', end: format(new Date(), 'yyyy-MM-dd') },
+  { label: 'Last 6 Months', start: format(subMonths(new Date(), 6), 'yyyy-MM-dd'), end: format(new Date(), 'yyyy-MM-dd') },
+  { label: 'Last Year', start: format(subYears(new Date(), 1), 'yyyy-MM-dd'), end: format(new Date(), 'yyyy-MM-dd') },
+  { label: '2025', start: '2025-01-01', end: '2025-12-31' },
+  { label: '2024', start: '2024-01-01', end: '2024-12-31' },
+  { label: '2023', start: '2023-01-01', end: '2023-12-31' },
+  { label: '2022', start: '2022-01-01', end: '2022-12-31' },
+  { label: '2021 (Mar-Dec)', start: '2021-03-01', end: '2021-12-31' },
+];
+
 export default function AdvancedAnalytics() {
   const [filters, setFilters] = useState<FilterState>({
-    startDate: format(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
-    endDate: format(new Date(), 'yyyy-MM-dd'),
+    startDate: '2021-03-01',  // Start from earliest data (March 2021)
+    endDate: format(new Date(), 'yyyy-MM-dd'),  // Up to present
     category: 'all',
     station: 'all',
     condition: 'hypertension',
@@ -46,7 +58,7 @@ export default function AdvancedAnalytics() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [exportFormat, setExportFormat] = useState<'json' | 'csv' | 'xlsx'>('json');
 
-  // Fetch trends with filters - FIXED to use api client
+  // Fetch trends with filters
   const { data: trends, refetch: refetchTrends, isLoading: trendsLoading } = useQuery({
     queryKey: ['health-trends', filters],
     queryFn: async () => {
@@ -60,7 +72,7 @@ export default function AdvancedAnalytics() {
     },
   });
 
-  // Fetch high-risk patients - FIXED to use api client
+  // Fetch high-risk patients
   const { data: highRiskPatients, refetch: refetchHighRisk } = useQuery({
     queryKey: ['high-risk', filters.condition, filters.consecutiveTests, filters.threshold],
     queryFn: async () => {
@@ -73,7 +85,12 @@ export default function AdvancedAnalytics() {
     },
   });
 
-  // AI Query handler - FIXED to use api client
+  // Apply date preset
+  const applyDatePreset = (preset: typeof datePresets[0]) => {
+    setFilters({ ...filters, startDate: preset.start, endDate: preset.end });
+  };
+
+  // AI Query handler
   const handleAiQuery = async () => {
     if (!aiQuery.trim()) return;
     setIsAiLoading(true);
@@ -90,20 +107,18 @@ export default function AdvancedAnalytics() {
     }
   };
 
-  // Export handler - FIXED to use api client
+  // Export handler
   const handleExport = async () => {
     const params = new URLSearchParams();
     params.append('format', exportFormat);
     if (filters.startDate) params.append('startDate', filters.startDate);
     if (filters.endDate) params.append('endDate', filters.endDate);
     
-    // Use api client for export
     try {
       const response = await api.get(`/analytics/export?${params}`, {
         responseType: 'blob'
       });
       
-      // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -117,7 +132,6 @@ export default function AdvancedAnalytics() {
     }
   };
 
-  // Rest of the component remains the same...
   return (
     <div style={{ padding: '24px' }}>
       {/* Header */}
@@ -150,7 +164,7 @@ export default function AdvancedAnalytics() {
         </div>
       </div>
 
-      {/* Filter Bar - Keep as is */}
+      {/* Filter Bar */}
       <div style={{
         background: 'white',
         borderRadius: '16px',
@@ -158,7 +172,7 @@ export default function AdvancedAnalytics() {
         marginBottom: '24px',
         boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <button
             onClick={() => setShowFilters(!showFilters)}
             style={{
@@ -177,7 +191,7 @@ export default function AdvancedAnalytics() {
             <ChevronDown size={16} style={{ transform: showFilters ? 'rotate(180deg)' : 'none' }} />
           </button>
           
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <select
               value={exportFormat}
               onChange={(e) => setExportFormat(e.target.value as any)}
@@ -210,6 +224,28 @@ export default function AdvancedAnalytics() {
               Export Report
             </button>
           </div>
+        </div>
+
+        {/* Date Presets */}
+        <div style={{ marginBottom: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {datePresets.map((preset, idx) => (
+            <button
+              key={idx}
+              onClick={() => applyDatePreset(preset)}
+              style={{
+                padding: '4px 12px',
+                background: filters.startDate === preset.start && filters.endDate === preset.end ? oceanColors.deep : '#f0f0f0',
+                color: filters.startDate === preset.start && filters.endDate === preset.end ? 'white' : '#333',
+                border: 'none',
+                borderRadius: '16px',
+                fontSize: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {preset.label}
+            </button>
+          ))}
         </div>
 
         {showFilters && (
@@ -262,7 +298,7 @@ export default function AdvancedAnalytics() {
         )}
       </div>
 
-      {/* Two Column Layout - Keep as is */}
+      {/* Two Column Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', marginBottom: '24px' }}>
         
         {/* Health Trends Chart */}
@@ -273,7 +309,7 @@ export default function AdvancedAnalytics() {
           </div>
           {trendsLoading ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>Loading trends...</div>
-          ) : (
+          ) : trends && trends.length > 0 ? (
             <div style={{ height: '300px', overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -283,12 +319,12 @@ export default function AdvancedAnalytics() {
                     <th style={{ padding: '8px', textAlign: 'center' }}>Pre-HTN</th>
                     <th style={{ padding: '8px', textAlign: 'center' }}>Hypertension</th>
                     <th style={{ padding: '8px', textAlign: 'center' }}>Total</th>
-                   </tr>
+                  </tr>
                 </thead>
                 <tbody>
-                  {trends?.map((day: any) => (
+                  {trends.map((day: any) => (
                     <tr key={day.date} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '8px' }}>{format(new Date(day.date), 'MMM dd')}</td>
+                      <td style={{ padding: '8px' }}>{format(new Date(day.date), 'MMM dd, yyyy')}</td>
                       <td style={{ padding: '8px', textAlign: 'center', color: oceanColors.success }}>{day.normal_bp}</td>
                       <td style={{ padding: '8px', textAlign: 'center', color: oceanColors.warning }}>{day.pre_hypertension}</td>
                       <td style={{ padding: '8px', textAlign: 'center', color: oceanColors.danger }}>{day.hypertension}</td>
@@ -297,6 +333,10 @@ export default function AdvancedAnalytics() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+              No data available for the selected date range
             </div>
           )}
         </div>
@@ -359,13 +399,13 @@ export default function AdvancedAnalytics() {
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
-              No high-risk patients found
+              No high-risk patients found for the selected criteria
             </div>
           )}
         </div>
       </div>
 
-      {/* AI Natural Language Query Section - Keep as is */}
+      {/* AI Natural Language Query Section */}
       <div style={{
         background: `linear-gradient(135deg, ${oceanColors.navy}, ${oceanColors.deep})`,
         borderRadius: '16px',
