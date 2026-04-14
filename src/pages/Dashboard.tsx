@@ -383,7 +383,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
             </div>
           </div>
 
-          {/* Filters */}
+          {/* Advanced Filters */}
           {showAdvancedFilters && (
             <div style={{ padding: '16px 24px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
               <div style={{ minWidth: '150px' }}>
@@ -588,7 +588,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
         </div>
       </div>
 
-      {/* Patient Profile Modal - THIS WAS MISSING! */}
+      {/* Patient Profile Modal */}
       {selectedPatient && (
         <PatientProfile 
           patient={selectedPatient} 
@@ -710,19 +710,30 @@ export default function Dashboard() {
     enabled: !!filters.startDate,
   });
 
+  // Fetch RBS data for charts
+  const { data: rbs, refetch: refetchRBS, isLoading: rbsLoading } = useQuery({
+    queryKey: ['rbs', filters],
+    queryFn: async () => {
+      const response = await api.get(`/analytics/employees/rbs?${paramString}`);
+      return response.data;
+    },
+    enabled: !!filters.startDate,
+  });
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
       refetchMetrics(),
       refetchHighRisk(),
       refetchBP(),
-      refetchBMI()
+      refetchBMI(),
+      refetchRBS()
     ]);
     setLastUpdated(new Date());
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  const isLoading = metricsLoading || highRiskLoading || bpLoading || bmiLoading;
+  const isLoading = metricsLoading || highRiskLoading || bpLoading || bmiLoading || rbsLoading;
 
   // Prepare chart data
   const bpData = bloodPressure?.map((item: any) => ({
@@ -735,6 +746,14 @@ export default function Dashboard() {
   const bmiData = bmi?.map((item: any) => ({
     name: item.BMICategory,
     value: Number(item.Count),
+  })).filter((item: any) => item.value > 0) || [];
+
+  const rbsData = rbs?.map((item: any) => ({
+    name: item.RBSCategory,
+    value: Number(item.Count),
+    color: item.RBSCategory === 'NORMAL' ? oceanColors.success :
+           item.RBSCategory === 'HYPOGLYCEMIA' ? oceanColors.info :
+           item.RBSCategory === 'PRE-DIABETIC' ? oceanColors.warning : oceanColors.danger,
   })).filter((item: any) => item.value > 0) || [];
 
   // Summary cards
@@ -966,46 +985,48 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Charts Row - 2 Column Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', marginBottom: '32px' }}>
+        {/* Charts Row - 3 Column Grid for BP, BMI, and RBS */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '32px' }}>
           
           {/* Blood Pressure Distribution */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
-            <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <HeartPulse size={22} style={{ color: oceanColors.gold }} />
+                <HeartPulse size={20} style={{ color: oceanColors.gold }} />
                 <div>
-                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>Blood Pressure Distribution</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Employee BP categories overview</p>
+                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Pressure</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BP categories distribution</p>
                 </div>
               </div>
             </div>
-            <div style={{ padding: '24px' }}>
+            <div style={{ padding: '16px' }}>
               {bpData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={340}>
+                <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie 
                       data={bpData} 
                       cx="50%" 
                       cy="50%" 
-                      innerRadius={60} 
-                      outerRadius={100} 
-                      paddingAngle={3} 
-                      dataKey="value" 
-                      label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
-                      labelLine={{ strokeWidth: 1, stroke: 'rgba(255,255,255,0.3)' }}
+                      innerRadius={40} 
+                      outerRadius={80} 
+                      paddingAngle={2} 
+                      dataKey="value"
                     >
                       {bpData.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
-                    <Legend verticalAlign="bottom" height={50} formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.8)' }}>{value}</span>} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white', fontSize: '12px' }} />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '11px' }}>{value}</span>} 
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.5)' }}>No blood pressure data available</p>
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BP data available</p>
                 </div>
               )}
             </div>
@@ -1013,29 +1034,73 @@ export default function Dashboard() {
 
           {/* BMI Distribution */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
-            <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Scale size={22} style={{ color: oceanColors.gold }} />
+                <Scale size={20} style={{ color: oceanColors.gold }} />
                 <div>
-                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>BMI Distribution</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Employee BMI categories breakdown</p>
+                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>BMI</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BMI categories breakdown</p>
                 </div>
               </div>
             </div>
-            <div style={{ padding: '24px' }}>
+            <div style={{ padding: '16px' }}>
               {bmiData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={340}>
-                  <BarChart data={bmiData} layout="vertical" margin={{ left: 100 }}>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={bmiData} layout="vertical" margin={{ left: 80 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis type="number" tick={{ fill: 'white' }} />
-                    <YAxis type="category" dataKey="name" width={100} tick={{ fill: 'white', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
-                    <Bar dataKey="value" fill={oceanColors.gold} radius={[0, 8, 8, 0]} />
+                    <XAxis type="number" tick={{ fill: 'white', fontSize: '10px' }} />
+                    <YAxis type="category" dataKey="name" width={80} tick={{ fill: 'white', fontSize: '10px' }} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white', fontSize: '12px' }} />
+                    <Bar dataKey="value" fill={oceanColors.gold} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.5)' }}>No BMI data available</p>
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BMI data available</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* RBS Distribution - NEW */}
+          <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
+            <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Droplets size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Sugar (RBS)</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>RBS categories distribution</p>
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: '16px' }}>
+              {rbsData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie 
+                      data={rbsData} 
+                      cx="50%" 
+                      cy="50%" 
+                      innerRadius={40} 
+                      outerRadius={80} 
+                      paddingAngle={2} 
+                      dataKey="value"
+                    >
+                      {rbsData.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white', fontSize: '12px' }} />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '11px' }}>{value}</span>} 
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No RBS data available</p>
                 </div>
               )}
             </div>
