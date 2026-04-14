@@ -43,6 +43,7 @@ interface User {
   LastName: string;
   FullName: string;
   Email?: string;
+  UserName?: string;
 }
 
 interface Station {
@@ -95,13 +96,22 @@ export default function DataCorrection() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  // Fetch users (field agents)
-  const { data: users, isLoading: usersLoading } = useQuery({
-    queryKey: ['users'],
+  // Fetch field agents (users with FieldAgent role)
+  const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
+    queryKey: ['field-agents'],
     queryFn: async () => {
-      const response = await api.get('/users');
-      return response.data.data || response.data || [];
+      try {
+        // Try the field-agents endpoint first
+        const response = await api.get('/users/field-agents');
+        return response.data.data || response.data || [];
+      } catch (error) {
+        // Fallback to all users if field-agents endpoint doesn't exist
+        console.warn('Field agents endpoint not found, falling back to all users');
+        const response = await api.get('/users');
+        return response.data.data || response.data || [];
+      }
     },
+    retry: 1,
   });
 
   // Fetch stations
@@ -134,7 +144,7 @@ export default function DataCorrection() {
     
     // Validate required fields
     if (!form.userId) {
-      toast.error("Please select a User (Field Agent)");
+      toast.error("Please select a Field Agent");
       return;
     }
     if (!form.stationId) {
@@ -178,7 +188,16 @@ export default function DataCorrection() {
 
   // Helper to format user display name
   const formatUserName = (user: User) => {
-    return `${user.FirstName || ''} ${user.LastName || ''}`.trim() || user.Email || `User #${user.Id}`;
+    if (user.FullName && user.FullName.trim() !== '') {
+      return user.FullName;
+    }
+    const firstName = user.FirstName || '';
+    const lastName = user.LastName || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    if (fullName) return fullName;
+    if (user.UserName) return user.UserName;
+    if (user.Email) return user.Email;
+    return `User #${user.Id}`;
   };
 
   return (
@@ -260,12 +279,16 @@ export default function DataCorrection() {
             <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: oceanColors.textDark, marginBottom: '6px' }}>
                 <User size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
-                Field Agent (User)
+                Field Agent
               </label>
               {usersLoading ? (
                 <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
-                  Loading users...
+                  Loading field agents...
+                </div>
+              ) : usersError ? (
+                <div style={{ ...inputStyle, color: oceanColors.danger }}>
+                  Error loading users. Please refresh.
                 </div>
               ) : (
                 <select
@@ -382,11 +405,11 @@ export default function DataCorrection() {
                   onChange={handleChange}
                   style={{ ...selectStyle, width: '100px', padding: '12px 32px 12px 12px' }}
                 >
-                  <option value="eq">=</option>
-                  <option value="gt">&gt;</option>
-                  <option value="gte">≥</option>
-                  <option value="lt">&lt;</option>
-                  <option value="lte">≤</option>
+                  <option value="eq">= (equals)</option>
+                  <option value="gt">&gt; (after)</option>
+                  <option value="gte">≥ (on or after)</option>
+                  <option value="lt">&lt; (before)</option>
+                  <option value="lte">≤ (on or before)</option>
                 </select>
                 <input
                   type="number"
@@ -439,17 +462,9 @@ export default function DataCorrection() {
                 min="0"
                 max="23"
                 placeholder="Optional"
-                value={form.beforeHour || ""}
+                value={form.beforeHour ?? ""}
                 onChange={handleNumberChange}
                 style={inputStyle}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = oceanColors.gold;
-                  e.currentTarget.style.boxShadow = `0 0 0 3px ${oceanColors.gold}20`;
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = `${oceanColors.surface}30`;
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
               />
             </div>
             <div>
@@ -462,17 +477,9 @@ export default function DataCorrection() {
                 min="0"
                 max="59"
                 placeholder="Optional"
-                value={form.beforeMinute || ""}
+                value={form.beforeMinute ?? ""}
                 onChange={handleNumberChange}
                 style={inputStyle}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = oceanColors.gold;
-                  e.currentTarget.style.boxShadow = `0 0 0 3px ${oceanColors.gold}20`;
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = `${oceanColors.surface}30`;
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
               />
             </div>
           </div>
@@ -501,16 +508,6 @@ export default function DataCorrection() {
               transition: 'all 0.3s ease',
               boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
             }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.currentTarget.style.transform = 'scale(1.02)';
-                e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.2)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)';
-            }}
           >
             {loading ? (
               <>
@@ -537,14 +534,6 @@ export default function DataCorrection() {
               fontWeight: '500',
               cursor: 'pointer',
               transition: 'all 0.3s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = oceanColors.light;
-              e.currentTarget.style.borderColor = oceanColors.surface;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = oceanColors.white;
-              e.currentTarget.style.borderColor = `${oceanColors.wave}30`;
             }}
           >
             Reset Form
