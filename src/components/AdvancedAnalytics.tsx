@@ -148,9 +148,18 @@ export default function AdvancedAnalytics() {
   };
 
   // Calculate summary statistics
-  const totalReadings = trends?.reduce((sum: number, day: any) => sum + (day.total_readings || 0), 0) || 0;
+  const totalReadings = trends?.reduce((sum: number, day: any) => {
+    const dayTotal = parseInt(day.total_readings) || 0;
+    return sum + dayTotal;
+  }, 0) || 0;
+
   const avgReadingsPerDay = trends?.length ? Math.round(totalReadings / trends.length) : 0;
   const uniqueDates = trends?.length || 0;
+
+  // Also calculate totals per category for additional insights
+  const totalNormalBP = trends?.reduce((sum: number, day: any) => sum + (parseInt(day.normal_bp) || 0), 0) || 0;
+  const totalPreHTN = trends?.reduce((sum: number, day: any) => sum + (parseInt(day.pre_hypertension) || 0), 0) || 0;
+  const totalHypertension = trends?.reduce((sum: number, day: any) => sum + (parseInt(day.hypertension) || 0), 0) || 0;
 
   return (
     <div style={{ 
@@ -241,7 +250,7 @@ export default function AdvancedAnalytics() {
         {/* Quick Stats Cards */}
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(3, 1fr)', 
+          gridTemplateColumns: 'repeat(4, 1fr)', 
           gap: '20px', 
           marginBottom: '24px' 
         }}>
@@ -254,14 +263,24 @@ export default function AdvancedAnalytics() {
             boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <Activity size={24} style={{ color: oceanColors.deep }} />
-              <h3 style={{ fontSize: '16px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Total Readings</h3>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Activity size={20} style={{ color: oceanColors.gold }} />
+              </div>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Total Readings</h3>
             </div>
             <p style={{ fontSize: '32px', fontWeight: 'bold', color: oceanColors.deep, margin: 0 }}>
               {trendsLoading ? '...' : totalReadings.toLocaleString()}
             </p>
             <p style={{ fontSize: '13px', color: oceanColors.textLight, marginTop: '4px' }}>
-              Across {uniqueDates} days
+              Across {uniqueDates} screening days
             </p>
           </div>
           
@@ -274,14 +293,24 @@ export default function AdvancedAnalytics() {
             boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <TrendingUp size={24} style={{ color: oceanColors.success }} />
-              <h3 style={{ fontSize: '16px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Avg Daily Readings</h3>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: `linear-gradient(135deg, ${oceanColors.success}, ${oceanColors.wave})`,
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <TrendingUp size={20} style={{ color: 'white' }} />
+              </div>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Avg Daily Readings</h3>
             </div>
             <p style={{ fontSize: '32px', fontWeight: 'bold', color: oceanColors.success, margin: 0 }}>
               {trendsLoading ? '...' : avgReadingsPerDay.toLocaleString()}
             </p>
             <p style={{ fontSize: '13px', color: oceanColors.textLight, marginTop: '4px' }}>
-              Readings per screening day
+              Per screening day
             </p>
           </div>
           
@@ -294,16 +323,54 @@ export default function AdvancedAnalytics() {
             boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <Calendar size={24} style={{ color: oceanColors.warning }} />
-              <h3 style={{ fontSize: '16px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Date Range</h3>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: `linear-gradient(135deg, ${oceanColors.warning}, ${oceanColors.gold})`,
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Heart size={20} style={{ color: oceanColors.navy }} />
+              </div>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Normal BP</h3>
             </div>
-            <p style={{ fontSize: '18px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>
-              {filters.startDate && filters.endDate ? (
-                `${format(new Date(filters.startDate), 'MMM dd, yyyy')} - ${format(new Date(filters.endDate), 'MMM dd, yyyy')}`
-              ) : 'All Time'}
+            <p style={{ fontSize: '32px', fontWeight: 'bold', color: oceanColors.success, margin: 0 }}>
+              {trendsLoading ? '...' : totalNormalBP.toLocaleString()}
             </p>
             <p style={{ fontSize: '13px', color: oceanColors.textLight, marginTop: '4px' }}>
-              {uniqueDates} days with data
+              {totalReadings > 0 ? `${((totalNormalBP / totalReadings) * 100).toFixed(1)}% of readings` : 'No data'}
+            </p>
+          </div>
+          
+          <div style={{
+            background: 'rgba(255,255,255,0.95)',
+            backdropFilter: 'blur(8px)',
+            borderRadius: '16px',
+            padding: '20px',
+            border: `1px solid ${oceanColors.wave}30`,
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: `linear-gradient(135deg, ${oceanColors.danger}, ${oceanColors.warning})`,
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Calendar size={20} style={{ color: 'white' }} />
+              </div>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Hypertension</h3>
+            </div>
+            <p style={{ fontSize: '32px', fontWeight: 'bold', color: oceanColors.danger, margin: 0 }}>
+              {trendsLoading ? '...' : totalHypertension.toLocaleString()}
+            </p>
+            <p style={{ fontSize: '13px', color: oceanColors.textLight, marginTop: '4px' }}>
+              {totalReadings > 0 ? `${((totalHypertension / totalReadings) * 100).toFixed(1)}% of readings` : 'No data'}
             </p>
           </div>
         </div>
