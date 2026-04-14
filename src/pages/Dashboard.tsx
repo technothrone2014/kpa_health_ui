@@ -15,6 +15,7 @@ import { format, subDays, subHours } from "date-fns";
 import api from "../api/client";
 import LoadingSpinner from "../components/LoadingSpinner";
 import * as XLSX from 'xlsx';
+import PatientProfile from "../components/PatientProfile";
 
 // Oceanic Theme Colors
 const oceanColors = {
@@ -43,6 +44,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('risk_score');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
   
   // Dynamic risk criteria
   const [riskCriteria, setRiskCriteria] = useState({
@@ -59,6 +61,20 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
     station: filters.station,
     gender: filters.gender
   });
+
+  // Helper function to transform high risk patient data to match PatientProfile expected format
+  const transformToPatientProfile = (patient: any) => {
+    return {
+      Id: patient.client_id,
+      FullName: patient.fullname,
+      IDNumber: patient.idnumber,
+      PhoneNumber: patient.phonenumber || '',
+      GenderTitle: patient.gender || 'N/A',
+      CategoryTitle: patient.category || 'N/A',
+      StationTitle: patient.station || 'N/A',
+      Status: true,
+    };
+  };
 
   if (!isOpen) return null;
 
@@ -218,348 +234,368 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.7)',
-      backdropFilter: 'blur(4px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      overflow: 'auto',
-      padding: '20px'
-    }}>
+    <>
       <div style={{
-        background: 'white',
-        borderRadius: '20px',
-        width: '95%',
-        maxWidth: '1600px',
-        maxHeight: '90vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.7)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        overflow: 'auto',
+        padding: '20px'
       }}>
-        {/* Modal Header */}
         <div style={{
-          background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
-          padding: '20px 24px',
+          background: 'white',
+          borderRadius: '20px',
+          width: '95%',
+          maxWidth: '1600px',
+          maxHeight: '90vh',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderBottom: `2px solid ${oceanColors.gold}`
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <AlertTriangle size={24} style={{ color: oceanColors.gold }} />
-            <div>
-              <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', margin: 0 }}>High Risk Patients</h2>
-              <p style={{ fontSize: '13px', color: oceanColors.foam, marginTop: '4px' }}>
-                {sortedPatients.length} patients meeting risk criteria
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              borderRadius: '8px',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: 'white'
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Risk Criteria Configuration */}
-        <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sliders size={18} style={{ color: oceanColors.deep }} />
-              <strong style={{ color: oceanColors.deep }}>Risk Criteria Configuration</strong>
+          {/* Modal Header */}
+          <div style={{
+            background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+            padding: '20px 24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottom: `2px solid ${oceanColors.gold}`
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <AlertTriangle size={24} style={{ color: oceanColors.gold }} />
+              <div>
+                <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', margin: 0 }}>High Risk Patients</h2>
+                <p style={{ fontSize: '13px', color: oceanColors.foam, marginTop: '4px' }}>
+                  {sortedPatients.length} patients meeting risk criteria
+                </p>
+              </div>
             </div>
             <button
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              onClick={onClose}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                borderRadius: '8px',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'white'
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Risk Criteria Configuration */}
+          <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sliders size={18} style={{ color: oceanColors.deep }} />
+                <strong style={{ color: oceanColors.deep }}>Risk Criteria Configuration</strong>
+              </div>
+              <button
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 12px',
+                  background: 'white',
+                  border: `1px solid ${oceanColors.mid}30`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                <Settings size={14} />
+                {showAdvancedFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+              </button>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Minimum Visits</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={riskCriteria.minVisits}
+                  onChange={(e) => setRiskCriteria({ ...riskCriteria, minVisits: parseInt(e.target.value) || 2 })}
+                  style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Min Abnormal BP Readings</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  value={riskCriteria.minAbnormalBP}
+                  onChange={(e) => setRiskCriteria({ ...riskCriteria, minAbnormalBP: parseInt(e.target.value) || 1 })}
+                  style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Min Abnormal BMI Readings</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  value={riskCriteria.minAbnormalBMI}
+                  onChange={(e) => setRiskCriteria({ ...riskCriteria, minAbnormalBMI: parseInt(e.target.value) || 1 })}
+                  style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Min Abnormal RBS Readings</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  value={riskCriteria.minAbnormalRBS}
+                  onChange={(e) => setRiskCriteria({ ...riskCriteria, minAbnormalRBS: parseInt(e.target.value) || 1 })}
+                  style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Conditions Required</label>
+                <select
+                  value={riskCriteria.conditionsRequired}
+                  onChange={(e) => setRiskCriteria({ ...riskCriteria, conditionsRequired: e.target.value as 'any' | 'all' })}
+                  style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                >
+                  <option value="any">Any Condition (OR)</option>
+                  <option value="all">All Conditions (AND)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Filters */}
+          {showAdvancedFilters && (
+            <div style={{ padding: '16px 24px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
+              <div style={{ minWidth: '150px' }}>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Category</label>
+                <select
+                  value={localFilters.category}
+                  onChange={(e) => setLocalFilters({ ...localFilters, category: e.target.value })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                >
+                  <option value="all">All Categories</option>
+                  {availableCategories?.map((cat: any) => (
+                    <option key={cat.Id} value={cat.Title}>{cat.Title}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ minWidth: '150px' }}>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Station</label>
+                <select
+                  value={localFilters.station}
+                  onChange={(e) => setLocalFilters({ ...localFilters, station: e.target.value })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                >
+                  <option value="all">All Stations</option>
+                  {availableStations?.map((station: any) => (
+                    <option key={station.Id} value={station.Title}>{station.Title}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ minWidth: '150px' }}>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Gender</label>
+                <select
+                  value={localFilters.gender}
+                  onChange={(e) => setLocalFilters({ ...localFilters, gender: e.target.value })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                >
+                  <option value="all">All Genders</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </div>
+              <button
+                onClick={handleApplyFilters}
+                style={{
+                  padding: '8px 16px',
+                  background: oceanColors.deep,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Filter size={14} />
+                Apply Filters
+              </button>
+            </div>
+          )}
+
+          {/* Search and Export Bar */}
+          <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search by name, ID number, or phone number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px 8px 36px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none'
+                }}
+              />
+            </div>
+            <button
+              onClick={handleExportExcel}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '6px 12px',
-                background: 'white',
-                border: `1px solid ${oceanColors.mid}30`,
+                padding: '8px 16px',
+                background: oceanColors.success,
+                color: 'white',
+                border: 'none',
                 borderRadius: '8px',
                 cursor: 'pointer',
-                fontSize: '12px'
+                fontSize: '14px'
               }}
             >
-              <Settings size={14} />
-              {showAdvancedFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+              <Download size={16} />
+              Export Excel
             </button>
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-            <div>
-              <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Minimum Visits</label>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={riskCriteria.minVisits}
-                onChange={(e) => setRiskCriteria({ ...riskCriteria, minVisits: parseInt(e.target.value) || 2 })}
-                style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Min Abnormal BP Readings</label>
-              <input
-                type="number"
-                min="0"
-                max="20"
-                value={riskCriteria.minAbnormalBP}
-                onChange={(e) => setRiskCriteria({ ...riskCriteria, minAbnormalBP: parseInt(e.target.value) || 1 })}
-                style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Min Abnormal BMI Readings</label>
-              <input
-                type="number"
-                min="0"
-                max="20"
-                value={riskCriteria.minAbnormalBMI}
-                onChange={(e) => setRiskCriteria({ ...riskCriteria, minAbnormalBMI: parseInt(e.target.value) || 1 })}
-                style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Min Abnormal RBS Readings</label>
-              <input
-                type="number"
-                min="0"
-                max="20"
-                value={riskCriteria.minAbnormalRBS}
-                onChange={(e) => setRiskCriteria({ ...riskCriteria, minAbnormalRBS: parseInt(e.target.value) || 1 })}
-                style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Conditions Required</label>
-              <select
-                value={riskCriteria.conditionsRequired}
-                onChange={(e) => setRiskCriteria({ ...riskCriteria, conditionsRequired: e.target.value as 'any' | 'all' })}
-                style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-              >
-                <option value="any">Any Condition (OR)</option>
-                <option value="all">All Conditions (AND)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        {showAdvancedFilters && (
-          <div style={{ padding: '16px 24px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
-            <div style={{ minWidth: '150px' }}>
-              <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Category</label>
-              <select
-                value={localFilters.category}
-                onChange={(e) => setLocalFilters({ ...localFilters, category: e.target.value })}
-                style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-              >
-                <option value="all">All Categories</option>
-                {availableCategories?.map((cat: any) => (
-                  <option key={cat.Id} value={cat.Title}>{cat.Title}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ minWidth: '150px' }}>
-              <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Station</label>
-              <select
-                value={localFilters.station}
-                onChange={(e) => setLocalFilters({ ...localFilters, station: e.target.value })}
-                style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-              >
-                <option value="all">All Stations</option>
-                {availableStations?.map((station: any) => (
-                  <option key={station.Id} value={station.Title}>{station.Title}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ minWidth: '150px' }}>
-              <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Gender</label>
-              <select
-                value={localFilters.gender}
-                onChange={(e) => setLocalFilters({ ...localFilters, gender: e.target.value })}
-                style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-              >
-                <option value="all">All Genders</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-            </div>
             <button
-              onClick={handleApplyFilters}
+              onClick={handlePrint}
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 padding: '8px 16px',
                 background: oceanColors.deep,
                 color: 'white',
                 border: 'none',
-                borderRadius: '6px',
+                borderRadius: '8px',
                 cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
+                fontSize: '14px'
               }}
             >
-              <Filter size={14} />
-              Apply Filters
+              <Printer size={16} />
+              Print
             </button>
           </div>
-        )}
 
-        {/* Search and Export Bar */}
-        <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input
-              type="text"
-              placeholder="Search by name, ID number, or phone number..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none'
-              }}
-            />
+          {/* Patient Table */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#f1f5f9', position: 'sticky', top: 0 }}>
+                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('fullname')}>
+                    Name {sortField === 'fullname' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('idnumber')}>
+                    ID Number {sortField === 'idnumber' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('phonenumber')}>
+                    Phone Number {sortField === 'phonenumber' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('category')}>
+                    Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('station')}>
+                    Station {sortField === 'station' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('total_visits')}>
+                    Visits {sortField === 'total_visits' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal BP</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal BMI</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal RBS</th>
+                  <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('risk_score')}>
+                    Risk Score {sortField === 'risk_score' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('last_visit_date')}>
+                    Last Visit {sortField === 'last_visit_date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedPatients.map((patient: any) => (
+                  <tr 
+                    key={patient.client_id} 
+                    style={{ 
+                      borderBottom: '1px solid #e2e8f0',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s'
+                    }}
+                    onClick={() => setSelectedPatient(transformToPatientProfile(patient))}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ padding: '12px', fontWeight: '500' }}>{patient.fullname}</td>
+                    <td style={{ padding: '12px', color: '#64748b' }}>{patient.idnumber}</td>
+                    <td style={{ padding: '12px', color: '#64748b' }}>{patient.phonenumber || 'N/A'}</td>
+                    <td style={{ padding: '12px' }}>{patient.category}</td>
+                    <td style={{ padding: '12px' }}>{patient.station}</td>
+                    <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>{patient.total_visits}</td>
+                    <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_bp_count || 0}</td>
+                    <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.warning }}>{patient.abnormal_bmi_count || 0}</td>
+                    <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_rbs_count || 0}</td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <div style={{
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        background: patient.risk_score >= 70 ? `${oceanColors.danger}20` :
+                                   patient.risk_score >= 40 ? `${oceanColors.warning}20` : `${oceanColors.success}20`,
+                        color: patient.risk_score >= 70 ? oceanColors.danger :
+                               patient.risk_score >= 40 ? oceanColors.warning : oceanColors.success
+                      }}>
+                        {patient.risk_score}%
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
+                      {patient.last_visit_date ? format(new Date(patient.last_visit_date), 'MMM dd, yyyy') : 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {sortedPatients.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+                No patients found matching the current criteria
+              </div>
+            )}
           </div>
-          <button
-            onClick={handleExportExcel}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              background: oceanColors.success,
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            <Download size={16} />
-            Export Excel
-          </button>
-          <button
-            onClick={handlePrint}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              background: oceanColors.deep,
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            <Printer size={16} />
-            Print
-          </button>
-        </div>
-
-        {/* Patient Table */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f1f5f9', position: 'sticky', top: 0 }}>
-                <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('fullname')}>
-                  Name {sortField === 'fullname' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('idnumber')}>
-                  ID Number {sortField === 'idnumber' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('phonenumber')}>
-                  Phone Number {sortField === 'phonenumber' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('category')}>
-                  Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('station')}>
-                  Station {sortField === 'station' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('total_visits')}>
-                  Visits {sortField === 'total_visits' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal BP</th>
-                <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal BMI</th>
-                <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal RBS</th>
-                <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('risk_score')}>
-                  Risk Score {sortField === 'risk_score' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('last_visit_date')}>
-                  Last Visit {sortField === 'last_visit_date' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedPatients.map((patient: any) => (
-                <tr key={patient.client_id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '12px', fontWeight: '500' }}>{patient.fullname}</td>
-                  <td style={{ padding: '12px', color: '#64748b' }}>{patient.idnumber}</td>
-                  <td style={{ padding: '12px', color: '#64748b' }}>{patient.phonenumber || 'N/A'}</td>
-                  <td style={{ padding: '12px' }}>{patient.category}</td>
-                  <td style={{ padding: '12px' }}>{patient.station}</td>
-                  <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>{patient.total_visits}</td>
-                  <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_bp_count || 0}</td>
-                  <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.warning }}>{patient.abnormal_bmi_count || 0}</td>
-                  <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_rbs_count || 0}</td>
-                  <td style={{ padding: '12px', textAlign: 'center' }}>
-                    <div style={{
-                      display: 'inline-block',
-                      padding: '4px 8px',
-                      borderRadius: '20px',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      background: patient.risk_score >= 70 ? `${oceanColors.danger}20` :
-                                 patient.risk_score >= 40 ? `${oceanColors.warning}20` : `${oceanColors.success}20`,
-                      color: patient.risk_score >= 70 ? oceanColors.danger :
-                             patient.risk_score >= 40 ? oceanColors.warning : oceanColors.success
-                    }}>
-                      {patient.risk_score}%
-                    </div>
-                  </td>
-                  <td style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
-                    {patient.last_visit_date ? format(new Date(patient.last_visit_date), 'MMM dd, yyyy') : 'N/A'}
-                   </td>
-                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {sortedPatients.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
-              No patients found matching the current criteria
-            </div>
-          )}
         </div>
       </div>
-    </div>
+
+      {/* Patient Profile Modal - THIS WAS MISSING! */}
+      {selectedPatient && (
+        <PatientProfile 
+          patient={selectedPatient} 
+          onClose={() => setSelectedPatient(null)} 
+        />
+      )}
+    </>
   );
 }
 
@@ -712,7 +748,7 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0B2F9E, #1A4D8C, #2B7BA8)', fontFamily: 'Verdana, Geneva, sans-serif' }}>
       
-      {/* Hero Section - same as before */}
+      {/* Hero Section */}
       <div style={{ position: 'relative', margin: '24px 24px 32px 24px', overflow: 'hidden', borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #0A1C40, #0B2F9E, #1A4D8C)' }}></div>
         <div style={{ position: 'relative', padding: '32px' }}>
