@@ -4,11 +4,12 @@ import {
   Users, Shield, Anchor, Activity, HeartPulse, ActivitySquare, Heart,
   RefreshCw, ChevronRight, Ship, Compass, Navigation, Scale,
   Droplets, Thermometer, Calendar, Clock, TrendingUp, Award,
-  AlertTriangle, Filter, Download, FileText
+  AlertTriangle, Filter, Download, FileText, X, Printer,
+  Search, ChevronDown, ChevronUp
 } from "lucide-react";
 import { 
   PieChart, Pie, Cell, BarChart, Bar, Tooltip, ResponsiveContainer, Legend,
-  CartesianGrid, XAxis, YAxis, LineChart, Line
+  CartesianGrid, XAxis, YAxis
 } from "recharts";
 import { format, subDays, subHours } from "date-fns";
 import api from "../api/client";
@@ -37,12 +38,344 @@ const formatNumber = (num: number): string => {
   return num.toString();
 };
 
+// High Risk Patients Modal Component
+function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onExport }: any) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortField, setSortField] = useState('risk_level');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [riskFilter, setRiskFilter] = useState('all');
+
+  if (!isOpen) return null;
+
+  const filteredPatients = patients?.filter((patient: any) => {
+    const matchesSearch = searchTerm === '' || 
+      patient.fullname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.idnumber?.includes(searchTerm);
+    const matchesRisk = riskFilter === 'all' || patient.risk_level === riskFilter;
+    return matchesSearch && matchesRisk;
+  }) || [];
+
+  const sortedPatients = [...filteredPatients].sort((a, b) => {
+    let aVal = a[sortField];
+    let bVal = b[sortField];
+    if (sortField === 'risk_level') {
+      const riskOrder = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+      aVal = riskOrder[aVal as keyof typeof riskOrder] || 0;
+      bVal = riskOrder[bVal as keyof typeof riskOrder] || 0;
+    }
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>High Risk Patients Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #0B2F9E; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #0B2F9E; color: white; }
+            .risk-high { color: #EF4444; font-weight: bold; }
+            .risk-medium { color: #F59E0B; font-weight: bold; }
+            .risk-low { color: #10B981; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>High Risk Patients Report</h1>
+          <p>Generated: ${format(new Date(), 'PPPpp')}</p>
+          <p>Filters: Period ${filters.startDate} to ${filters.endDate} | Category: ${filters.category} | Station: ${filters.station}</p>
+           <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>ID Number</th>
+                <th>Phone</th>
+                <th>Category</th>
+                <th>Station</th>
+                <th>Visits</th>
+                <th>Abnormal BP</th>
+                <th>Abnormal BMI</th>
+                <th>Abnormal RBS</th>
+                <th>Risk Level</th>
+                <th>Last Visit</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sortedPatients.map((patient: any) => `
+                <tr>
+                  <td>${patient.fullname}</td>
+                  <td>${patient.idnumber}</td>
+                  <td>${patient.phonenumber || 'N/A'}</td>
+                  <td>${patient.category}</td>
+                  <td>${patient.station}</td>
+                  <td>${patient.total_visits}</td>
+                  <td>${patient.abnormal_bp_count || 0}</td>
+                  <td>${patient.abnormal_bmi_count || 0}</td>
+                  <td>${patient.abnormal_rbs_count || 0}</td>
+                  <td class="risk-${patient.risk_level?.toLowerCase()}">${patient.risk_level}</td>
+                  <td>${patient.last_visit_date ? new Date(patient.last_visit_date).toLocaleDateString() : 'N/A'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+           </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handleExportExcel = () => {
+    const exportData = sortedPatients.map((patient: any) => ({
+      'Full Name': patient.fullname,
+      'ID Number': patient.idnumber,
+      'Phone Number': patient.phonenumber,
+      'Category': patient.category,
+      'Station': patient.station,
+      'Total Visits': patient.total_visits,
+      'Abnormal BP Visits': patient.abnormal_bp_count || 0,
+      'Abnormal BMI Visits': patient.abnormal_bmi_count || 0,
+      'Abnormal RBS Visits': patient.abnormal_rbs_count || 0,
+      'Risk Level': patient.risk_level,
+      'Conditions Count': patient.conditions_count,
+      'Last Visit Date': patient.last_visit_date ? format(new Date(patient.last_visit_date), 'PPP') : 'N/A'
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'High Risk Patients');
+    XLSX.writeFile(wb, `high_risk_patients_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.7)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      overflow: 'auto',
+      padding: '20px'
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: '20px',
+        width: '90%',
+        maxWidth: '1400px',
+        maxHeight: '90vh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+      }}>
+        {/* Modal Header */}
+        <div style={{
+          background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
+          padding: '20px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: `2px solid ${oceanColors.gold}`
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <AlertTriangle size={24} style={{ color: oceanColors.gold }} />
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', margin: 0 }}>High Risk Patients</h2>
+              <p style={{ fontSize: '13px', color: oceanColors.foam, marginTop: '4px' }}>
+                {sortedPatients.length} patients requiring immediate attention
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '8px',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'white'
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Modal Filters */}
+        <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input
+              type="text"
+              placeholder="Search by name or ID number..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 36px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '14px',
+                outline: 'none'
+              }}
+            />
+          </div>
+          <select
+            value={riskFilter}
+            onChange={(e) => setRiskFilter(e.target.value)}
+            style={{ padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px' }}
+          >
+            <option value="all">All Risk Levels</option>
+            <option value="HIGH">High Risk</option>
+            <option value="MEDIUM">Medium Risk</option>
+            <option value="LOW">Low Risk</option>
+          </select>
+          <button
+            onClick={handleExportExcel}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              background: oceanColors.success,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            <Download size={16} />
+            Export Excel
+          </button>
+          <button
+            onClick={handlePrint}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              background: oceanColors.deep,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            <Printer size={16} />
+            Print
+          </button>
+        </div>
+
+        {/* Modal Table */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f1f5f9', position: 'sticky', top: 0 }}>
+                <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('fullname')}>
+                  Name {sortField === 'fullname' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('idnumber')}>
+                  ID Number {sortField === 'idnumber' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th style={{ padding: '12px', textAlign: 'left' }}>Phone</th>
+                <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('category')}>
+                  Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('station')}>
+                  Station {sortField === 'station' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('total_visits')}>
+                  Visits {sortField === 'total_visits' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal BP</th>
+                <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal BMI</th>
+                <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal RBS</th>
+                <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('risk_level')}>
+                  Risk Level {sortField === 'risk_level' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('last_visit_date')}>
+                  Last Visit {sortField === 'last_visit_date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedPatients.map((patient: any) => (
+                <tr key={patient.client_id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '12px', fontWeight: '500' }}>{patient.fullname}</td>
+                  <td style={{ padding: '12px', color: '#64748b' }}>{patient.idnumber}</td>
+                  <td style={{ padding: '12px', color: '#64748b' }}>{patient.phonenumber || 'N/A'}</td>
+                  <td style={{ padding: '12px' }}>{patient.category}</td>
+                  <td style={{ padding: '12px' }}>{patient.station}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>{patient.total_visits}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_bp_count || 0}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.warning }}>{patient.abnormal_bmi_count || 0}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_rbs_count || 0}</td>
+                  <td style={{ padding: '12px', textAlign: 'center' }}>
+                    <span style={{
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      background: patient.risk_level === 'HIGH' ? `${oceanColors.danger}20` :
+                                 patient.risk_level === 'MEDIUM' ? `${oceanColors.warning}20` : `${oceanColors.success}20`,
+                      color: patient.risk_level === 'HIGH' ? oceanColors.danger :
+                             patient.risk_level === 'MEDIUM' ? oceanColors.warning : oceanColors.success
+                    }}>
+                      {patient.risk_level}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
+                    {patient.last_visit_date ? format(new Date(patient.last_visit_date), 'MMM dd, yyyy') : 'N/A'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {sortedPatients.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+              No high-risk patients found for the selected criteria
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [greeting, setGreeting] = useState("");
   const [currentTime, setCurrentTime] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [showFilters, setShowFilters] = useState(false);
+  const [showHighRiskModal, setShowHighRiskModal] = useState(false);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -117,31 +450,11 @@ export default function Dashboard() {
     enabled: !!filters.startDate,
   });
 
-  // Fetch abnormal readings
-  const { data: abnormalReadings, refetch: refetchAbnormal, isLoading: abnormalLoading } = useQuery({
-    queryKey: ['abnormal-readings', filters],
-    queryFn: async () => {
-      const response = await api.get(`/analytics/abnormal-readings?${paramString}`);
-      return response.data.data;
-    },
-    enabled: !!filters.startDate,
-  });
-
   // Fetch high-risk patients
   const { data: highRiskPatients, refetch: refetchHighRisk, isLoading: highRiskLoading } = useQuery({
     queryKey: ['high-risk-patients', filters],
     queryFn: async () => {
       const response = await api.get(`/analytics/high-risk-patients?${paramString}`);
-      return response.data.data || [];
-    },
-    enabled: !!filters.startDate,
-  });
-
-  // Fetch multi-visit abnormal patients
-  const { data: multiVisitAbnormal, refetch: refetchMultiVisit, isLoading: multiVisitLoading } = useQuery({
-    queryKey: ['multi-visit-abnormal', filters],
-    queryFn: async () => {
-      const response = await api.get(`/analytics/multi-visit-abnormal?${paramString}&minVisits=2`);
       return response.data.data || [];
     },
     enabled: !!filters.startDate,
@@ -171,9 +484,7 @@ export default function Dashboard() {
     setRefreshing(true);
     await Promise.all([
       refetchMetrics(),
-      refetchAbnormal(),
       refetchHighRisk(),
-      refetchMultiVisit(),
       refetchBP(),
       refetchBMI()
     ]);
@@ -181,28 +492,7 @@ export default function Dashboard() {
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  const handleExport = () => {
-    const exportData = highRiskPatients?.map((patient: any) => ({
-      'Full Name': patient.fullname,
-      'ID Number': patient.idnumber,
-      'Phone Number': patient.phonenumber,
-      'Category': patient.category,
-      'Station': patient.station,
-      'Total Visits': patient.total_visits,
-      'Abnormal BP Visits': patient.abnormal_bp_count,
-      'Abnormal BMI Visits': patient.abnormal_bmi_count,
-      'Abnormal RBS Visits': patient.abnormal_rbs_count,
-      'Risk Level': patient.risk_level,
-      'Last Visit Date': patient.last_visit_date ? format(new Date(patient.last_visit_date), 'PPP') : 'N/A'
-    })) || [];
-    
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'High Risk Patients');
-    XLSX.writeFile(wb, `high_risk_patients_${format(new Date(), 'yyyyMMdd')}.xlsx`);
-  };
-
-  const isLoading = metricsLoading || abnormalLoading || highRiskLoading || multiVisitLoading || bpLoading || bmiLoading;
+  const isLoading = metricsLoading || highRiskLoading || bpLoading || bmiLoading;
 
   // Prepare chart data
   const bpData = bloodPressure?.map((item: any) => ({
@@ -217,12 +507,12 @@ export default function Dashboard() {
     value: Number(item.Count),
   })).filter((item: any) => item.value > 0) || [];
 
-  // Health metrics for summary cards
+  // Summary cards
   const summaryCards = [
     { title: "Total Visits", value: metrics?.totalOutstandingVisits || 0, icon: Activity, color: "from-blue-500 to-cyan-500", description: "Total health visits recorded" },
     { title: "Clients Seen", value: metrics?.totalClientsSeen || 0, icon: Users, color: "from-emerald-500 to-teal-500", description: "Unique clients" },
-    { title: "High Risk", value: highRiskPatients?.length || 0, icon: AlertTriangle, color: "from-red-500 to-rose-500", description: "Patients needing follow-up" },
-    { title: "Multi-Visit", value: multiVisitAbnormal?.length || 0, icon: TrendingUp, color: "from-purple-500 to-pink-500", description: "Patients with >1 visit" },
+    { title: "High Risk Patients", value: highRiskPatients?.length || 0, icon: AlertTriangle, color: "from-red-500 to-rose-500", description: "Click to view details", isClickable: true, onClick: () => setShowHighRiskModal(true) },
+    { title: "Health Score", value: metrics?.healthScore || 85, icon: Award, color: "from-purple-500 to-pink-500", description: "Overall population health", suffix: "%" },
   ];
 
   return (
@@ -271,26 +561,6 @@ export default function Dashboard() {
               >
                 <Filter size={18} />
                 Filters
-              </button>
-              <button
-                onClick={handleExport}
-                disabled={highRiskPatients?.length === 0}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 20px',
-                  background: 'rgba(255,255,255,0.1)',
-                  backdropFilter: 'blur(4px)',
-                  borderRadius: '12px',
-                  color: 'white',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  cursor: highRiskPatients?.length === 0 ? 'not-allowed' : 'pointer',
-                  opacity: highRiskPatients?.length === 0 ? 0.5 : 1
-                }}
-              >
-                <Download size={18} />
-                Export
               </button>
               <button
                 onClick={handleRefresh}
@@ -401,6 +671,7 @@ export default function Dashboard() {
           {summaryCards.map((card) => (
             <div 
               key={card.title}
+              onClick={card.isClickable ? card.onClick : undefined}
               style={{
                 position: 'relative',
                 overflow: 'hidden',
@@ -410,6 +681,19 @@ export default function Dashboard() {
                 padding: '20px',
                 transition: 'all 0.3s',
                 border: '1px solid rgba(255,255,255,0.2)',
+                cursor: card.isClickable ? 'pointer' : 'default',
+              }}
+              onMouseEnter={(e) => {
+                if (card.isClickable) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                  e.currentTarget.style.transform = 'scale(1.02)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (card.isClickable) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -424,10 +708,30 @@ export default function Dashboard() {
                 }}>
                   <card.icon size={24} style={{ color: 'white' }} />
                 </div>
+                {card.title === "High Risk Patients" && highRiskPatients?.length > 0 && (
+                  <div style={{
+                    background: oceanColors.danger,
+                    color: 'white',
+                    borderRadius: '20px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    animation: 'pulse 2s infinite'
+                  }}>
+                    URGENT
+                  </div>
+                )}
               </div>
-              <p style={{ fontSize: '28px', fontWeight: 'bold', color: 'white' }}>{formatNumber(card.value)}</p>
+              <p style={{ fontSize: '28px', fontWeight: 'bold', color: 'white' }}>
+                {formatNumber(card.value)}{card.suffix || ''}
+              </p>
               <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px', marginTop: '4px', fontWeight: '500' }}>{card.title}</p>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '4px' }}>{card.description}</p>
+              {card.isClickable && (
+                <div style={{ marginTop: '12px', color: oceanColors.gold, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  Click to view details →
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -507,120 +811,17 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-
-        {/* High Risk Patients Table */}
-        <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)', marginBottom: '24px' }}>
-          <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <AlertTriangle size={22} style={{ color: oceanColors.gold }} />
-              <div>
-                <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>High Risk Patients</h3>
-                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Patients requiring immediate attention</p>
-              </div>
-            </div>
-          </div>
-          <div style={{ padding: '20px', overflow: 'auto', maxHeight: '400px' }}>
-            {highRiskLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>Loading high-risk patients...</div>
-            ) : highRiskPatients?.length > 0 ? (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>Name</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>ID Number</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>Category</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>Station</th>
-                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Visits</th>
-                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Risk Level</th>
-                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Last Visit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {highRiskPatients.map((patient: any) => (
-                    <tr key={patient.client_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <td style={{ padding: '12px', color: 'white' }}>{patient.fullname}</td>
-                      <td style={{ padding: '12px', color: 'rgba(255,255,255,0.8)' }}>{patient.idnumber}</td>
-                      <td style={{ padding: '12px', color: 'rgba(255,255,255,0.8)' }}>{patient.category}</td>
-                      <td style={{ padding: '12px', color: 'rgba(255,255,255,0.8)' }}>{patient.station}</td>
-                      <td style={{ padding: '12px', textAlign: 'center', color: 'white' }}>{patient.total_visits}</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <span style={{
-                          padding: '4px 12px',
-                          borderRadius: '20px',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          background: patient.risk_level === 'HIGH' ? `${oceanColors.danger}30` :
-                                     patient.risk_level === 'MEDIUM' ? `${oceanColors.warning}30` : `${oceanColors.success}30`,
-                          color: patient.risk_level === 'HIGH' ? oceanColors.danger :
-                                 patient.risk_level === 'MEDIUM' ? oceanColors.warning : oceanColors.success
-                        }}>
-                          {patient.risk_level}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
-                        {patient.last_visit_date ? format(new Date(patient.last_visit_date), 'MMM dd, yyyy') : 'N/A'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.5)' }}>
-                No high-risk patients found for the selected criteria
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Multi-Visit Abnormal Patients Table */}
-        <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
-          <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <TrendingUp size={22} style={{ color: oceanColors.gold }} />
-              <div>
-                <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>Multi-Visit Abnormal Patients</h3>
-                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Patients with multiple abnormal readings</p>
-              </div>
-            </div>
-          </div>
-          <div style={{ padding: '20px', overflow: 'auto', maxHeight: '400px' }}>
-            {multiVisitLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>Loading multi-visit patients...</div>
-            ) : multiVisitAbnormal?.length > 0 ? (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>Name</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>ID Number</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>Category</th>
-                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Visits</th>
-                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Abnormal BP</th>
-                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Abnormal BMI</th>
-                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Abnormal RBS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {multiVisitAbnormal.map((patient: any) => (
-                    <tr key={patient.client_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <td style={{ padding: '12px', color: 'white' }}>{patient.fullname}</td>
-                      <td style={{ padding: '12px', color: 'rgba(255,255,255,0.8)' }}>{patient.idnumber}</td>
-                      <td style={{ padding: '12px', color: 'rgba(255,255,255,0.8)' }}>{patient.category}</td>
-                      <td style={{ padding: '12px', textAlign: 'center', color: 'white' }}>{patient.total_visits}</td>
-                      <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_bp_visits || 0}</td>
-                      <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.warning }}>{patient.abnormal_bmi_visits || 0}</td>
-                      <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_rbs_visits || 0}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.5)' }}>
-                No multi-visit abnormal patients found for the selected criteria
-              </div>
-            )}
-          </div>
-        </div>
       </div>
+
+      {/* High Risk Patients Modal */}
+      <HighRiskModal
+        isOpen={showHighRiskModal}
+        onClose={() => setShowHighRiskModal(false)}
+        patients={highRiskPatients}
+        filters={filters}
+        onFilterChange={setFilters}
+        onExport={() => {}}
+      />
 
       <style>{`
         @keyframes float {
@@ -630,6 +831,10 @@ export default function Dashboard() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
         }
         .animate-float { animation: float 3s ease-in-out infinite; }
         .animate-spin { animation: spin 1s linear infinite; }
