@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Users, Shield, Anchor, Activity, HeartPulse, ActivitySquare, Heart,
@@ -36,8 +36,8 @@ const oceanColors = {
   white: '#FFFFFF',
 };
 
-// Common select style for filter dropdowns
-const filterSelectStyle = {
+// Common select style for filter dropdowns - using CSSProperties type
+const filterSelectStyle: CSSProperties = {
   width: '100%',
   padding: '8px 12px',
   borderRadius: '8px',
@@ -48,9 +48,9 @@ const filterSelectStyle = {
   cursor: 'pointer',
   outline: 'none',
   backdropFilter: 'blur(4px)',
-  WebkitAppearance: 'none',
-  MozAppearance: 'none',
-  appearance: 'none',
+  WebkitAppearance: 'none' as any,
+  MozAppearance: 'none' as any,
+  appearance: 'none' as any,
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
   backgroundPosition: 'right 12px center',
@@ -59,7 +59,7 @@ const filterSelectStyle = {
 };
 
 // Common select style for modal dropdowns (dark text on light background)
-const modalSelectStyle = {
+const modalSelectStyle: CSSProperties = {
   width: '100%',
   padding: '8px 12px',
   borderRadius: '6px',
@@ -69,9 +69,9 @@ const modalSelectStyle = {
   fontSize: '14px',
   cursor: 'pointer',
   outline: 'none',
-  WebkitAppearance: 'none',
-  MozAppearance: 'none',
-  appearance: 'none',
+  WebkitAppearance: 'none' as any,
+  MozAppearance: 'none' as any,
+  appearance: 'none' as any,
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231F2937' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
   backgroundPosition: 'right 12px center',
@@ -80,7 +80,7 @@ const modalSelectStyle = {
 };
 
 // Common input style for filter inputs
-const filterInputStyle = {
+const filterInputStyle: CSSProperties = {
   width: '100%',
   padding: '8px 12px',
   borderRadius: '8px',
@@ -97,6 +97,27 @@ const formatNumber = (num: number): string => {
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
   return num.toString();
 };
+
+// Alternative approach: inline styles for selects to avoid TypeScript issues
+const getFilterSelectStyle = (): React.CSSProperties => ({
+  width: '100%',
+  padding: '8px 36px 8px 12px',
+  borderRadius: '8px',
+  border: '1px solid rgba(255,255,255,0.3)',
+  background: 'rgba(255,255,255,0.15)',
+  color: 'white',
+  fontSize: '14px',
+  cursor: 'pointer',
+  outline: 'none',
+  backdropFilter: 'blur(4px)',
+  WebkitAppearance: 'none',
+  MozAppearance: 'none',
+  appearance: 'none',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 12px center',
+  backgroundSize: '16px',
+} as React.CSSProperties);
 
 // High Risk Patients Modal Component with Dynamic Filters
 function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onExport, availableStations, availableCategories }: any) {
@@ -292,6 +313,26 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
     XLSX.writeFile(wb, `high_risk_patients_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
   };
 
+  // Modal select style inline to avoid TypeScript issues
+  const modalSelectStyleInline: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 36px 8px 12px',
+    borderRadius: '6px',
+    border: '1px solid #e2e8f0',
+    background: 'white',
+    color: oceanColors.textDark,
+    fontSize: '14px',
+    cursor: 'pointer',
+    outline: 'none',
+    WebkitAppearance: 'none',
+    MozAppearance: 'none',
+    appearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231F2937' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center',
+    backgroundSize: '16px',
+  } as React.CSSProperties;
+
   return (
     <>
       <div style={{
@@ -433,7 +474,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 <select
                   value={riskCriteria.conditionsRequired}
                   onChange={(e) => setRiskCriteria({ ...riskCriteria, conditionsRequired: e.target.value as 'any' | 'all' })}
-                  style={modalSelectStyle}
+                  style={modalSelectStyleInline}
                 >
                   <option value="any">Any Condition (OR)</option>
                   <option value="all">All Conditions (AND)</option>
@@ -450,7 +491,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 <select
                   value={localFilters.category}
                   onChange={(e) => setLocalFilters({ ...localFilters, category: e.target.value })}
-                  style={modalSelectStyle}
+                  style={modalSelectStyleInline}
                 >
                   <option value="all">All Categories</option>
                   {availableCategories?.map((cat: any) => (
@@ -463,7 +504,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 <select
                   value={localFilters.station}
                   onChange={(e) => setLocalFilters({ ...localFilters, station: e.target.value })}
-                  style={modalSelectStyle}
+                  style={modalSelectStyleInline}
                 >
                   <option value="all">All Stations</option>
                   {availableStations?.map((station: any) => (
@@ -476,7 +517,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 <select
                   value={localFilters.gender}
                   onChange={(e) => setLocalFilters({ ...localFilters, gender: e.target.value })}
-                  style={modalSelectStyle}
+                  style={modalSelectStyleInline}
                 >
                   <option value="all">All Genders</option>
                   <option value="Male">Male</option>
@@ -825,6 +866,39 @@ export default function Dashboard() {
     { title: "Health Score", value: metrics?.healthScore || 85, icon: Award, color: "from-purple-500 to-pink-500", description: "Overall population health", suffix: "%" },
   ];
 
+  // Filter select style inline
+  const filterSelectStyleInline: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 36px 8px 12px',
+    borderRadius: '8px',
+    border: '1px solid rgba(255,255,255,0.3)',
+    background: 'rgba(255,255,255,0.15)',
+    color: 'white',
+    fontSize: '14px',
+    cursor: 'pointer',
+    outline: 'none',
+    backdropFilter: 'blur(4px)',
+    WebkitAppearance: 'none',
+    MozAppearance: 'none',
+    appearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center',
+    backgroundSize: '16px',
+  } as React.CSSProperties;
+
+  const filterInputStyleInline: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '1px solid rgba(255,255,255,0.3)',
+    background: 'rgba(255,255,255,0.15)',
+    color: 'white',
+    fontSize: '14px',
+    outline: 'none',
+    backdropFilter: 'blur(4px)',
+  } as React.CSSProperties;
+
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0B2F9E, #1A4D8C, #2B7BA8)', fontFamily: 'Verdana, Geneva, sans-serif' }}>
       
@@ -913,7 +987,7 @@ export default function Dashboard() {
                 min={dateRange.earliest}
                 max={dateRange.latest}
                 onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                style={filterInputStyle}
+                style={filterInputStyleInline}
               />
             </div>
             <div>
@@ -924,7 +998,7 @@ export default function Dashboard() {
                 min={dateRange.earliest}
                 max={dateRange.latest}
                 onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                style={filterInputStyle}
+                style={filterInputStyleInline}
               />
             </div>
             <div>
@@ -932,7 +1006,7 @@ export default function Dashboard() {
               <select
                 value={filters.category}
                 onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-                style={filterSelectStyle}
+                style={filterSelectStyleInline}
               >
                 <option value="all" style={{ color: oceanColors.textDark, background: 'white' }}>All Categories</option>
                 {availableCategories.map((cat: any) => (
@@ -947,7 +1021,7 @@ export default function Dashboard() {
               <select
                 value={filters.station}
                 onChange={(e) => setFilters({ ...filters, station: e.target.value })}
-                style={filterSelectStyle}
+                style={filterSelectStyleInline}
               >
                 <option value="all" style={{ color: oceanColors.textDark, background: 'white' }}>All Stations</option>
                 {availableStations.map((station: any) => (
@@ -962,7 +1036,7 @@ export default function Dashboard() {
               <select
                 value={filters.gender}
                 onChange={(e) => setFilters({ ...filters, gender: e.target.value })}
-                style={filterSelectStyle}
+                style={filterSelectStyleInline}
               >
                 <option value="all" style={{ color: oceanColors.textDark, background: 'white' }}>All Genders</option>
                 <option value="Male" style={{ color: oceanColors.textDark, background: 'white' }}>Male</option>
