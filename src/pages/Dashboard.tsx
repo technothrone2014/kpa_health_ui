@@ -31,6 +31,65 @@ const oceanColors = {
   warning: '#F59E0B',
   danger: '#EF4444',
   info: '#3B82F6',
+  textDark: '#1F2937',
+  textLight: '#6B7280',
+  white: '#FFFFFF',
+};
+
+// Common select style for filter dropdowns
+const filterSelectStyle = {
+  width: '100%',
+  padding: '8px 12px',
+  borderRadius: '8px',
+  border: '1px solid rgba(255,255,255,0.3)',
+  background: 'rgba(255,255,255,0.15)',
+  color: 'white',
+  fontSize: '14px',
+  cursor: 'pointer',
+  outline: 'none',
+  backdropFilter: 'blur(4px)',
+  WebkitAppearance: 'none',
+  MozAppearance: 'none',
+  appearance: 'none',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 12px center',
+  backgroundSize: '16px',
+  paddingRight: '36px',
+};
+
+// Common select style for modal dropdowns (dark text on light background)
+const modalSelectStyle = {
+  width: '100%',
+  padding: '8px 12px',
+  borderRadius: '6px',
+  border: '1px solid #e2e8f0',
+  background: 'white',
+  color: oceanColors.textDark,
+  fontSize: '14px',
+  cursor: 'pointer',
+  outline: 'none',
+  WebkitAppearance: 'none',
+  MozAppearance: 'none',
+  appearance: 'none',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231F2937' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 12px center',
+  backgroundSize: '16px',
+  paddingRight: '36px',
+};
+
+// Common input style for filter inputs
+const filterInputStyle = {
+  width: '100%',
+  padding: '8px 12px',
+  borderRadius: '8px',
+  border: '1px solid rgba(255,255,255,0.3)',
+  background: 'rgba(255,255,255,0.15)',
+  color: 'white',
+  fontSize: '14px',
+  outline: 'none',
+  backdropFilter: 'blur(4px)',
 };
 
 const formatNumber = (num: number): string => {
@@ -374,7 +433,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 <select
                   value={riskCriteria.conditionsRequired}
                   onChange={(e) => setRiskCriteria({ ...riskCriteria, conditionsRequired: e.target.value as 'any' | 'all' })}
-                  style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                  style={modalSelectStyle}
                 >
                   <option value="any">Any Condition (OR)</option>
                   <option value="all">All Conditions (AND)</option>
@@ -391,7 +450,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 <select
                   value={localFilters.category}
                   onChange={(e) => setLocalFilters({ ...localFilters, category: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                  style={modalSelectStyle}
                 >
                   <option value="all">All Categories</option>
                   {availableCategories?.map((cat: any) => (
@@ -404,7 +463,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 <select
                   value={localFilters.station}
                   onChange={(e) => setLocalFilters({ ...localFilters, station: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                  style={modalSelectStyle}
                 >
                   <option value="all">All Stations</option>
                   {availableStations?.map((station: any) => (
@@ -417,7 +476,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 <select
                   value={localFilters.gender}
                   onChange={(e) => setLocalFilters({ ...localFilters, gender: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
+                  style={modalSelectStyle}
                 >
                   <option value="all">All Genders</option>
                   <option value="Male">Male</option>
@@ -459,7 +518,9 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                   border: '1px solid #e2e8f0',
                   borderRadius: '8px',
                   fontSize: '14px',
-                  outline: 'none'
+                  outline: 'none',
+                  color: oceanColors.textDark,
+                  background: 'white'
                 }}
               />
             </div>
@@ -852,7 +913,7 @@ export default function Dashboard() {
                 min={dateRange.earliest}
                 max={dateRange.latest}
                 onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white' }}
+                style={filterInputStyle}
               />
             </div>
             <div>
@@ -863,7 +924,7 @@ export default function Dashboard() {
                 min={dateRange.earliest}
                 max={dateRange.latest}
                 onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white' }}
+                style={filterInputStyle}
               />
             </div>
             <div>
@@ -871,11 +932,13 @@ export default function Dashboard() {
               <select
                 value={filters.category}
                 onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white' }}
+                style={filterSelectStyle}
               >
-                <option value="all">All Categories</option>
+                <option value="all" style={{ color: oceanColors.textDark, background: 'white' }}>All Categories</option>
                 {availableCategories.map((cat: any) => (
-                  <option key={cat.Id} value={cat.Title}>{cat.Title}</option>
+                  <option key={cat.Id} value={cat.Title} style={{ color: oceanColors.textDark, background: 'white' }}>
+                    {cat.Title}
+                  </option>
                 ))}
               </select>
             </div>
@@ -884,11 +947,13 @@ export default function Dashboard() {
               <select
                 value={filters.station}
                 onChange={(e) => setFilters({ ...filters, station: e.target.value })}
-                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white' }}
+                style={filterSelectStyle}
               >
-                <option value="all">All Stations</option>
+                <option value="all" style={{ color: oceanColors.textDark, background: 'white' }}>All Stations</option>
                 {availableStations.map((station: any) => (
-                  <option key={station.Id} value={station.Title}>{station.Title}</option>
+                  <option key={station.Id} value={station.Title} style={{ color: oceanColors.textDark, background: 'white' }}>
+                    {station.Title}
+                  </option>
                 ))}
               </select>
             </div>
@@ -897,11 +962,11 @@ export default function Dashboard() {
               <select
                 value={filters.gender}
                 onChange={(e) => setFilters({ ...filters, gender: e.target.value })}
-                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white' }}
+                style={filterSelectStyle}
               >
-                <option value="all">All Genders</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
+                <option value="all" style={{ color: oceanColors.textDark, background: 'white' }}>All Genders</option>
+                <option value="Male" style={{ color: oceanColors.textDark, background: 'white' }}>Male</option>
+                <option value="Female" style={{ color: oceanColors.textDark, background: 'white' }}>Female</option>
               </select>
             </div>
           </div>
@@ -1062,7 +1127,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* RBS Distribution - NEW */}
+          {/* RBS Distribution */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
