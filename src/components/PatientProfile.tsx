@@ -9,7 +9,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine, ComposedChart, Area } from 'recharts';
 import * as XLSX from 'xlsx';
 import api from '../api/client';
 import aiService from '../api/aiService';
@@ -59,10 +59,33 @@ const getStatusColor = (status: string, type: 'bp' | 'bmi' | 'rbs') => {
   } else {
     if (status === 'NORMAL') return { bg: `${oceanColors.success}20`, color: oceanColors.success, text: 'Normal' };
     if (status === 'PRE-HYPERTENSION') return { bg: `${oceanColors.warning}20`, color: oceanColors.warning, text: 'Pre-Hypertension' };
-    if (status.includes('HYPERTENSION')) return { bg: `${oceanColors.danger}20`, color: oceanColors.danger, text: status };
+    if (status?.includes('HYPERTENSION')) return { bg: `${oceanColors.danger}20`, color: oceanColors.danger, text: status };
     if (status === 'HIGH' || status === 'ELEVATED') return { bg: `${oceanColors.danger}20`, color: oceanColors.danger, text: status };
     return { bg: `${oceanColors.textLight}20`, color: oceanColors.textLight, text: status };
   }
+};
+
+// Helper function to safely get numeric value from various possible field names
+const getNumericValue = (obj: any, ...possibleKeys: string[]): number | null => {
+  for (const key of possibleKeys) {
+    const val = obj[key];
+    if (val !== undefined && val !== null) {
+      const num = Number(val);
+      if (!isNaN(num)) return num;
+    }
+  }
+  return null;
+};
+
+// Helper function to safely get string value
+const getStringValue = (obj: any, ...possibleKeys: string[]): string => {
+  for (const key of possibleKeys) {
+    const val = obj[key];
+    if (val !== undefined && val !== null && val !== '') {
+      return String(val);
+    }
+  }
+  return '';
 };
 
 export default function PatientProfile({ patient, onClose }: PatientProfileProps) {
@@ -74,13 +97,68 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
   const [insightsError, setInsightsError] = useState<string | null>(null);
 
   // Fetch patient's tallies/visits
-  const { data: visits, isLoading: visitsLoading, error: visitsError, refetch: refetchVisits } = useQuery({
+  const { data: visitsData, isLoading: visitsLoading, error: visitsError, refetch: refetchVisits } = useQuery({
     queryKey: ['patient-visits', patient.Id],
     queryFn: async () => {
       const response = await api.get(`/patients/${patient.Id}/visits`);
+      console.log('Visits API Response:', response.data); // Debug log
       return response.data;
     },
   });
+
+  // Normalize visits data to handle different API response structures
+  const visits = React.useMemo(() => {
+    if (!visitsData) return [];
+    
+    // Handle both array response and wrapped response
+    const rawVisits = Array.isArray(visitsData) ? visitsData : (visitsData.data || visitsData.visits || []);
+    
+    return rawVisits.map((visit: any, index: number) => {
+      // Try multiple possible field names for each property
+      const systolic = getNumericValue(visit, 'systolic', 'Systolic', 'SysBP', 'sys_bp', 'systolic_bp', 'bp_systolic');
+      const diastolic = getNumericValue(visit, 'diastolic', 'Diastolic', 'DiaBP', 'dia_bp', 'diastolic_bp', 'bp_diastolic');
+      const bmivalue = getNumericValue(visit, 'bmivalue', 'BMIValue', 'bmi', 'BMI', 'bmi_value');
+      const rbsvalue = getNumericValue(visit, 'rbsvalue', 'RBSValue', 'rbs', 'RBS', 'rbs_value', 'blood_sugar');
+      const weight = getNumericValue(visit, 'weight', 'Weight', 'weight_kg');
+      const height = getNumericValue(visit, 'height', 'Height', 'height_cm');
+      const waist = getNumericValue(visit, 'waist', 'Waist', 'waist_cm');
+      const hip = getNumericValue(visit, 'hip', 'Hip', 'hip_cm');
+      const whratio = getNumericValue(visit, 'whratio', 'WHRatio', 'wh_ratio', 'waist_hip_ratio');
+      
+      const date = getStringValue(visit, 'date', 'Date', 'visit_date', 'VisitDate', 'created_at');
+      const bpstatus = getStringValue(visit, 'bpstatus', 'BPStatus', 'bp_status', 'blood_pressure_status');
+      const bmistatus = getStringValue(visit, 'bmistatus', 'BMIStatus', 'bmi_status');
+      const rbsstatus = getStringValue(visit, 'rbsstatus', 'RBSStatus', 'rbs_status');
+
+      return {
+        ...visit,
+        // Normalized fields
+        systolic,
+        diastolic,
+        bmivalue,
+        rbsvalue,
+        weight,
+        height,
+        waist,
+        hip,
+        whratio,
+        date,
+        bpstatus,
+        bmistatus,
+        rbsstatus,
+        // Keep original index for key
+        _idx: index
+      };
+    });
+  }, [visitsData]);
+
+  // Log normalized visits for debugging
+  useEffect(() => {
+    if (visits.length > 0) {
+      console.log('Normalized visits:', visits);
+      console.log('Sample visit systolic/diastolic:', visits[0]?.systolic, visits[0]?.diastolic);
+    }
+  }, [visits]);
 
   // Fetch patient's health trends
   const { data: trends, isLoading: trendsLoading, error: trendsError } = useQuery({
@@ -105,7 +183,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     try {
       // Prepare patient data summary for AI - MASK PERSONAL INFO
       const patientSummary = {
-        id: patient.IDNumber,  // Use ID number (Chk No) instead of name
+        id: patient.IDNumber,
         category: patient.CategoryTitle,
         station: patient.StationTitle,
         gender: patient.GenderTitle,
@@ -242,7 +320,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
   };
 
   const getBPStatusInfo = (percentage: string) => {
-    const percent = parseInt(percentage);
+    const percent = parseFloat(percentage);
     if (percent === 0) {
       return { color: oceanColors.success, icon: CheckCircle, text: 'Excellent' };
     } else if (percent < 30) {
@@ -258,7 +336,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     } else if (bmiNormal > 0 && bmiAbnormal === 0 && bmiUnderweight === 0) {
       return { color: oceanColors.success, icon: CheckCircle, text: 'All Normal' };
     } else if (bmiAbnormal > 0 || bmiUnderweight > 0) {
-      const percent = parseInt(abnormalPercentage.bmi);
+      const percent = parseFloat(abnormalPercentage.bmi);
       if (percent < 30) {
         return { color: oceanColors.warning, icon: AlertTriangle, text: 'Monitor - Some Concerns' };
       } else {
@@ -269,7 +347,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
   };
 
   const getRBSStatusInfo = (percentage: string) => {
-    const percent = parseInt(percentage);
+    const percent = parseFloat(percentage);
     if (percent === 0) {
       return { color: oceanColors.success, icon: CheckCircle, text: 'Excellent' };
     } else if (percent < 30) {
@@ -288,39 +366,42 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     bmiStatus.text === 'Critical - High Risk' || 
     rbsStatus.text === 'Critical';
 
-  // Prepare chart data
-  const chartData = visits?.map((visit: any) => ({
-    date: format(new Date(visit.date), 'MMM dd'),
-    systolic: visit.systolic,
-    diastolic: visit.diastolic,
-    bmi: visit.bmivalue,
-    rbs: visit.rbsvalue,
-  })).reverse() || [];
+  // Prepare chart data - sorted by date ascending for proper trend visualization
+  const chartData = visits
+    ?.map((visit: any) => ({
+      date: visit.date ? format(new Date(visit.date), 'MMM dd, yyyy') : 'Unknown',
+      timestamp: visit.date ? new Date(visit.date).getTime() : 0,
+      systolic: visit.systolic,
+      diastolic: visit.diastolic,
+      bmi: visit.bmivalue,
+      rbs: visit.rbsvalue,
+    }))
+    .filter((d: any) => d.systolic !== null || d.diastolic !== null || d.bmi !== null || d.rbs !== null)
+    .sort((a: any, b: any) => a.timestamp - b.timestamp) || [];
 
   // Export function
   const handleExport = async () => {
     setIsExporting(true);
     try {
       const exportData = visits?.map((visit: any) => ({
-        'Date': format(new Date(visit.date), 'PPP'),
-        'Systolic BP': visit.systolic,
-        'Diastolic BP': visit.diastolic,
-        'BP Status': visit.bpstatus,
-        'BMI Value': visit.bmivalue,
-        'BMI Status': visit.bmistatus,
-        'RBS Value': visit.rbsvalue,
-        'RBS Status': visit.rbsstatus,
-        'Weight (kg)': visit.weight,
-        'Height (cm)': visit.height,
-        'Waist (cm)': visit.waist,
-        'Hip (cm)': visit.hip,
-        'Waist-Hip Ratio': visit.whratio,
+        'Date': visit.date ? format(new Date(visit.date), 'PPP') : 'N/A',
+        'Systolic BP': visit.systolic ?? 'N/A',
+        'Diastolic BP': visit.diastolic ?? 'N/A',
+        'BP Status': visit.bpstatus || 'N/A',
+        'BMI Value': visit.bmivalue ?? 'N/A',
+        'BMI Status': visit.bmistatus || 'N/A',
+        'RBS Value': visit.rbsvalue ?? 'N/A',
+        'RBS Status': visit.rbsstatus || 'N/A',
+        'Weight (kg)': visit.weight ?? 'N/A',
+        'Height (cm)': visit.height ?? 'N/A',
+        'Waist (cm)': visit.waist ?? 'N/A',
+        'Hip (cm)': visit.hip ?? 'N/A',
+        'Waist-Hip Ratio': visit.whratio ?? 'N/A',
       })) || [];
 
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, `${patient.FullName}_Health_History`);
-      XLSX.writeFile(wb, `${patient.FullName}_${patient.IDNumber}_Health_History.xlsx`);
       
       // Also export insights if available
       if (aiInsights) {
@@ -354,7 +435,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000,
+      zIndex: 1001,
       overflow: 'auto'
     }}>
       <div style={{
@@ -369,7 +450,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
         flexDirection: 'column'
       }}>
         
-        {/* Header */}
+        {/* Header - unchanged */}
         <div style={{
           background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
           padding: '24px 32px',
@@ -676,15 +757,21 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                       </tr>
                     </thead>
                     <tbody>
-                      {visits?.slice(0, 5).map((visit: any, idx: number) => {
+                      {visits?.slice(-5).reverse().map((visit: any, idx: number) => {
                         const bpColorInfo = getStatusColor(visit.bpstatus, 'bp');
                         const bmiColorInfo = getStatusColor(visit.bmistatus, 'bmi');
                         const rbsColorInfo = getStatusColor(visit.rbsstatus, 'rbs');
                         
                         return (
                           <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.mid}20` }}>
-                            <td style={{ padding: '12px' }}>{format(new Date(visit.date), 'MMM dd, yyyy')}</td>
-                            <td style={{ padding: '12px', textAlign: 'center' }}>{visit.systolic}/{visit.diastolic}</td>
+                            <td style={{ padding: '12px' }}>
+                              {visit.date ? format(new Date(visit.date), 'MMM dd, yyyy') : 'N/A'}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                              {visit.systolic != null && visit.diastolic != null 
+                                ? `${visit.systolic}/${visit.diastolic}` 
+                                : 'N/A'}
+                            </td>
                             <td style={{ padding: '12px', textAlign: 'center' }}>
                               <span style={{
                                 padding: '4px 12px',
@@ -697,7 +784,9 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                                 {bpColorInfo.text}
                               </span>
                             </td>
-                            <td style={{ padding: '12px', textAlign: 'center' }}>{visit.bmivalue}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                              {visit.bmivalue?.toFixed(1) ?? 'N/A'}
+                            </td>
                             <td style={{ padding: '12px', textAlign: 'center' }}>
                               <span style={{
                                 padding: '4px 12px',
@@ -710,7 +799,9 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                                 {bmiColorInfo.text}
                               </span>
                             </td>
-                            <td style={{ padding: '12px', textAlign: 'center' }}>{visit.rbsvalue}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                              {visit.rbsvalue?.toFixed(1) ?? 'N/A'}
+                            </td>
                             <td style={{ padding: '12px', textAlign: 'center' }}>
                               <span style={{
                                 padding: '4px 12px',
@@ -735,24 +826,88 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
 
           {activeTab === 'trends' && (
             <div>
-              {/* BP Trend Chart */}
+              {/* BP Trend Chart - Enhanced with better visualization */}
               <div style={{ marginBottom: '32px' }}>
                 <h3 style={{ marginBottom: '16px', color: oceanColors.textDark }}>
                   <Heart size={18} style={{ display: 'inline', marginRight: '8px' }} />
                   Blood Pressure Trends
                 </h3>
-                <div style={{ height: '300px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis yAxisId="left" domain={[80, 200]} label={{ value: 'mmHg', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip />
-                      <Line yAxisId="left" type="monotone" dataKey="systolic" stroke={oceanColors.danger} name="Systolic" strokeWidth={2} />
-                      <Line yAxisId="left" type="monotone" dataKey="diastolic" stroke={oceanColors.warning} name="Diastolic" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                {chartData.filter((d: { systolic: null; diastolic: null; }) => d.systolic != null || d.diastolic != null).length > 0 ? (
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis 
+                          dataKey="date" 
+                          tick={{ fontSize: 11, fill: oceanColors.textLight }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={60}
+                        />
+                        <YAxis 
+                          yAxisId="left" 
+                          domain={[40, 200]} 
+                          label={{ value: 'mmHg', angle: -90, position: 'insideLeft', fill: oceanColors.textLight }}
+                          tick={{ fill: oceanColors.textLight }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            borderRadius: '12px', 
+                            background: 'white', 
+                            border: `1px solid ${oceanColors.mid}30`,
+                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                          }}
+                          formatter={(value: any) => [`${value} mmHg`, '']}
+                        />
+                        <ReferenceLine y={140} yAxisId="left" stroke={oceanColors.warning} strokeDasharray="3 3" label={{ value: 'Systolic Threshold', fill: oceanColors.warning, fontSize: 10 }} />
+                        <ReferenceLine y={90} yAxisId="left" stroke={oceanColors.warning} strokeDasharray="3 3" label={{ value: 'Diastolic Threshold', fill: oceanColors.warning, fontSize: 10 }} />
+                        <Area 
+                          yAxisId="left" 
+                          type="monotone" 
+                          dataKey="systolic" 
+                          fill={`${oceanColors.danger}10`} 
+                          stroke="none" 
+                        />
+                        <Line 
+                          yAxisId="left" 
+                          type="monotone" 
+                          dataKey="systolic" 
+                          stroke={oceanColors.danger} 
+                          name="Systolic" 
+                          strokeWidth={2} 
+                          dot={{ fill: oceanColors.danger, r: 4 }}
+                          activeDot={{ r: 6 }}
+                          connectNulls
+                        />
+                        <Line 
+                          yAxisId="left" 
+                          type="monotone" 
+                          dataKey="diastolic" 
+                          stroke={oceanColors.info} 
+                          name="Diastolic" 
+                          strokeWidth={2} 
+                          dot={{ fill: oceanColors.info, r: 4 }}
+                          activeDot={{ r: 6 }}
+                          connectNulls
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    height: '300px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    background: '#f8fafc',
+                    borderRadius: '12px',
+                    border: `1px dashed ${oceanColors.mid}30`
+                  }}>
+                    <p style={{ color: oceanColors.textLight }}>
+                      No blood pressure data available for trending
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* BMI Trend Chart */}
@@ -761,20 +916,68 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                   <Scale size={18} style={{ display: 'inline', marginRight: '8px' }} />
                   BMI Trends
                 </h3>
-                <div style={{ height: '300px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis domain={[15, 45]} label={{ value: 'BMI', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="bmi" stroke={oceanColors.deep} strokeWidth={2} />
-                      <ReferenceLine y={18.5} stroke={oceanColors.warning} strokeDasharray="3 3" label="Underweight" />
-                      <ReferenceLine y={25} stroke={oceanColors.warning} strokeDasharray="3 3" label="Overweight" />
-                      <ReferenceLine y={30} stroke={oceanColors.danger} strokeDasharray="3 3" label="Obese" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                {chartData.filter((d: { bmi: null; }) => d.bmi != null).length > 0 ? (
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis 
+                          dataKey="date" 
+                          tick={{ fontSize: 11, fill: oceanColors.textLight }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={60}
+                        />
+                        <YAxis 
+                          domain={[15, 45]} 
+                          label={{ value: 'BMI', angle: -90, position: 'insideLeft', fill: oceanColors.textLight }}
+                          tick={{ fill: oceanColors.textLight }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            borderRadius: '12px', 
+                            background: 'white', 
+                            border: `1px solid ${oceanColors.mid}30`,
+                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                          }}
+                          formatter={(value: any) => [value?.toFixed(1), 'BMI']}
+                        />
+                        <ReferenceLine y={18.5} stroke={oceanColors.info} strokeDasharray="3 3" label={{ value: 'Underweight', fill: oceanColors.info, fontSize: 10 }} />
+                        <ReferenceLine y={25} stroke={oceanColors.warning} strokeDasharray="3 3" label={{ value: 'Overweight', fill: oceanColors.warning, fontSize: 10 }} />
+                        <ReferenceLine y={30} stroke={oceanColors.danger} strokeDasharray="3 3" label={{ value: 'Obese', fill: oceanColors.danger, fontSize: 10 }} />
+                        <Area 
+                          type="monotone" 
+                          dataKey="bmi" 
+                          fill={`${oceanColors.deep}10`} 
+                          stroke="none" 
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="bmi" 
+                          stroke={oceanColors.deep} 
+                          strokeWidth={2} 
+                          dot={{ fill: oceanColors.deep, r: 4 }}
+                          activeDot={{ r: 6 }}
+                          connectNulls
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    height: '300px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    background: '#f8fafc',
+                    borderRadius: '12px',
+                    border: `1px dashed ${oceanColors.mid}30`
+                  }}>
+                    <p style={{ color: oceanColors.textLight }}>
+                      No BMI data available for trending
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* RBS Trend Chart */}
@@ -783,18 +986,67 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                   <Droplets size={18} style={{ display: 'inline', marginRight: '8px' }} />
                   Random Blood Sugar Trends
                 </h3>
-                <div style={{ height: '300px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis domain={[0, 300]} label={{ value: 'mg/dL', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="rbs" stroke={oceanColors.danger} strokeWidth={2} />
-                      <ReferenceLine y={140} stroke={oceanColors.warning} strokeDasharray="3 3" label="Elevated" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                {chartData.filter((d: { rbs: null; }) => d.rbs != null).length > 0 ? (
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis 
+                          dataKey="date" 
+                          tick={{ fontSize: 11, fill: oceanColors.textLight }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={60}
+                        />
+                        <YAxis 
+                          domain={[0, 'auto']} 
+                          label={{ value: 'mg/dL', angle: -90, position: 'insideLeft', fill: oceanColors.textLight }}
+                          tick={{ fill: oceanColors.textLight }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            borderRadius: '12px', 
+                            background: 'white', 
+                            border: `1px solid ${oceanColors.mid}30`,
+                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                          }}
+                          formatter={(value: any) => [`${value?.toFixed(1)} mg/dL`, 'RBS']}
+                        />
+                        <ReferenceLine y={140} stroke={oceanColors.warning} strokeDasharray="3 3" label={{ value: 'Elevated Threshold', fill: oceanColors.warning, fontSize: 10 }} />
+                        <ReferenceLine y={200} stroke={oceanColors.danger} strokeDasharray="3 3" label={{ value: 'High Threshold', fill: oceanColors.danger, fontSize: 10 }} />
+                        <Area 
+                          type="monotone" 
+                          dataKey="rbs" 
+                          fill={`${oceanColors.danger}10`} 
+                          stroke="none" 
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="rbs" 
+                          stroke={oceanColors.danger} 
+                          strokeWidth={2} 
+                          dot={{ fill: oceanColors.danger, r: 4 }}
+                          activeDot={{ r: 6 }}
+                          connectNulls
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    height: '300px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    background: '#f8fafc',
+                    borderRadius: '12px',
+                    border: `1px dashed ${oceanColors.mid}30`
+                  }}>
+                    <p style={{ color: oceanColors.textLight }}>
+                      No RBS data available for trending
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -824,8 +1076,14 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                     
                     return (
                       <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.mid}20` }}>
-                        <td style={{ padding: '12px' }}>{format(new Date(visit.date), 'PPP')}</td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.systolic}/{visit.diastolic}</td>
+                        <td style={{ padding: '12px' }}>
+                          {visit.date ? format(new Date(visit.date), 'PPP') : 'N/A'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          {visit.systolic != null && visit.diastolic != null 
+                            ? `${visit.systolic}/${visit.diastolic}` 
+                            : 'N/A'}
+                        </td>
                         <td style={{ padding: '12px', textAlign: 'center' }}>
                           <span style={{
                             padding: '4px 12px',
@@ -837,7 +1095,9 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                             {bpColorInfo.text}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.bmivalue}</td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          {visit.bmivalue?.toFixed(1) ?? 'N/A'}
+                        </td>
                         <td style={{ padding: '12px', textAlign: 'center' }}>
                           <span style={{
                             padding: '4px 12px',
@@ -849,7 +1109,9 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                             {bmiColorInfo.text}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.rbsvalue}</td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          {visit.rbsvalue?.toFixed(1) ?? 'N/A'}
+                        </td>
                         <td style={{ padding: '12px', textAlign: 'center' }}>
                           <span style={{
                             padding: '4px 12px',
@@ -861,9 +1123,15 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                             {rbsColorInfo.text}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.weight} kg</td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.height} cm</td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>{visit.whratio}</td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          {visit.weight ? `${visit.weight} kg` : 'N/A'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          {visit.height ? `${visit.height} cm` : 'N/A'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          {visit.whratio?.toFixed(2) ?? 'N/A'}
+                        </td>
                       </tr>
                     );
                   })}
@@ -1139,7 +1407,6 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(aiInsights);
-                        // Optional: Add toast notification
                       }}
                       style={{
                         padding: '8px 16px',
