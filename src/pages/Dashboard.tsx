@@ -3,22 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import { 
   Users, Shield, Anchor, Activity, HeartPulse, ActivitySquare, Heart,
   RefreshCw, ChevronRight, Ship, Compass, Navigation, Scale,
-  Droplets, Thermometer, Calendar, Clock, TrendingUp, Award
+  Droplets, Thermometer, Calendar, Clock, TrendingUp, Award,
+  AlertTriangle, Filter, Download, FileText
 } from "lucide-react";
 import { 
   PieChart, Pie, Cell, BarChart, Bar, Tooltip, ResponsiveContainer, Legend,
-  CartesianGrid, XAxis, YAxis
+  CartesianGrid, XAxis, YAxis, LineChart, Line
 } from "recharts";
-import { format, subDays, subHours, subMinutes } from "date-fns";
-import { 
-  getDashboardOverview, 
-  getEmployeeBloodPressureResults, 
-  getEmployeeBMIResults,
-  getClientsPerCategory,
-  getEmployeeFBSResults,
-  getEmployeeHBA1CResults
-} from "../api/analytics";
+import { format, subDays, subHours } from "date-fns";
+import api from "../api/client";
 import LoadingSpinner from "../components/LoadingSpinner";
+import * as XLSX from 'xlsx';
 
 // Oceanic Theme Colors
 const oceanColors = {
@@ -33,6 +28,7 @@ const oceanColors = {
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
+  info: '#3B82F6',
 };
 
 const formatNumber = (num: number): string => {
@@ -46,6 +42,20 @@ export default function Dashboard() {
   const [greeting, setGreeting] = useState("");
   const [currentTime, setCurrentTime] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    category: 'all',
+    station: 'all',
+    gender: 'all'
+  });
+  
+  const [availableStations, setAvailableStations] = useState<any[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<any[]>([]);
+  const [dateRange, setDateRange] = useState<{ earliest: string; latest: string }>({ earliest: '', latest: '' });
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -58,145 +68,162 @@ export default function Dashboard() {
     }, 60000);
     return () => clearInterval(timer);
   }, []);
-  
-  const { data: overview, isLoading: overviewLoading, refetch: refetchOverview } = useQuery({
-    queryKey: ["dashboard-overview"],
-    queryFn: () => getDashboardOverview(),
+
+  // Fetch stations and categories for filters
+  useEffect(() => {
+    const fetchFilterData = async () => {
+      try {
+        const [stationsRes, categoriesRes, dateRangeRes] = await Promise.all([
+          api.get('/analytics/stations'),
+          api.get('/analytics/categories'),
+          api.get('/analytics/data-date-range')
+        ]);
+        setAvailableStations(stationsRes.data.data || []);
+        setAvailableCategories(categoriesRes.data.data || []);
+        if (dateRangeRes.data.data) {
+          setDateRange({
+            earliest: format(new Date(dateRangeRes.data.data.earliest), 'yyyy-MM-dd'),
+            latest: format(new Date(dateRangeRes.data.data.latest), 'yyyy-MM-dd')
+          });
+          setFilters(prev => ({
+            ...prev,
+            startDate: format(new Date(dateRangeRes.data.data.earliest), 'yyyy-MM-dd'),
+            endDate: format(new Date(dateRangeRes.data.data.latest), 'yyyy-MM-dd')
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching filter data:', error);
+      }
+    };
+    fetchFilterData();
+  }, []);
+
+  // Build query params for API calls
+  const queryParams = new URLSearchParams();
+  if (filters.startDate) queryParams.append('startDate', filters.startDate);
+  if (filters.endDate) queryParams.append('endDate', filters.endDate);
+  if (filters.category !== 'all') queryParams.append('category', filters.category);
+  if (filters.station !== 'all') queryParams.append('station', filters.station);
+  if (filters.gender !== 'all') queryParams.append('gender', filters.gender);
+  const paramString = queryParams.toString();
+
+  // Fetch summary metrics
+  const { data: metrics, refetch: refetchMetrics, isLoading: metricsLoading } = useQuery({
+    queryKey: ['summary-metrics', filters],
+    queryFn: async () => {
+      const response = await api.get(`/analytics/summary-metrics?${paramString}`);
+      return response.data.data;
+    },
+    enabled: !!filters.startDate,
   });
 
-  const { data: bloodPressure, isLoading: bpLoading, refetch: refetchBP } = useQuery({
-    queryKey: ["blood-pressure"],
-    queryFn: () => getEmployeeBloodPressureResults(),
+  // Fetch abnormal readings
+  const { data: abnormalReadings, refetch: refetchAbnormal, isLoading: abnormalLoading } = useQuery({
+    queryKey: ['abnormal-readings', filters],
+    queryFn: async () => {
+      const response = await api.get(`/analytics/abnormal-readings?${paramString}`);
+      return response.data.data;
+    },
+    enabled: !!filters.startDate,
   });
 
-  const { data: bmi, isLoading: bmiLoading, refetch: refetchBMI } = useQuery({
-    queryKey: ["bmi"],
-    queryFn: () => getEmployeeBMIResults(),
+  // Fetch high-risk patients
+  const { data: highRiskPatients, refetch: refetchHighRisk, isLoading: highRiskLoading } = useQuery({
+    queryKey: ['high-risk-patients', filters],
+    queryFn: async () => {
+      const response = await api.get(`/analytics/high-risk-patients?${paramString}`);
+      return response.data.data || [];
+    },
+    enabled: !!filters.startDate,
   });
 
-  const { data: categories, isLoading: categoriesLoading } = useQuery({
-    queryKey: ["categories"],
-    queryFn: () => getClientsPerCategory(),
+  // Fetch multi-visit abnormal patients
+  const { data: multiVisitAbnormal, refetch: refetchMultiVisit, isLoading: multiVisitLoading } = useQuery({
+    queryKey: ['multi-visit-abnormal', filters],
+    queryFn: async () => {
+      const response = await api.get(`/analytics/multi-visit-abnormal?${paramString}&minVisits=2`);
+      return response.data.data || [];
+    },
+    enabled: !!filters.startDate,
+  });
+
+  // Fetch blood pressure data for charts
+  const { data: bloodPressure, refetch: refetchBP, isLoading: bpLoading } = useQuery({
+    queryKey: ['blood-pressure', filters],
+    queryFn: async () => {
+      const response = await api.get(`/analytics/employees/blood-pressure?${paramString}`);
+      return response.data;
+    },
+    enabled: !!filters.startDate,
+  });
+
+  // Fetch BMI data for charts
+  const { data: bmi, refetch: refetchBMI, isLoading: bmiLoading } = useQuery({
+    queryKey: ['bmi', filters],
+    queryFn: async () => {
+      const response = await api.get(`/analytics/employees/bmi?${paramString}`);
+      return response.data;
+    },
+    enabled: !!filters.startDate,
   });
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchOverview(), refetchBP(), refetchBMI()]);
+    await Promise.all([
+      refetchMetrics(),
+      refetchAbnormal(),
+      refetchHighRisk(),
+      refetchMultiVisit(),
+      refetchBP(),
+      refetchBMI()
+    ]);
     setLastUpdated(new Date());
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  if (overviewLoading || bpLoading || bmiLoading || categoriesLoading) {
-    return <LoadingSpinner />;
-  }
-
-  const categoryDist = overview?.categoryDistribution || [];
-  const getCount = (item: any) => {
-    if (!item) return 0;
-    const count = item.Count !== undefined ? item.Count : item.count;
-    return typeof count === 'string' ? parseInt(count, 10) : (count || 0);
+  const handleExport = () => {
+    const exportData = highRiskPatients?.map((patient: any) => ({
+      'Full Name': patient.fullname,
+      'ID Number': patient.idnumber,
+      'Phone Number': patient.phonenumber,
+      'Category': patient.category,
+      'Station': patient.station,
+      'Total Visits': patient.total_visits,
+      'Abnormal BP Visits': patient.abnormal_bp_count,
+      'Abnormal BMI Visits': patient.abnormal_bmi_count,
+      'Abnormal RBS Visits': patient.abnormal_rbs_count,
+      'Risk Level': patient.risk_level,
+      'Last Visit Date': patient.last_visit_date ? format(new Date(patient.last_visit_date), 'PPP') : 'N/A'
+    })) || [];
+    
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'High Risk Patients');
+    XLSX.writeFile(wb, `high_risk_patients_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
-  
-  const totalEmployees = getCount(categoryDist.find(c => c.Category === 'EMPLOYEE')) || 0;
-  const totalDependants = getCount(categoryDist.find(c => c.Category === 'DEPENDENT')) || 0;
-  const totalPortUsers = getCount(categoryDist.find(c => c.Category === 'PORT USER')) || 0;
-  const totalBPReadings = bloodPressure?.reduce((sum, item) => sum + (Number(item.Count) || 0), 0) || 0;
-  const normalBP = bloodPressure?.find(item => item.BloodPressureCategory === 'NORMAL')?.Count || 0;
-  const hypertensionBP = bloodPressure?.find(item => item.BloodPressureCategory === 'STAGE I HYPERTENSION')?.Count || 0;
-  const preHypertension = bloodPressure?.find(item => item.BloodPressureCategory === 'PRE-HYPERTENSION')?.Count || 0;
 
-  // Calculate real-time statistics for Ship's Log
-  const totalReadings = totalBPReadings;
-  const normalPercentage = totalReadings > 0 ? ((normalBP / totalReadings) * 100).toFixed(1) : "0";
-  const atRiskPercentage = totalReadings > 0 ? (((preHypertension + hypertensionBP) / totalReadings) * 100).toFixed(1) : "0";
-  
-  // Calculate health metrics
-  const healthScore = totalReadings > 0 ? Math.round((normalBP / totalReadings) * 100) : 0;
-  
-  // Get BMI categories for additional insights
-  const underweight = bmi?.find(item => item.BMICategory === 'UNDERWEIGHT')?.Count || 0;
-  const normalBmi = bmi?.find(item => item.BMICategory === 'NORMAL')?.Count || 0;
-  const overweight = bmi?.find(item => item.BMICategory === 'OVERWEIGHT')?.Count || 0;
-  const obese = bmi?.find(item => item.BMICategory === 'OBESE')?.Count || 0;
-  
-  const totalBmiReadings = (underweight + normalBmi + overweight + obese) || 1;
-  const healthyBmiPercentage = ((normalBmi / totalBmiReadings) * 100).toFixed(1);
+  const isLoading = metricsLoading || abnormalLoading || highRiskLoading || multiVisitLoading || bpLoading || bmiLoading;
 
-  // Real Ship's Log entries based on actual data
-  const shipLogEntries = [
-    {
-      message: `${totalEmployees.toLocaleString()} crew members registered in the port authority system`,
-      timestamp: subHours(new Date(), 2),
-      icon: "👥",
-      bg: "linear-gradient(135deg, #0B2F9E, #1A4D8C)",
-      type: "registration"
-    },
-    {
-      message: `${totalBPReadings.toLocaleString()} blood pressure readings recorded - ${normalPercentage}% within normal range`,
-      timestamp: subHours(new Date(), 5),
-      icon: "❤️",
-      bg: "linear-gradient(135deg, #10B981, #059669)",
-      type: "screening"
-    },
-    {
-      message: `${totalBmiReadings.toLocaleString()} BMI assessments completed - ${healthyBmiPercentage}% healthy weight`,
-      timestamp: subHours(new Date(), 8),
-      icon: "⚖️",
-      bg: "linear-gradient(135deg, #3B82F6, #06B6D4)",
-      type: "assessment"
-    },
-    {
-      message: `${totalDependants.toLocaleString()} dependants and ${totalPortUsers.toLocaleString()} port users included in health coverage`,
-      timestamp: subHours(new Date(), 12),
-      icon: "👨‍👩‍👧",
-      bg: "linear-gradient(135deg, #8B5CF6, #6366F1)",
-      type: "coverage"
-    },
-    {
-      message: `Health screening completed for ${(totalEmployees + totalDependants + totalPortUsers).toLocaleString()} total individuals`,
-      timestamp: subHours(new Date(), 18),
-      icon: "🩺",
-      bg: "linear-gradient(135deg, #F59E0B, #EA580C)",
-      type: "milestone"
-    },
-    {
-      message: `${atRiskPercentage}% of crew members identified for follow-up health monitoring`,
-      timestamp: subHours(new Date(), 24),
-      icon: "📊",
-      bg: "linear-gradient(135deg, #EF4444, #DC2626)",
-      type: "alert"
-    }
-  ];
-
-  const allStats = [
-    { title: "Total Employees", value: totalEmployees, formattedValue: formatNumber(totalEmployees), icon: Users, iconBg: "from-blue-500 to-cyan-500", description: "Registered employees", trend: "+12%", trendUp: true },
-    { title: "Total Dependants", value: totalDependants, formattedValue: formatNumber(totalDependants), icon: Shield, iconBg: "from-emerald-500 to-teal-500", description: "Family members", trend: "+5%", trendUp: true },
-    { title: "Port Users", value: totalPortUsers, formattedValue: formatNumber(totalPortUsers), icon: Anchor, iconBg: "from-purple-500 to-pink-500", description: "Active port users", trend: "+3%", trendUp: true },
-    { title: "Total Visits", value: overview?.totalVisits || 0, formattedValue: formatNumber(overview?.totalVisits || 0), icon: Activity, iconBg: "from-orange-500 to-red-500", description: "Health visits", trend: "+8%", trendUp: true },
-    { title: "Normal BP", value: normalBP, formattedValue: normalBP.toLocaleString(), icon: HeartPulse, iconBg: "from-emerald-500 to-green-500", description: `${normalPercentage}% of readings`, trend: "Healthy", trendUp: true },
-    { title: "Pre-Hypertension", value: preHypertension, formattedValue: preHypertension.toLocaleString(), icon: ActivitySquare, iconBg: "from-amber-500 to-orange-500", description: "Monitor", trend: "Monitor", trendUp: false },
-    { title: "Hypertension", value: hypertensionBP, formattedValue: hypertensionBP.toLocaleString(), icon: Heart, iconBg: "from-red-500 to-rose-500", description: "Alert", trend: "Alert", trendUp: false },
-  ];
-
-  const categoryData = [
-    { name: 'EMPLOYEES', value: totalEmployees, color: oceanColors.deep },
-    { name: 'DEPENDANTS', value: totalDependants, color: oceanColors.mid },
-    { name: 'PORT USERS', value: totalPortUsers, color: oceanColors.surface },
-  ].filter(item => item.value > 0);
-
-  const bpData = bloodPressure?.map(item => ({
+  // Prepare chart data
+  const bpData = bloodPressure?.map((item: any) => ({
     name: item.BloodPressureCategory,
     value: Number(item.Count),
     color: item.BloodPressureCategory === 'NORMAL' ? oceanColors.success :
            item.BloodPressureCategory === 'PRE-HYPERTENSION' ? oceanColors.warning : oceanColors.danger,
-  })).filter(item => item.value > 0) || [];
+  })).filter((item: any) => item.value > 0) || [];
 
-  const bmiData = bmi?.map(item => ({
+  const bmiData = bmi?.map((item: any) => ({
     name: item.BMICategory,
     value: Number(item.Count),
-  })).filter(item => item.value > 0) || [];
+  })).filter((item: any) => item.value > 0) || [];
 
-  const PIE_COLORS = [oceanColors.deep, oceanColors.mid, oceanColors.surface, oceanColors.gold];
+  // Health metrics for summary cards
+  const summaryCards = [
+    { title: "Total Visits", value: metrics?.totalOutstandingVisits || 0, icon: Activity, color: "from-blue-500 to-cyan-500", description: "Total health visits recorded" },
+    { title: "Clients Seen", value: metrics?.totalClientsSeen || 0, icon: Users, color: "from-emerald-500 to-teal-500", description: "Unique clients" },
+    { title: "High Risk", value: highRiskPatients?.length || 0, icon: AlertTriangle, color: "from-red-500 to-rose-500", description: "Patients needing follow-up" },
+    { title: "Multi-Visit", value: multiVisitAbnormal?.length || 0, icon: TrendingUp, color: "from-purple-500 to-pink-500", description: "Patients with >1 visit" },
+  ];
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0B2F9E, #1A4D8C, #2B7BA8)', fontFamily: 'Verdana, Geneva, sans-serif' }}>
@@ -226,46 +253,154 @@ export default function Dashboard() {
               </p>
             </div>
             
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 24px',
-                background: 'rgba(255,255,255,0.1)',
-                backdropFilter: 'blur(4px)',
-                borderRadius: '12px',
-                color: 'white',
-                fontWeight: '600',
-                border: '1px solid rgba(255,255,255,0.2)',
-                cursor: 'pointer',
-                transition: 'all 0.3s',
-                opacity: refreshing ? 0.5 : 1
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-            >
-              <RefreshCw size={20} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
-              Refresh Data
-            </button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 20px',
+                  background: 'rgba(255,255,255,0.1)',
+                  backdropFilter: 'blur(4px)',
+                  borderRadius: '12px',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Filter size={18} />
+                Filters
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={highRiskPatients?.length === 0}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 20px',
+                  background: 'rgba(255,255,255,0.1)',
+                  backdropFilter: 'blur(4px)',
+                  borderRadius: '12px',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  cursor: highRiskPatients?.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: highRiskPatients?.length === 0 ? 0.5 : 1
+                }}
+              >
+                <Download size={18} />
+                Export
+              </button>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 24px',
+                  background: 'rgba(255,255,255,0.1)',
+                  backdropFilter: 'blur(4px)',
+                  borderRadius: '12px',
+                  color: 'white',
+                  fontWeight: '600',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  opacity: refreshing ? 0.5 : 1
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              >
+                <RefreshCw size={20} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+                Refresh Data
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Filters Panel */}
+      {showFilters && (
+        <div style={{ margin: '0 24px 24px 24px', padding: '20px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.2)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <div>
+              <label style={{ fontSize: '12px', color: oceanColors.foam, display: 'block', marginBottom: '4px' }}>Start Date</label>
+              <input
+                type="date"
+                value={filters.startDate}
+                min={dateRange.earliest}
+                max={dateRange.latest}
+                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', color: oceanColors.foam, display: 'block', marginBottom: '4px' }}>End Date</label>
+              <input
+                type="date"
+                value={filters.endDate}
+                min={dateRange.earliest}
+                max={dateRange.latest}
+                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', color: oceanColors.foam, display: 'block', marginBottom: '4px' }}>Category</label>
+              <select
+                value={filters.category}
+                onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white' }}
+              >
+                <option value="all">All Categories</option>
+                {availableCategories.map((cat: any) => (
+                  <option key={cat.Id} value={cat.Title}>{cat.Title}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', color: oceanColors.foam, display: 'block', marginBottom: '4px' }}>Station</label>
+              <select
+                value={filters.station}
+                onChange={(e) => setFilters({ ...filters, station: e.target.value })}
+                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white' }}
+              >
+                <option value="all">All Stations</option>
+                {availableStations.map((station: any) => (
+                  <option key={station.Id} value={station.Title}>{station.Title}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', color: oceanColors.foam, display: 'block', marginBottom: '4px' }}>Gender</label>
+              <select
+                value={filters.gender}
+                onChange={(e) => setFilters({ ...filters, gender: e.target.value })}
+                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white' }}
+              >
+                <option value="all">All Genders</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ padding: '0 24px 32px 24px' }}>
         
-        {/* Stats Grid */}
+        {/* Summary Cards Grid */}
         <div style={{ 
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
           gap: '20px',
           marginBottom: '32px'
         }}>
-          {allStats.map((stat) => (
+          {summaryCards.map((card) => (
             <div 
-              key={stat.title}
+              key={card.title}
               style={{
                 position: 'relative',
                 overflow: 'hidden',
@@ -273,49 +408,26 @@ export default function Dashboard() {
                 backdropFilter: 'blur(8px)',
                 borderRadius: '16px',
                 padding: '20px',
-                cursor: 'pointer',
                 transition: 'all 0.3s',
                 border: '1px solid rgba(255,255,255,0.2)',
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                e.currentTarget.style.transform = 'scale(1.02)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
             >
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <div style={{ 
-                    width: '56px', 
-                    height: '56px', 
-                    background: `linear-gradient(135deg, ${stat.iconBg.split(' ')[1]}, ${stat.iconBg.split(' ')[3]})`,
-                    borderRadius: '12px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
-                  }}>
-                    <stat.icon size={28} style={{ color: 'white' }} />
-                  </div>
-                  <span style={{ 
-                    fontSize: '14px', 
-                    fontWeight: '600',
-                    padding: '4px 8px',
-                    borderRadius: '8px',
-                    whiteSpace: 'nowrap',
-                    background: stat.trendUp ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
-                    color: stat.trendUp ? '#6EE7B7' : '#FCA5A5'
-                  }}>
-                    {stat.trend}
-                  </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ 
+                  width: '48px', 
+                  height: '48px', 
+                  background: `linear-gradient(135deg, ${card.color.split(' ')[1]}, ${card.color.split(' ')[3]})`,
+                  borderRadius: '12px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center'
+                }}>
+                  <card.icon size={24} style={{ color: 'white' }} />
                 </div>
-                <p style={{ fontSize: 'clamp(24px, 3vw, 32px)', fontWeight: 'bold', color: 'white' }}>{stat.formattedValue}</p>
-                <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px', marginTop: '4px', fontWeight: '500' }}>{stat.title}</p>
-                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '4px' }}>{stat.description}</p>
               </div>
+              <p style={{ fontSize: '28px', fontWeight: 'bold', color: 'white' }}>{formatNumber(card.value)}</p>
+              <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px', marginTop: '4px', fontWeight: '500' }}>{card.title}</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '4px' }}>{card.description}</p>
             </div>
           ))}
         </div>
@@ -327,9 +439,7 @@ export default function Dashboard() {
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #FFD700, #FFA500)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
-                  <HeartPulse size={22} style={{ color: '#0A1C40' }} />
-                </div>
+                <HeartPulse size={22} style={{ color: oceanColors.gold }} />
                 <div>
                   <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>Blood Pressure Distribution</h3>
                   <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Employee BP categories overview</p>
@@ -344,14 +454,14 @@ export default function Dashboard() {
                       data={bpData} 
                       cx="50%" 
                       cy="50%" 
-                      innerRadius={70} 
-                      outerRadius={110} 
+                      innerRadius={60} 
+                      outerRadius={100} 
                       paddingAngle={3} 
                       dataKey="value" 
                       label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                       labelLine={{ strokeWidth: 1, stroke: 'rgba(255,255,255,0.3)' }}
                     >
-                      {bpData.map((entry, index) => (
+                      {bpData.map((entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
                       ))}
                     </Pie>
@@ -367,179 +477,147 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Client Categories */}
+          {/* BMI Distribution */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #FFD700, #FFA500)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
-                  <Anchor size={22} style={{ color: '#0A1C40' }} />
-                </div>
+                <Scale size={22} style={{ color: oceanColors.gold }} />
                 <div>
-                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>Port Authority Categories</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Distribution by client type</p>
+                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>BMI Distribution</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Employee BMI categories breakdown</p>
                 </div>
               </div>
             </div>
             <div style={{ padding: '24px' }}>
-              {categoryData.length > 0 ? (
+              {bmiData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={340}>
-                  <PieChart>
-                    <Pie 
-                      data={categoryData} 
-                      cx="50%" 
-                      cy="50%" 
-                      innerRadius={70} 
-                      outerRadius={110} 
-                      paddingAngle={3} 
-                      dataKey="value" 
-                      label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
-                      labelLine={{ strokeWidth: 1, stroke: 'rgba(255,255,255,0.3)' }}
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="rgba(255,255,255,0.3)" strokeWidth={2} />
-                      ))}
-                    </Pie>
+                  <BarChart data={bmiData} layout="vertical" margin={{ left: 100 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis type="number" tick={{ fill: 'white' }} />
+                    <YAxis type="category" dataKey="name" width={100} tick={{ fill: 'white', fontSize: 11 }} />
                     <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
-                    <Legend verticalAlign="bottom" height={50} formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.8)' }}>{value}</span>} />
-                  </PieChart>
+                    <Bar dataKey="value" fill={oceanColors.gold} radius={[0, 8, 8, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <div style={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.5)' }}>No category data available</p>
+                  <p style={{ color: 'rgba(255,255,255,0.5)' }}>No BMI data available</p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* BMI Distribution */}
-        <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', marginBottom: '32px', border: '1px solid rgba(255,255,255,0.2)' }}>
+        {/* High Risk Patients Table */}
+        <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)', marginBottom: '24px' }}>
           <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #FFD700, #FFA500)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
-                <Scale size={22} style={{ color: '#0A1C40' }} />
-              </div>
+              <AlertTriangle size={22} style={{ color: oceanColors.gold }} />
               <div>
-                <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>BMI Navigation Chart</h3>
-                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Employee BMI categories breakdown</p>
+                <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>High Risk Patients</h3>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Patients requiring immediate attention</p>
               </div>
             </div>
           </div>
-          <div style={{ padding: '24px' }}>
-            {bmiData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={bmiData} margin={{ top: 20, right: 30, left: 40, bottom: 80 }}>
-                  <defs>
-                    <linearGradient id="bmiOceanGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#FFD700" />
-                      <stop offset="100%" stopColor="#FFA500" />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} interval={0} tick={{ fontSize: 11, fill: 'white' }} />
-                  <YAxis tickFormatter={(value) => value.toLocaleString()} tick={{ fill: 'white' }} />
-                  <Tooltip contentStyle={{ borderRadius: '12px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white' }} />
-                  <Bar dataKey="value" fill="url(#bmiOceanGradient)" radius={[8, 8, 0, 0]} label={{ position: 'top', fill: '#FFD700', fontSize: 12 }} />
-                </BarChart>
-              </ResponsiveContainer>
+          <div style={{ padding: '20px', overflow: 'auto', maxHeight: '400px' }}>
+            {highRiskLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>Loading high-risk patients...</div>
+            ) : highRiskPatients?.length > 0 ? (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>Name</th>
+                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>ID Number</th>
+                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>Category</th>
+                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>Station</th>
+                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Visits</th>
+                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Risk Level</th>
+                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Last Visit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {highRiskPatients.map((patient: any) => (
+                    <tr key={patient.client_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <td style={{ padding: '12px', color: 'white' }}>{patient.fullname}</td>
+                      <td style={{ padding: '12px', color: 'rgba(255,255,255,0.8)' }}>{patient.idnumber}</td>
+                      <td style={{ padding: '12px', color: 'rgba(255,255,255,0.8)' }}>{patient.category}</td>
+                      <td style={{ padding: '12px', color: 'rgba(255,255,255,0.8)' }}>{patient.station}</td>
+                      <td style={{ padding: '12px', textAlign: 'center', color: 'white' }}>{patient.total_visits}</td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          background: patient.risk_level === 'HIGH' ? `${oceanColors.danger}30` :
+                                     patient.risk_level === 'MEDIUM' ? `${oceanColors.warning}30` : `${oceanColors.success}30`,
+                          color: patient.risk_level === 'HIGH' ? oceanColors.danger :
+                                 patient.risk_level === 'MEDIUM' ? oceanColors.warning : oceanColors.success
+                        }}>
+                          {patient.risk_level}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
+                        {patient.last_visit_date ? format(new Date(patient.last_visit_date), 'MMM dd, yyyy') : 'N/A'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ) : (
-              <div style={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <p style={{ color: 'rgba(255,255,255,0.5)' }}>No BMI data available</p>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.5)' }}>
+                No high-risk patients found for the selected criteria
               </div>
             )}
           </div>
         </div>
 
-        {/* Ship's Log - REAL DATA VERSION */}
+        {/* Multi-Visit Abnormal Patients Table */}
         <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
           <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #FFD700, #FFA500)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
-                  <Navigation size={22} style={{ color: '#0A1C40' }} />
-                </div>
-                <div>
-                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>Ship's Log</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Real-time health intelligence updates</p>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '6px 12px', borderRadius: '20px' }}>
-                <Clock size={14} style={{ color: oceanColors.foam }} />
-                <span style={{ color: oceanColors.foam, fontSize: '12px' }}>Last updated: {format(lastUpdated, "HH:mm")}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <TrendingUp size={22} style={{ color: oceanColors.gold }} />
+              <div>
+                <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '18px' }}>Multi-Visit Abnormal Patients</h3>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Patients with multiple abnormal readings</p>
               </div>
             </div>
           </div>
-          <div style={{ padding: '24px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '16px' }}>
-              {shipLogEntries.map((entry, idx) => (
-                <div 
-                  key={idx}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '16px',
-                    padding: '16px',
-                    background: 'rgba(255,255,255,0.05)',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s',
-                    border: '1px solid rgba(255,255,255,0.05)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
-                    e.currentTarget.style.transform = 'translateX(4px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
-                    e.currentTarget.style.transform = 'translateX(0)';
-                  }}
-                >
-                  <div style={{ width: '48px', height: '48px', background: entry.bg, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-                    <span style={{ fontSize: '24px' }}>{entry.icon}</span>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: '600', color: 'white', fontSize: '14px', marginBottom: '4px' }}>{entry.message}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Calendar size={12} style={{ color: 'rgba(255,255,255,0.4)' }} />
-                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-                        {format(entry.timestamp, "MMM dd, HH:mm")} • {format(entry.timestamp, "h:mm a")}
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight size={18} style={{ color: 'rgba(255,255,255,0.3)', transition: 'transform 0.3s' }} />
-                </div>
-              ))}
-            </div>
-            
-            {/* Health Score Card */}
-            <div style={{ 
-              marginTop: '20px', 
-              padding: '16px 20px', 
-              background: 'linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,160,0,0.05))',
-              borderRadius: '12px',
-              border: `1px solid ${oceanColors.gold}30`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Award size={24} style={{ color: oceanColors.gold }} />
-                <div>
-                  <p style={{ color: oceanColors.foam, fontSize: '12px' }}>Overall Health Score</p>
-                  <p style={{ color: 'white', fontSize: '24px', fontWeight: 'bold' }}>{healthScore}/100</p>
-                </div>
+          <div style={{ padding: '20px', overflow: 'auto', maxHeight: '400px' }}>
+            {multiVisitLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>Loading multi-visit patients...</div>
+            ) : multiVisitAbnormal?.length > 0 ? (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>Name</th>
+                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>ID Number</th>
+                    <th style={{ padding: '12px', textAlign: 'left', color: oceanColors.gold }}>Category</th>
+                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Visits</th>
+                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Abnormal BP</th>
+                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Abnormal BMI</th>
+                    <th style={{ padding: '12px', textAlign: 'center', color: oceanColors.gold }}>Abnormal RBS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {multiVisitAbnormal.map((patient: any) => (
+                    <tr key={patient.client_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <td style={{ padding: '12px', color: 'white' }}>{patient.fullname}</td>
+                      <td style={{ padding: '12px', color: 'rgba(255,255,255,0.8)' }}>{patient.idnumber}</td>
+                      <td style={{ padding: '12px', color: 'rgba(255,255,255,0.8)' }}>{patient.category}</td>
+                      <td style={{ padding: '12px', textAlign: 'center', color: 'white' }}>{patient.total_visits}</td>
+                      <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_bp_visits || 0}</td>
+                      <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.warning }}>{patient.abnormal_bmi_visits || 0}</td>
+                      <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_rbs_visits || 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.5)' }}>
+                No multi-visit abnormal patients found for the selected criteria
               </div>
-              <div style={{ width: '200px', height: '8px', background: 'rgba(255,255,255,0.2)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${healthScore}%`, height: '100%', background: `linear-gradient(90deg, ${oceanColors.success}, ${oceanColors.gold})`, borderRadius: '4px', transition: 'width 1s ease' }} />
-              </div>
-              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
-                Based on {totalBPReadings.toLocaleString()} health readings
-              </p>
-            </div>
+            )}
           </div>
         </div>
       </div>
