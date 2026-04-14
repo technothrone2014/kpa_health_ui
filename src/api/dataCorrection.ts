@@ -1,11 +1,13 @@
+// dataCorrection.ts (frontend API)
 import api from "./client";
 
 export interface CorrectionParams {
   year: number;
   month: number;
   day: number;
-  userId: number;
-  stationId: number;
+  dayOperator: 'eq' | 'gt' | 'gte' | 'lt' | 'lte';
+  userId: number | null;
+  stationId: number | null;
   beforeHour?: number;
   beforeMinute?: number;
 }
