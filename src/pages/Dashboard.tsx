@@ -491,70 +491,104 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Charts Row 2 - Health Score, BP, BMI, RBS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+        {/* Charts Row 2 - Health Score & BP (Row 1) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
           
           {/* Health Score - Donut */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Award size={20} style={{ color: oceanColors.gold }} /><div><h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Health Score</h3><p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Client classification</p></div></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Award size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Health Score</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Client classification</p>
+                </div>
+              </div>
             </div>
-            <div style={{ padding: '16px' }}>
-              {isLoading ? <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} /></div> :
-              healthScoreData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
+            <div style={{ padding: '20px' }}>
+              {isLoading ? (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : healthScoreData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie data={healthScoreData} cx="50%" cy="50%" innerRadius={30} outerRadius={60} paddingAngle={2} dataKey="value">
+                    <Pie data={healthScoreData} cx="50%" cy="50%" innerRadius={45} outerRadius={85} paddingAngle={2} dataKey="value">
                       {healthScoreData.map((entry, idx) => (<Cell key={idx} fill={entry.color} />))}
                     </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)' }} formatter={(v, n, entry) => [`${v} (${Math.round(entry?.payload?.percentage || 0)}%)`, n]} />
-                    <Legend verticalAlign="bottom" height={30} formatter={(v) => <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '10px' }}>{v}</span>} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white }} 
+                      formatter={(v, n, entry) => [`${v} (${Math.round(entry?.payload?.percentage || 0)}%)`, n]} />
+                    <Legend verticalAlign="bottom" height={30} formatter={(v) => <span style={{ color: oceanColors.white, fontSize: '11px' }}>{v}</span>} />
                   </PieChart>
                 </ResponsiveContainer>
-              ) : <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No data</p></div>}
+              ) : <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: oceanColors.white }}>No data</p></div>}
             </div>
           </div>
 
           {/* BP - Stacked Bar */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><HeartPulse size={20} style={{ color: oceanColors.gold }} /><div><h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Pressure</h3><p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BP classification</p></div></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <HeartPulse size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Blood Pressure</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BP classification</p>
+                </div>
+              </div>
             </div>
-            <div style={{ padding: '16px' }}>
-              {isLoading ? <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} /></div> :
-              bpChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={bpChartData} layout="vertical" margin={{ left: 0 }}>
+            <div style={{ padding: '20px' }}>
+              {isLoading ? (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : bpChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={bpChartData} layout="horizontal" margin={{ top: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis type="number" tick={{ fill: 'white', fontSize: '9px' }} />
-                    <YAxis type="category" dataKey="name" hide />
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white, fontSize: '12px' }} />
-                    {Object.keys(bpStackColors).map((key) => (<Bar key={key} dataKey={key} stackId="a" fill={bpStackColors[key as keyof typeof bpStackColors]} />))}
-                    <Legend verticalAlign="bottom" height={40} formatter={(v) => <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '9px' }}>{v}</span>} />
+                    <XAxis dataKey="name" tick={{ fill: oceanColors.white, fontSize: '11px' }} />
+                    <YAxis tick={{ fill: oceanColors.white, fontSize: '10px' }} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white }} />
+                    {Object.keys(bpStackColors).map((key) => (
+                      <Bar key={key} dataKey={key} stackId="a" fill={bpStackColors[key as keyof typeof bpStackColors]} />
+                    ))}
+                    <Legend verticalAlign="bottom" height={40} formatter={(v) => <span style={{ color: oceanColors.white, fontSize: '10px' }}>{v}</span>} />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BP data</p></div>}
+              ) : <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: oceanColors.white }}>No BP data</p></div>}
             </div>
           </div>
+        </div>
 
+        {/* Charts Row 3 - BMI & RBS (Row 2) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '32px' }}>
+          
           {/* BMI - Horizontal Bar */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Scale size={20} style={{ color: oceanColors.gold }} /><div><h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>BMI</h3><p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BMI classification</p></div></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Scale size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>BMI</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BMI classification</p>
+                </div>
+              </div>
             </div>
-            <div style={{ padding: '16px' }}>
-              {isLoading ? <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} /></div> :
-              bmiData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={bmiData} layout="vertical" margin={{ left: 70 }}>
+            <div style={{ padding: '20px' }}>
+              {isLoading ? (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : bmiData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={bmiData} layout="vertical" margin={{ left: 80 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis type="number" tick={{ fill: 'white', fontSize: '8px' }} />
-                    <YAxis type="category" dataKey="name" width={70} tick={{ fill: 'white', fontSize: '8px' }} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white, fontSize: '12px' }} />
+                    <XAxis type="number" tick={{ fill: oceanColors.white, fontSize: '10px' }} />
+                    <YAxis type="category" dataKey="name" width={80} tick={{ fill: oceanColors.white, fontSize: '10px' }} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white }} />
                     <Bar dataKey="value" fill={oceanColors.gold} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BMI data</p></div>}
+              ) : <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: oceanColors.white }}>No BMI data</p></div>}
             </div>
           </div>
 
@@ -569,17 +603,17 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <div style={{ padding: '16px' }}>
+            <div style={{ padding: '20px' }}>
               {isLoading ? (
-                <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : rbsData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={rbsData} layout="vertical" margin={{ left: 85 }}>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={rbsData} layout="vertical" margin={{ left: 95 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                     <XAxis type="number" tick={{ fill: oceanColors.white, fontSize: '10px' }} />
-                    <YAxis type="category" dataKey="name" width={85} tick={{ fill: oceanColors.white, fontSize: '10px' }} />
+                    <YAxis type="category" dataKey="name" width={95} tick={{ fill: oceanColors.white, fontSize: '10px' }} />
                     <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white }} />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                       {rbsData.map((entry: any, index: number) => (
@@ -589,7 +623,7 @@ export default function Dashboard() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <p style={{ color: oceanColors.white, fontSize: '12px' }}>No RBS data</p>
                 </div>
               )}
