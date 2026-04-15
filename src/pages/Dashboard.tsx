@@ -479,8 +479,8 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Charts Row 1 - Station & Category Distribution */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
+        {/* Charts Row 1 - Station */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '20px', marginBottom: '24px' }}>
           
           {/* Station Distribution - Simple Inverted Funnel */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
@@ -551,6 +551,10 @@ export default function Dashboard() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Charts Row 2 - Category & Gender Distribution */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
 
           {/* Category Distribution - Pie Chart */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
@@ -672,7 +676,7 @@ export default function Dashboard() {
 
         </div>
 
-        {/* Charts Row 2 - Health Score & BP (Row 1) */}
+        {/* Charts Row 3 - Health Score & BP (Row 1) */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
           
           {/* Health Score - Donut */}
@@ -740,7 +744,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Charts Row 3 - BMI & RBS (Row 2) */}
+        {/* Charts Row 4 - BMI & RBS (Row 2) */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '32px' }}>
           
           {/* BMI - Horizontal Bar */}
