@@ -236,6 +236,7 @@ export default function Dashboard() {
     fetchFilterData();
   }, []);
 
+  // Build query params for API calls
   const queryParams = new URLSearchParams();
   if (filters.startDate) queryParams.append('startDate', filters.startDate);
   if (filters.endDate) queryParams.append('endDate', filters.endDate);
@@ -244,33 +245,66 @@ export default function Dashboard() {
   if (filters.gender !== 'all') queryParams.append('gender', filters.gender);
   const paramString = queryParams.toString();
 
+  // For station distribution - DO NOT filter by station (we're grouping by it)
+  const stationParams = new URLSearchParams();
+  if (filters.startDate) stationParams.append('startDate', filters.startDate);
+  if (filters.endDate) stationParams.append('endDate', filters.endDate);
+  if (filters.category !== 'all') stationParams.append('category', filters.category);
+  if (filters.gender !== 'all') stationParams.append('gender', filters.gender);
+  const stationParamString = stationParams.toString();
+
+  // For category distribution - DO NOT filter by category (we're grouping by it)
+  const categoryParams = new URLSearchParams();
+  if (filters.startDate) categoryParams.append('startDate', filters.startDate);
+  if (filters.endDate) categoryParams.append('endDate', filters.endDate);
+  if (filters.station !== 'all') categoryParams.append('station', filters.station);
+  if (filters.gender !== 'all') categoryParams.append('gender', filters.gender);
+  const categoryParamString = categoryParams.toString();
+
+  // Fetch client health status
   const { data: healthStatus, isLoading: healthLoading, refetch: refetchHealth } = useQuery({
     queryKey: ['client-health-status', filters],
     queryFn: async () => (await api.get(`/analytics/clients/health-status?${paramString}`)).data.data,
     enabled: !!filters.startDate,
   });
 
+  // Fetch high risk clients
   const { data: highRiskClients, refetch: refetchHighRisk } = useQuery({
     queryKey: ['high-risk-clients', filters],
     queryFn: async () => (await api.get(`/analytics/clients/high-risk?${paramString}`)).data.data || [],
     enabled: !!filters.startDate,
   });
 
-  const { data: stationDistribution } = useQuery({
+  // Fetch station distribution - using stationParamString (without station filter)
+  const { data: stationDistribution, refetch: refetchStation } = useQuery({
     queryKey: ['station-distribution', filters],
-    queryFn: async () => (await api.get(`/analytics/clients/station-distribution?${paramString}`)).data.data || [],
+    queryFn: async () => {
+      const response = await api.get(`/analytics/clients/station-distribution?${stationParamString}`);
+      console.log('Station Distribution Response:', response.data);
+      return response.data.data || [];
+    },
     enabled: !!filters.startDate,
   });
 
-  const { data: categoryDistribution } = useQuery({
+  // Fetch category distribution - using categoryParamString (without category filter)
+  const { data: categoryDistribution, refetch: refetchCategory } = useQuery({
     queryKey: ['category-distribution', filters],
-    queryFn: async () => (await api.get(`/analytics/clients/category-distribution?${paramString}`)).data.data || [],
+    queryFn: async () => {
+      const response = await api.get(`/analytics/clients/category-distribution?${categoryParamString}`);
+      console.log('Category Distribution Response:', response.data);
+      return response.data.data || [];
+    },
     enabled: !!filters.startDate,
   });
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchHealth(), refetchHighRisk()]);
+    await Promise.all([
+      refetchHealth(), 
+      refetchHighRisk(),
+      refetchStation(),
+      refetchCategory()
+    ]);
     setTimeout(() => setRefreshing(false), 1000);
   };
 
@@ -309,10 +343,10 @@ export default function Dashboard() {
     const rbs = healthStatus.rbs;
     return [
       { name: 'Normal', value: rbs.normal || 0, color: oceanColors.success },
-      { name: 'Hypoglycemia', value: rbs.hypoglycemia || 0, color: oceanColors.info },
-      { name: 'Pre-Diabetic', value: rbs.preDiabetic || 0, color: oceanColors.warning },
+      { name: 'Hypoglycemia', value: rbs.hypoglycemia || 0, color: '#06B6D4' },
+      { name: 'Pre-Diabetic', value: rbs.preDiabetic || 0, color: '#F59E0B' },
       { name: 'Diabetic', value: rbs.diabetic || 0, color: oceanColors.danger },
-      { name: 'Mixed', value: rbs.mixed || 0, color: '#94a3b8' }
+      { name: 'Mixed', value: rbs.mixed || 0, color: '#6B7280' }
     ].filter(item => item.value > 0);
   }, [healthStatus]);
 
@@ -426,7 +460,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                     <XAxis type="number" tick={{ fill: 'white', fontSize: '10px' }} />
                     <YAxis type="category" dataKey="station" width={100} tick={{ fill: 'white', fontSize: '10px' }} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white', fontSize: '12px' }} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white, fontSize: '12px' }} />
                     <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                       {stationData.map((entry: any, index: number) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                     </Bar>
@@ -494,7 +528,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                     <XAxis type="number" tick={{ fill: 'white', fontSize: '9px' }} />
                     <YAxis type="category" dataKey="name" hide />
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)' }} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white, fontSize: '12px' }} />
                     {Object.keys(bpStackColors).map((key) => (<Bar key={key} dataKey={key} stackId="a" fill={bpStackColors[key as keyof typeof bpStackColors]} />))}
                     <Legend verticalAlign="bottom" height={40} formatter={(v) => <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '9px' }}>{v}</span>} />
                   </BarChart>
@@ -516,7 +550,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                     <XAxis type="number" tick={{ fill: 'white', fontSize: '8px' }} />
                     <YAxis type="category" dataKey="name" width={70} tick={{ fill: 'white', fontSize: '8px' }} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)' }} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white, fontSize: '12px' }} />
                     <Bar dataKey="value" fill={oceanColors.gold} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -524,26 +558,41 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* RBS - Vertical Bar Chart */}
+          {/* RBS - Horizontal Bar Chart */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Droplets size={20} style={{ color: oceanColors.gold }} /><div><h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Sugar</h3><p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>RBS classification</p></div></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Droplets size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Blood Sugar</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>RBS classification</p>
+                </div>
+              </div>
             </div>
             <div style={{ padding: '16px' }}>
-              {isLoading ? <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} /></div> :
-              rbsData.length > 0 ? (
+              {isLoading ? (
+                <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : rbsData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={rbsData} margin={{ bottom: 20 }}>
+                  <BarChart data={rbsData} layout="vertical" margin={{ left: 85 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="name" tick={{ fill: 'white', fontSize: '8px', angle: -45, textAnchor: 'end' }} height={50} />
-                    <YAxis tick={{ fill: 'white', fontSize: '9px' }} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)' }} />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                      {rbsData.map((entry, idx) => (<Cell key={idx} fill={entry.color} />))}
+                    <XAxis type="number" tick={{ fill: oceanColors.white, fontSize: '10px' }} />
+                    <YAxis type="category" dataKey="name" width={85} tick={{ fill: oceanColors.white, fontSize: '10px' }} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white }} />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                      {rbsData.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No RBS data</p></div>}
+              ) : (
+                <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: oceanColors.white, fontSize: '12px' }}>No RBS data</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
