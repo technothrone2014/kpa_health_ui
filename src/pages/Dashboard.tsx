@@ -362,8 +362,9 @@ export default function Dashboard() {
   const categoryData = React.useMemo(() => {
     if (!categoryDistribution) return [];
     return categoryDistribution.map((c: any, idx: number) => ({ 
-      ...c, 
+      category: c.category,  // Keep the category name
       count: parseInt(c.count) || 0,  // Convert string to number!
+      value: parseInt(c.count) || 0,  // Add value field for compatibility
       color: categoryColors[idx % categoryColors.length] 
     }));
   }, [categoryDistribution]);
@@ -502,20 +503,57 @@ export default function Dashboard() {
           {/* Category Distribution - Pie Chart */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><PieChartIcon size={20} style={{ color: oceanColors.gold }} /><div><h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Clients per Category</h3><p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Active client distribution by category</p></div></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <PieChartIcon size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Clients per Category</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Active client distribution by category</p>
+                </div>
+              </div>
             </div>
-            <div style={{ padding: '16px' }}>
-              {isLoading ? <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} /></div> :
-              categoryData.length > 0 ? (
+            <div style={{ padding: '20px' }}>
+              {isLoading ? (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : categoryData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie data={categoryData} cx="50%" cy="50%" innerRadius={0} outerRadius={80} paddingAngle={2} dataKey="count" label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`} labelLine={{ stroke: 'rgba(255,255,255,0.5)' }}>
-                      {categoryData.map((entry: any, index: number) => (<Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />))}
+                    <Pie 
+                      data={categoryData} 
+                      cx="50%" 
+                      cy="50%" 
+                      innerRadius={0} 
+                      outerRadius={80} 
+                      paddingAngle={2} 
+                      dataKey="count"
+                      nameKey="category"
+                      label={({ payload, percent }: any) => `${payload?.category || ''} (${((percent || 0) * 100).toFixed(0)}%)`}
+                      labelLine={{ stroke: 'rgba(255,255,255,0.5)' }}
+                    >
+                      {categoryData.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+                      ))}
                     </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white', fontSize: '12px' }} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white }}
+                      formatter={(value: any, name: any, props: any) => {
+                        const categoryName = props?.payload?.category || name || '';
+                        return [`${value} clients`, categoryName];
+                      }}
+                    />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value) => <span style={{ color: oceanColors.white, fontSize: '11px' }}>{value}</span>}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
-              ) : <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No category data</p></div>}
+              ) : (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: oceanColors.white, fontSize: '12px' }}>No category data</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
