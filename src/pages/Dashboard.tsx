@@ -352,12 +352,20 @@ export default function Dashboard() {
 
   const stationData = React.useMemo(() => {
     if (!stationDistribution) return [];
-    return stationDistribution.map((s: any, idx: number) => ({ ...s, color: stationColors[idx % stationColors.length] }));
+    return stationDistribution.map((s: any, idx: number) => ({ 
+      ...s, 
+      count: parseInt(s.count) || 0,  // Convert string to number!
+      color: stationColors[idx % stationColors.length] 
+    }));
   }, [stationDistribution]);
 
   const categoryData = React.useMemo(() => {
     if (!categoryDistribution) return [];
-    return categoryDistribution.map((c: any, idx: number) => ({ ...c, color: categoryColors[idx % categoryColors.length] }));
+    return categoryDistribution.map((c: any, idx: number) => ({ 
+      ...c, 
+      count: parseInt(c.count) || 0,  // Convert string to number!
+      color: categoryColors[idx % categoryColors.length] 
+    }));
   }, [categoryDistribution]);
 
   const summaryCards = [
@@ -447,26 +455,47 @@ export default function Dashboard() {
         {/* Charts Row 1 - Station & Category Distribution */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
           
-          {/* Station Distribution - Horizontal Bar Chart */}
+          {/* Station Distribution - Population Pyramid Style */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><MapPin size={20} style={{ color: oceanColors.gold }} /><div><h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Clients per Station</h3><p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Active client distribution by station</p></div></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <MapPin size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Clients per Station</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Active client distribution by station</p>
+                </div>
+              </div>
             </div>
-            <div style={{ padding: '16px' }}>
-              {isLoading ? <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} /></div> :
-              stationData.length > 0 ? (
+            <div style={{ padding: '20px' }}>
+              {isLoading ? (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : stationData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={stationData} layout="vertical" margin={{ left: 100 }}>
+                  <BarChart data={stationData} layout="vertical" margin={{ left: 100, right: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis type="number" tick={{ fill: 'white', fontSize: '10px' }} />
-                    <YAxis type="category" dataKey="station" width={100} tick={{ fill: 'white', fontSize: '10px' }} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white, fontSize: '12px' }} />
+                    <XAxis type="number" tick={{ fill: oceanColors.white, fontSize: '9px' }} />
+                    <YAxis 
+                      type="category" 
+                      dataKey="station" 
+                      width={100} 
+                      tick={{ fill: oceanColors.white, fontSize: '9px' }}
+                      tickFormatter={(value) => value.length > 15 ? value.substring(0, 12) + '...' : value}
+                    />
+                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white }} />
                     <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                      {stationData.map((entry: any, index: number) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                      {stationData.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No station data</p></div>}
+              ) : (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: oceanColors.white, fontSize: '12px' }}>No station data</p>
+                </div>
+              )}
             </div>
           </div>
 
