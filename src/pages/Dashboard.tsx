@@ -36,103 +36,24 @@ const oceanColors = {
   white: '#FFFFFF',
 };
 
-// Common select style for filter dropdowns - using CSSProperties type
-const filterSelectStyle: CSSProperties = {
-  width: '100%',
-  padding: '8px 12px',
-  borderRadius: '8px',
-  border: '1px solid rgba(255,255,255,0.3)',
-  background: 'rgba(255,255,255,0.15)',
-  color: 'white',
-  fontSize: '14px',
-  cursor: 'pointer',
-  outline: 'none',
-  backdropFilter: 'blur(4px)',
-  WebkitAppearance: 'none' as any,
-  MozAppearance: 'none' as any,
-  appearance: 'none' as any,
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'right 12px center',
-  backgroundSize: '16px',
-  paddingRight: '36px',
-};
-
-// Common select style for modal dropdowns (dark text on light background)
-const modalSelectStyle: CSSProperties = {
-  width: '100%',
-  padding: '8px 12px',
-  borderRadius: '6px',
-  border: '1px solid #e2e8f0',
-  background: 'white',
-  color: oceanColors.textDark,
-  fontSize: '14px',
-  cursor: 'pointer',
-  outline: 'none',
-  WebkitAppearance: 'none' as any,
-  MozAppearance: 'none' as any,
-  appearance: 'none' as any,
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231F2937' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'right 12px center',
-  backgroundSize: '16px',
-  paddingRight: '36px',
-};
-
-// Common input style for filter inputs
-const filterInputStyle: CSSProperties = {
-  width: '100%',
-  padding: '8px 12px',
-  borderRadius: '8px',
-  border: '1px solid rgba(255,255,255,0.3)',
-  background: 'rgba(255,255,255,0.15)',
-  color: 'white',
-  fontSize: '14px',
-  outline: 'none',
-  backdropFilter: 'blur(4px)',
-};
-
 const formatNumber = (num: number): string => {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
   return num.toString();
 };
 
-// Alternative approach: inline styles for selects to avoid TypeScript issues
-const getFilterSelectStyle = (): React.CSSProperties => ({
-  width: '100%',
-  padding: '8px 36px 8px 12px',
-  borderRadius: '8px',
-  border: '1px solid rgba(255,255,255,0.3)',
-  background: 'rgba(255,255,255,0.15)',
-  color: 'white',
-  fontSize: '14px',
-  cursor: 'pointer',
-  outline: 'none',
-  backdropFilter: 'blur(4px)',
-  WebkitAppearance: 'none',
-  MozAppearance: 'none',
-  appearance: 'none',
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'right 12px center',
-  backgroundSize: '16px',
-} as React.CSSProperties);
-
 // High Risk Patients Modal Component with Dynamic Filters
 function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onExport, availableStations, availableCategories }: any) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState('risk_score');
+  const [sortField, setSortField] = useState('riskScore');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   
   // Dynamic risk criteria
   const [riskCriteria, setRiskCriteria] = useState({
     minVisits: 2,
-    minAbnormalBP: 1,
-    minAbnormalBMI: 1,
-    minAbnormalRBS: 1,
-    conditionsRequired: 'any' as 'any' | 'all'
+    minConditions: 1,
+    riskLevel: 'all' as 'all' | 'HIGH' | 'MEDIUM' | 'LOW'
   });
   
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -145,10 +66,10 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
   // Helper function to transform high risk patient data to match PatientProfile expected format
   const transformToPatientProfile = (patient: any) => {
     return {
-      Id: patient.client_id,
-      FullName: patient.fullname,
-      IDNumber: patient.idnumber,
-      PhoneNumber: patient.phonenumber || '',
+      Id: patient.clientId || patient.client_id,
+      FullName: patient.fullName || patient.fullname,
+      IDNumber: patient.idNumber || patient.idnumber,
+      PhoneNumber: patient.phoneNumber || patient.phonenumber || '',
       GenderTitle: patient.gender || 'N/A',
       CategoryTitle: patient.category || 'N/A',
       StationTitle: patient.station || 'N/A',
@@ -158,49 +79,23 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
 
   if (!isOpen) return null;
 
-  // Calculate risk score and filter patients based on dynamic criteria
-  const processedPatients = patients?.map((patient: any) => {
-    let conditionsMet = 0;
-    if (patient.abnormal_bp_count >= riskCriteria.minAbnormalBP) conditionsMet++;
-    if (patient.abnormal_bmi_count >= riskCriteria.minAbnormalBMI) conditionsMet++;
-    if (patient.abnormal_rbs_count >= riskCriteria.minAbnormalRBS) conditionsMet++;
+  // Filter patients based on dynamic criteria
+  const filteredPatients = patients?.filter((patient: any) => {
+    const meetsVisitRequirement = patient.totalVisits >= riskCriteria.minVisits;
+    const meetsConditionRequirement = patient.conditionsCount >= riskCriteria.minConditions;
+    const matchesRiskLevel = riskCriteria.riskLevel === 'all' || patient.riskLevel === riskCriteria.riskLevel;
     
-    const meetsVisitRequirement = patient.total_visits >= riskCriteria.minVisits;
-    const meetsConditionRequirement = riskCriteria.conditionsRequired === 'any' 
-      ? conditionsMet >= 1 
-      : conditionsMet === 3;
-    
-    const isHighRisk = meetsVisitRequirement && meetsConditionRequirement;
-    
-    // Calculate risk score (0-100)
-    const riskScore = Math.min(
-      100,
-      (patient.abnormal_bp_count / patient.total_visits * 40) +
-      (patient.abnormal_bmi_count / patient.total_visits * 30) +
-      (patient.abnormal_rbs_count / patient.total_visits * 30)
-    );
-    
-    return {
-      ...patient,
-      isHighRisk,
-      risk_score: Math.round(riskScore),
-      conditions_met: conditionsMet
-    };
-  }) || [];
-
-  // Apply filters
-  const filteredPatients = processedPatients.filter((patient: any) => {
     const matchesSearch = searchTerm === '' || 
-      patient.fullname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.idnumber?.includes(searchTerm) ||
-      patient.phonenumber?.includes(searchTerm);
+      (patient.fullName || patient.fullname)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (patient.idNumber || patient.idnumber)?.includes(searchTerm) ||
+      (patient.phoneNumber || patient.phonenumber)?.includes(searchTerm);
     const matchesCategory = localFilters.category === 'all' || patient.category === localFilters.category;
     const matchesStation = localFilters.station === 'all' || patient.station === localFilters.station;
     const matchesGender = localFilters.gender === 'all' || patient.gender === localFilters.gender;
-    const matchesRisk = patient.isHighRisk;
     
-    return matchesSearch && matchesCategory && matchesStation && matchesGender && matchesRisk;
-  });
+    return meetsVisitRequirement && meetsConditionRequirement && matchesRiskLevel &&
+           matchesSearch && matchesCategory && matchesStation && matchesGender;
+  }) || [];
 
   // Sort patients
   const sortedPatients = [...filteredPatients].sort((a, b) => {
@@ -248,7 +143,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
         <body>
           <h1>High Risk Patients Report</h1>
           <p>Generated: ${format(new Date(), 'PPPpp')}</p>
-          <p>Risk Criteria: Min Visits: ${riskCriteria.minVisits}, Min Abnormal BP: ${riskCriteria.minAbnormalBP}, Min Abnormal BMI: ${riskCriteria.minAbnormalBMI}, Min Abnormal RBS: ${riskCriteria.minAbnormalRBS}</p>
+          <p>Risk Criteria: Min Visits: ${riskCriteria.minVisits}, Min Conditions: ${riskCriteria.minConditions}</p>
           <p>Filters: Category: ${localFilters.category}, Station: ${localFilters.station}, Gender: ${localFilters.gender}</p>
           <table>
             <thead>
@@ -259,27 +154,29 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 <th>Category</th>
                 <th>Station</th>
                 <th>Visits</th>
-                <th>Abnormal BP</th>
-                <th>Abnormal BMI</th>
-                <th>Abnormal RBS</th>
-                <th>Risk Score</th>
+                <th>BP Status</th>
+                <th>BMI Status</th>
+                <th>RBS Status</th>
+                <th>Conditions</th>
+                <th>Risk Level</th>
                 <th>Last Visit</th>
               </tr>
             </thead>
             <tbody>
               ${sortedPatients.map((patient: any) => `
                 <tr>
-                  <td>${patient.fullname}</td>
-                  <td>${patient.idnumber}</td>
-                  <td>${patient.phonenumber || 'N/A'}</td>
+                  <td>${patient.fullName || patient.fullname}</td>
+                  <td>${patient.idNumber || patient.idnumber}</td>
+                  <td>${patient.phoneNumber || patient.phonenumber || 'N/A'}</td>
                   <td>${patient.category}</td>
                   <td>${patient.station}</td>
-                  <td>${patient.total_visits}</td>
-                  <td>${patient.abnormal_bp_count || 0}</td>
-                  <td>${patient.abnormal_bmi_count || 0}</td>
-                  <td>${patient.abnormal_rbs_count || 0}</td>
-                  <td class="risk-${patient.risk_score > 70 ? 'high' : patient.risk_score > 40 ? 'medium' : 'low'}">${patient.risk_score}%</td>
-                  <td>${patient.last_visit_date ? new Date(patient.last_visit_date).toLocaleDateString() : 'N/A'}</td>
+                  <td>${patient.totalVisits}</td>
+                  <td>${patient.bpStatus || 'N/A'}</td>
+                  <td>${patient.bmiStatus || 'N/A'}</td>
+                  <td>${patient.rbsStatus || 'N/A'}</td>
+                  <td>${patient.conditionsCount || 0}</td>
+                  <td class="risk-${patient.riskLevel === 'HIGH' ? 'high' : patient.riskLevel === 'MEDIUM' ? 'medium' : 'low'}">${patient.riskLevel}</td>
+                  <td>${patient.lastVisitDate ? format(new Date(patient.lastVisitDate), 'MMM dd, yyyy') : 'N/A'}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -293,19 +190,21 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
 
   const handleExportExcel = () => {
     const exportData = sortedPatients.map((patient: any) => ({
-      'Full Name': patient.fullname,
-      'ID Number': patient.idnumber,
-      'Phone Number': patient.phonenumber,
+      'Full Name': patient.fullName || patient.fullname,
+      'ID Number': patient.idNumber || patient.idnumber,
+      'Phone Number': patient.phoneNumber || patient.phonenumber,
       'Category': patient.category,
       'Station': patient.station,
       'Gender': patient.gender,
-      'Total Visits': patient.total_visits,
-      'Abnormal BP Visits': patient.abnormal_bp_count || 0,
-      'Abnormal BMI Visits': patient.abnormal_bmi_count || 0,
-      'Abnormal RBS Visits': patient.abnormal_rbs_count || 0,
-      'Risk Score': `${patient.risk_score}%`,
-      'Conditions Met': patient.conditions_met,
-      'Last Visit Date': patient.last_visit_date ? format(new Date(patient.last_visit_date), 'PPP') : 'N/A'
+      'Total Visits': patient.totalVisits,
+      'BP Status': patient.bpStatus,
+      'BMI Status': patient.bmiStatus,
+      'RBS Status': patient.rbsStatus,
+      'Abnormal Conditions': (patient.abnormalConditions || []).join(', '),
+      'Conditions Count': patient.conditionsCount,
+      'Risk Level': patient.riskLevel,
+      'Risk Score': patient.riskScore ? `${patient.riskScore}%` : 'N/A',
+      'Last Visit Date': patient.lastVisitDate ? format(new Date(patient.lastVisitDate), 'PPP') : 'N/A'
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -313,7 +212,6 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
     XLSX.writeFile(wb, `high_risk_patients_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
   };
 
-  // Modal select style inline to avoid TypeScript issues
   const modalSelectStyleInline: React.CSSProperties = {
     width: '100%',
     padding: '8px 36px 8px 12px',
@@ -420,7 +318,7 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 }}
               >
                 <Settings size={14} />
-                {showAdvancedFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+                {showAdvancedFilters ? 'Hide Filters' : 'Show Filters'}
               </button>
             </div>
             
@@ -437,47 +335,27 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                 />
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Min Abnormal BP Readings</label>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Min Abnormal Conditions</label>
                 <input
                   type="number"
-                  min="0"
-                  max="20"
-                  value={riskCriteria.minAbnormalBP}
-                  onChange={(e) => setRiskCriteria({ ...riskCriteria, minAbnormalBP: parseInt(e.target.value) || 1 })}
+                  min="1"
+                  max="3"
+                  value={riskCriteria.minConditions}
+                  onChange={(e) => setRiskCriteria({ ...riskCriteria, minConditions: parseInt(e.target.value) || 1 })}
                   style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Min Abnormal BMI Readings</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="20"
-                  value={riskCriteria.minAbnormalBMI}
-                  onChange={(e) => setRiskCriteria({ ...riskCriteria, minAbnormalBMI: parseInt(e.target.value) || 1 })}
-                  style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Min Abnormal RBS Readings</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="20"
-                  value={riskCriteria.minAbnormalRBS}
-                  onChange={(e) => setRiskCriteria({ ...riskCriteria, minAbnormalRBS: parseInt(e.target.value) || 1 })}
-                  style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Conditions Required</label>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Risk Level</label>
                 <select
-                  value={riskCriteria.conditionsRequired}
-                  onChange={(e) => setRiskCriteria({ ...riskCriteria, conditionsRequired: e.target.value as 'any' | 'all' })}
+                  value={riskCriteria.riskLevel}
+                  onChange={(e) => setRiskCriteria({ ...riskCriteria, riskLevel: e.target.value as any })}
                   style={modalSelectStyleInline}
                 >
-                  <option value="any">Any Condition (OR)</option>
-                  <option value="all">All Conditions (AND)</option>
+                  <option value="all">All Risk Levels</option>
+                  <option value="HIGH">High Risk Only</option>
+                  <option value="MEDIUM">Medium Risk Only</option>
+                  <option value="LOW">Low Risk Only</option>
                 </select>
               </div>
             </div>
@@ -608,39 +486,32 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f1f5f9', position: 'sticky', top: 0 }}>
-                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('fullname')}>
-                    Name {sortField === 'fullname' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('fullName')}>
+                    Name {sortField === 'fullName' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('idnumber')}>
-                    ID Number {sortField === 'idnumber' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('idNumber')}>
+                    ID Number {sortField === 'idNumber' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('phonenumber')}>
-                    Phone Number {sortField === 'phonenumber' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Category</th>
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Station</th>
+                  <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('totalVisits')}>
+                    Visits {sortField === 'totalVisits' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('category')}>
-                    Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <th style={{ padding: '12px', textAlign: 'center' }}>BP Status</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>BMI Status</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>RBS Status</th>
+                  <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('conditionsCount')}>
+                    Conditions {sortField === 'conditionsCount' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th style={{ padding: '12px', textAlign: 'left', cursor: 'pointer' }} onClick={() => handleSort('station')}>
-                    Station {sortField === 'station' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('total_visits')}>
-                    Visits {sortField === 'total_visits' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal BP</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal BMI</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Abnormal RBS</th>
-                  <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('risk_score')}>
-                    Risk Score {sortField === 'risk_score' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('last_visit_date')}>
-                    Last Visit {sortField === 'last_visit_date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <th style={{ padding: '12px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('riskLevel')}>
+                    Risk Level {sortField === 'riskLevel' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {sortedPatients.map((patient: any) => (
                   <tr 
-                    key={patient.client_id} 
+                    key={patient.clientId || patient.client_id} 
                     style={{ 
                       borderBottom: '1px solid #e2e8f0',
                       cursor: 'pointer',
@@ -650,32 +521,67 @@ function HighRiskModal({ isOpen, onClose, patients, filters, onFilterChange, onE
                     onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
-                    <td style={{ padding: '12px', fontWeight: '500' }}>{patient.fullname}</td>
-                    <td style={{ padding: '12px', color: '#64748b' }}>{patient.idnumber}</td>
-                    <td style={{ padding: '12px', color: '#64748b' }}>{patient.phonenumber || 'N/A'}</td>
+                    <td style={{ padding: '12px', fontWeight: '500' }}>{patient.fullName || patient.fullname}</td>
+                    <td style={{ padding: '12px', color: '#64748b' }}>{patient.idNumber || patient.idnumber}</td>
                     <td style={{ padding: '12px' }}>{patient.category}</td>
                     <td style={{ padding: '12px' }}>{patient.station}</td>
-                    <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>{patient.total_visits}</td>
-                    <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_bp_count || 0}</td>
-                    <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.warning }}>{patient.abnormal_bmi_count || 0}</td>
-                    <td style={{ padding: '12px', textAlign: 'center', color: oceanColors.danger }}>{patient.abnormal_rbs_count || 0}</td>
+                    <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>{patient.totalVisits}</td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
-                      <div style={{
-                        display: 'inline-block',
+                      <span style={{
                         padding: '4px 8px',
                         borderRadius: '20px',
-                        fontSize: '12px',
+                        fontSize: '11px',
                         fontWeight: 'bold',
-                        background: patient.risk_score >= 70 ? `${oceanColors.danger}20` :
-                                   patient.risk_score >= 40 ? `${oceanColors.warning}20` : `${oceanColors.success}20`,
-                        color: patient.risk_score >= 70 ? oceanColors.danger :
-                               patient.risk_score >= 40 ? oceanColors.warning : oceanColors.success
+                        background: patient.bpStatus === 'NORMAL' ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
+                        color: patient.bpStatus === 'NORMAL' ? oceanColors.success : oceanColors.danger
                       }}>
-                        {patient.risk_score}%
-                      </div>
+                        {patient.bpStatus || 'N/A'}
+                      </span>
                     </td>
-                    <td style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
-                      {patient.last_visit_date ? format(new Date(patient.last_visit_date), 'MMM dd, yyyy') : 'N/A'}
+                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        background: patient.bmiStatus === 'NORMAL' ? `${oceanColors.success}20` : 
+                                   patient.bmiStatus === 'OVERWEIGHT' ? `${oceanColors.warning}20` : `${oceanColors.danger}20`,
+                        color: patient.bmiStatus === 'NORMAL' ? oceanColors.success : 
+                               patient.bmiStatus === 'OVERWEIGHT' ? oceanColors.warning : oceanColors.danger
+                      }}>
+                        {patient.bmiStatus || 'N/A'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        background: patient.rbsStatus === 'NORMAL' ? `${oceanColors.success}20` : 
+                                   patient.rbsStatus === 'PRE-DIABETIC' ? `${oceanColors.warning}20` : `${oceanColors.danger}20`,
+                        color: patient.rbsStatus === 'NORMAL' ? oceanColors.success : 
+                               patient.rbsStatus === 'PRE-DIABETIC' ? oceanColors.warning : oceanColors.danger
+                      }}>
+                        {patient.rbsStatus || 'N/A'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>
+                      {patient.conditionsCount || 0}
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        background: patient.riskLevel === 'HIGH' ? `${oceanColors.danger}20` :
+                                   patient.riskLevel === 'MEDIUM' ? `${oceanColors.warning}20` : `${oceanColors.success}20`,
+                        color: patient.riskLevel === 'HIGH' ? oceanColors.danger :
+                               patient.riskLevel === 'MEDIUM' ? oceanColors.warning : oceanColors.success
+                      }}>
+                        {patient.riskLevel || 'LOW'}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -772,113 +678,129 @@ export default function Dashboard() {
   if (filters.gender !== 'all') queryParams.append('gender', filters.gender);
   const paramString = queryParams.toString();
 
-  // Fetch summary metrics
-  const { data: metrics, refetch: refetchMetrics, isLoading: metricsLoading } = useQuery({
-    queryKey: ['summary-metrics', filters],
+  // Fetch client health status (NEW - correct clinical interpretation)
+  const { data: healthStatus, isLoading: healthLoading, refetch: refetchHealth } = useQuery({
+    queryKey: ['client-health-status', filters],
     queryFn: async () => {
-      const response = await api.get(`/analytics/summary-metrics?${paramString}`);
+      const response = await api.get(`/analytics/clients/health-status?${paramString}`);
       return response.data.data;
     },
     enabled: !!filters.startDate,
   });
 
-  // Fetch high-risk patients
-  const { data: highRiskPatients, refetch: refetchHighRisk, isLoading: highRiskLoading } = useQuery({
-    queryKey: ['high-risk-patients', filters],
+  // Fetch high risk clients (NEW - with proper clinical context)
+  const { data: highRiskClients, refetch: refetchHighRisk } = useQuery({
+    queryKey: ['high-risk-clients', filters],
     queryFn: async () => {
-      const response = await api.get(`/analytics/high-risk-patients?${paramString}`);
+      const response = await api.get(`/analytics/clients/high-risk?${paramString}`);
       return response.data.data || [];
-    },
-    enabled: !!filters.startDate,
-  });
-
-  // Fetch blood pressure data for charts
-  const { data: bloodPressure, refetch: refetchBP, isLoading: bpLoading } = useQuery({
-    queryKey: ['blood-pressure', filters],
-    queryFn: async () => {
-      const response = await api.get(`/analytics/employees/blood-pressure?${paramString}`);
-      return response.data;
-    },
-    enabled: !!filters.startDate,
-  });
-
-  // Fetch BMI data for charts
-  const { data: bmi, refetch: refetchBMI, isLoading: bmiLoading } = useQuery({
-    queryKey: ['bmi', filters],
-    queryFn: async () => {
-      const response = await api.get(`/analytics/employees/bmi?${paramString}`);
-      return response.data;
-    },
-    enabled: !!filters.startDate,
-  });
-
-  // Fetch RBS data for charts
-  const { data: rbs, refetch: refetchRBS, isLoading: rbsLoading } = useQuery({
-    queryKey: ['rbs', filters],
-    queryFn: async () => {
-      const response = await api.get(`/analytics/employees/rbs?${paramString}`);
-      return response.data;
     },
     enabled: !!filters.startDate,
   });
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([
-      refetchMetrics(),
-      refetchHighRisk(),
-      refetchBP(),
-      refetchBMI(),
-      refetchRBS()
-    ]);
+    await refetchHealth();
+    await refetchHighRisk();
     setLastUpdated(new Date());
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  const isLoading = metricsLoading || highRiskLoading || bpLoading || bmiLoading || rbsLoading;
+  const isLoading = healthLoading;
 
   // Prepare chart data with proper reactivity to filters
+  const healthScoreData = React.useMemo(() => {
+    if (!healthStatus?.healthScore) return [];
+    return [
+      { 
+        name: 'Healthy', 
+        value: healthStatus.healthScore.healthy,
+        percentage: healthStatus.healthScore.healthyPercentage,
+        color: oceanColors.success 
+      },
+      { 
+        name: 'Intermediate', 
+        value: healthStatus.healthScore.intermediate,
+        percentage: healthStatus.healthScore.intermediatePercentage,
+        color: oceanColors.warning 
+      },
+      { 
+        name: 'High Risk', 
+        value: healthStatus.healthScore.highRisk,
+        percentage: healthStatus.healthScore.highRiskPercentage,
+        color: oceanColors.danger 
+      }
+    ];
+  }, [healthStatus, filters]);
+
   const bpData = React.useMemo(() => {
-    if (!bloodPressure) return [];
-    return bloodPressure
-      .map((item: any) => ({
-        name: item.BloodPressureCategory,
-        value: Number(item.Count),
-        color: item.BloodPressureCategory === 'NORMAL' ? oceanColors.success :
-              item.BloodPressureCategory === 'PRE-HYPERTENSION' ? oceanColors.warning : oceanColors.danger,
-      }))
-      .filter((item: any) => item.value > 0);
-  }, [bloodPressure, filters]); // Add filters to dependency array
+    if (!healthStatus?.bloodPressure) return [];
+    const bp = healthStatus.bloodPressure;
+    return [
+      { name: 'Normal', value: bp.normal, color: oceanColors.success },
+      { name: 'Pre-Hypertension', value: bp.preHypertension, color: oceanColors.warning },
+      { name: 'Stage I HTN', value: bp.stage1Hypertension, color: '#F97316' },
+      { name: 'Stage II HTN', value: bp.stage2Hypertension, color: oceanColors.danger },
+      { name: 'Hypotension', value: bp.hypotension, color: oceanColors.info }
+    ].filter(item => item.value > 0);
+  }, [healthStatus, filters]);
 
   const bmiData = React.useMemo(() => {
-    if (!bmi) return [];
-    return bmi
-      .map((item: any) => ({
-        name: item.BMICategory,
-        value: Number(item.Count),
-      }))
-      .filter((item: any) => item.value > 0);
-  }, [bmi, filters]); // Add filters to dependency array
+    if (!healthStatus?.bmi) return [];
+    const bmi = healthStatus.bmi;
+    return [
+      { name: 'Underweight', value: bmi.underweight },
+      { name: 'Normal', value: bmi.normal },
+      { name: 'Overweight', value: bmi.overweight },
+      { name: 'Obese', value: bmi.obese },
+      { name: 'Very Obese', value: bmi.veryObese }
+    ].filter(item => item.value > 0);
+  }, [healthStatus, filters]);
 
   const rbsData = React.useMemo(() => {
-    if (!rbs) return [];
-    return rbs
-      .map((item: any) => ({
-        name: item.RBSCategory,
-        value: Number(item.Count),
-        color: item.RBSCategory === 'NORMAL' ? oceanColors.success :
-              item.RBSCategory === 'HYPOGLYCEMIA' ? oceanColors.info :
-              item.RBSCategory === 'PRE-DIABETIC' ? oceanColors.warning : oceanColors.danger,
-      }))
-      .filter((item: any) => item.value > 0);
-  }, [rbs, filters]); // Add filters to dependency array
+    if (!healthStatus?.rbs) return [];
+    const rbs = healthStatus.rbs;
+    return [
+      { name: 'Normal', value: rbs.normal, color: oceanColors.success },
+      { name: 'Hypoglycemia', value: rbs.hypoglycemia, color: oceanColors.info },
+      { name: 'Pre-Diabetic', value: rbs.preDiabetic, color: oceanColors.warning },
+      { name: 'Diabetic', value: rbs.diabetic, color: oceanColors.danger }
+    ].filter(item => item.value > 0);
+  }, [healthStatus, filters]);
 
   // Summary cards
   const summaryCards = [
-    { title: "Total Visits", value: metrics?.totalOutstandingVisits || 0, icon: Activity, color: "from-blue-500 to-cyan-500", description: "Total health visits recorded" },
-    { title: "Clients Seen", value: metrics?.totalClientsSeen || 0, icon: Users, color: "from-emerald-500 to-teal-500", description: "Unique clients" },
-    { title: "High Risk Patients", value: highRiskPatients?.length || 0, icon: AlertTriangle, color: "from-red-500 to-rose-500", description: "Click to configure risk criteria", isClickable: true, onClick: () => setShowHighRiskModal(true) },
-    { title: "Health Score", value: metrics?.healthScore || 85, icon: Award, color: "from-purple-500 to-pink-500", description: "Overall population health", suffix: "%" },
+    { 
+      title: "Total Visits", 
+      value: healthStatus?.totalVisits || 0, 
+      icon: Activity, 
+      color: "from-blue-500 to-cyan-500", 
+      description: "Total health visits recorded" 
+    },
+    { 
+      title: "Clients Seen", 
+      value: healthStatus?.totalClients || 0, 
+      icon: Users, 
+      color: "from-emerald-500 to-teal-500", 
+      description: "Unique clients screened" 
+    },
+    { 
+      title: "High Risk Clients", 
+      value: healthStatus?.healthScore?.highRisk || 0, 
+      icon: AlertTriangle, 
+      color: "from-red-500 to-rose-500", 
+      description: `${healthStatus?.healthScore?.highRiskPercentage?.toFixed(1) || 0}% of clients`,
+      isClickable: true, 
+      onClick: () => setShowHighRiskModal(true) 
+    },
+    { 
+      title: "Health Score", 
+      value: healthStatus?.healthScore?.healthyPercentage || 0, 
+      icon: Award, 
+      color: "from-purple-500 to-pink-500", 
+      description: `${healthStatus?.healthScore?.healthy || 0} healthy clients`, 
+      suffix: "%" 
+    },
   ];
 
   // Filter select style inline
@@ -1062,7 +984,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Active Filters Summary - Add this right after the Filters Panel */}
+      {/* Active Filters Summary */}
       {(filters.category !== 'all' || filters.station !== 'all' || filters.gender !== 'all') && (
         <div style={{ 
           margin: '0 24px 16px 24px', 
@@ -1190,7 +1112,7 @@ export default function Dashboard() {
                 }}>
                   <card.icon size={24} style={{ color: 'white' }} />
                 </div>
-                {card.title === "High Risk Patients" && highRiskPatients?.length > 0 && (
+                {card.title === "High Risk Clients" && healthStatus?.healthScore?.highRisk > 0 && (
                   <div style={{
                     background: oceanColors.danger,
                     color: 'white',
@@ -1200,7 +1122,7 @@ export default function Dashboard() {
                     fontWeight: 'bold',
                     animation: 'pulse 2s infinite'
                   }}>
-                    {highRiskPatients.length}
+                    {healthStatus.healthScore.highRisk}
                   </div>
                 )}
               </div>
@@ -1211,45 +1133,99 @@ export default function Dashboard() {
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '4px' }}>{card.description}</p>
               {card.isClickable && (
                 <div style={{ marginTop: '12px', color: oceanColors.gold, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  Configure risk criteria →
+                  View high risk clients →
                 </div>
               )}
             </div>
           ))}
         </div>
 
-        {/* Charts Row - 3 Column Grid for BP, BMI, and RBS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '32px' }}>
-          {/* Blood Pressure Distribution */}
+        {/* Charts Row - 4 Column Grid for Health Score, BP, BMI, and RBS */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+          
+          {/* Health Score Index */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <HeartPulse size={20} style={{ color: oceanColors.gold }} />
+                  <Award size={20} style={{ color: oceanColors.gold }} />
                   <div>
-                    <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Pressure</h3>
-                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BP categories distribution</p>
+                    <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Health Score</h3>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Client classification</p>
                   </div>
                 </div>
-                {bpLoading && (
-                  <RefreshCw size={16} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
-                )}
               </div>
             </div>
             <div style={{ padding: '16px' }}>
-              {bpLoading ? (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isLoading ? (
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : healthScoreData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie 
+                      data={healthScoreData} 
+                      cx="50%" 
+                      cy="50%" 
+                      innerRadius={35} 
+                      outerRadius={70} 
+                      paddingAngle={2} 
+                      dataKey="value"
+                    >
+                      {healthScoreData.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white', fontSize: '12px' }}
+                      formatter={(value: any, name: any, entry: any) => {
+                        const percentage = entry?.payload?.percentage;
+                        return percentage !== undefined 
+                          ? [`${value} clients (${percentage.toFixed(1)}%)`, name]
+                          : [`${value} clients`, name];
+                      }}
+                    />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '11px' }}>{value}</span>} 
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No data available</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Blood Pressure Distribution */}
+          <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
+            <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <HeartPulse size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Pressure</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Client BP status</p>
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: '16px' }}>
+              {isLoading ? (
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : bpData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie 
                       data={bpData} 
                       cx="50%" 
                       cy="50%" 
-                      innerRadius={40} 
-                      outerRadius={80} 
+                      innerRadius={35} 
+                      outerRadius={70} 
                       paddingAngle={2} 
                       dataKey="value"
                     >
@@ -1266,8 +1242,8 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BP data available for selected filters</p>
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BP data available</p>
                 </div>
               )}
             </div>
@@ -1276,37 +1252,32 @@ export default function Dashboard() {
           {/* BMI Distribution */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Scale size={20} style={{ color: oceanColors.gold }} />
-                  <div>
-                    <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>BMI</h3>
-                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BMI categories breakdown</p>
-                  </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Scale size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>BMI</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Client BMI status</p>
                 </div>
-                {bmiLoading && (
-                  <RefreshCw size={16} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
-                )}
               </div>
             </div>
             <div style={{ padding: '16px' }}>
-              {bmiLoading ? (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isLoading ? (
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : bmiData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={bmiData} layout="vertical" margin={{ left: 80 }}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={bmiData} layout="vertical" margin={{ left: 70 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis type="number" tick={{ fill: 'white', fontSize: '10px' }} />
-                    <YAxis type="category" dataKey="name" width={80} tick={{ fill: 'white', fontSize: '10px' }} />
+                    <XAxis type="number" tick={{ fill: 'white', fontSize: '9px' }} />
+                    <YAxis type="category" dataKey="name" width={70} tick={{ fill: 'white', fontSize: '9px' }} />
                     <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: 'white', fontSize: '12px' }} />
                     <Bar dataKey="value" fill={oceanColors.gold} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BMI data available for selected filters</p>
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BMI data available</p>
                 </div>
               )}
             </div>
@@ -1315,33 +1286,28 @@ export default function Dashboard() {
           {/* RBS Distribution */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Droplets size={20} style={{ color: oceanColors.gold }} />
-                  <div>
-                    <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Sugar (RBS)</h3>
-                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>RBS categories distribution</p>
-                  </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Droplets size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Sugar</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Client RBS status</p>
                 </div>
-                {rbsLoading && (
-                  <RefreshCw size={16} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
-                )}
               </div>
             </div>
             <div style={{ padding: '16px' }}>
-              {rbsLoading ? (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isLoading ? (
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : rbsData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie 
                       data={rbsData} 
                       cx="50%" 
                       cy="50%" 
-                      innerRadius={40} 
-                      outerRadius={80} 
+                      innerRadius={35} 
+                      outerRadius={70} 
                       paddingAngle={2} 
                       dataKey="value"
                     >
@@ -1358,8 +1324,8 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No RBS data available for selected filters</p>
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No RBS data available</p>
                 </div>
               )}
             </div>
@@ -1371,7 +1337,7 @@ export default function Dashboard() {
       <HighRiskModal
         isOpen={showHighRiskModal}
         onClose={() => setShowHighRiskModal(false)}
-        patients={highRiskPatients}
+        patients={highRiskClients}
         filters={filters}
         onFilterChange={setFilters}
         onExport={() => {}}
