@@ -208,6 +208,7 @@ export default function Dashboard() {
   const [availableStations, setAvailableStations] = useState<any[]>([]);
   const [availableCategories, setAvailableCategories] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<{ earliest: string; latest: string }>({ earliest: '', latest: '' });
+  const [trendView, setTrendView] = useState<'daily' | 'period'>('period');
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -320,6 +321,31 @@ export default function Dashboard() {
     },
     enabled: !!filters.startDate,
   });
+
+  // Fetch participation trends
+  const { data: participationTrends } = useQuery({
+    queryKey: ['participation-trends', filters, trendView],
+    queryFn: async () => {
+      const endpoint = trendView === 'daily' 
+        ? '/analytics/participation/daily' 
+        : '/analytics/participation/periods';
+      const response = await api.get(`${endpoint}?${paramString}`);
+      return response.data.data || [];
+    },
+    enabled: !!filters.startDate,
+  });
+
+  // Format data for participation chart
+  const participationData = React.useMemo(() => {
+    if (!participationTrends) return [];
+    return participationTrends.map((p: any) => ({
+      label: p.period_label || p.date_label || p.screening_date,
+      tallies: parseInt(p.total_tallies) || parseInt(p.tally_count) || 0,
+      clients: parseInt(p.total_unique_clients) || parseInt(p.unique_clients) || 0,
+      avgDaily: p.avg_daily_tallies || 0,
+      screeningDays: p.screening_days || 1
+    }));
+  }, [participationTrends]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -479,7 +505,90 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Charts Row 1 - Station */}
+        {/* Charts Row 1 - Participation trends */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '20px', marginBottom: '24px' }}>
+
+          {/* Participation Trends Over Time */}
+          <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)', gridColumn: 'span 2' }}>
+            <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <TrendingUp size={20} style={{ color: oceanColors.gold }} />
+                  <div>
+                    <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Participation Trends</h3>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>EAP screening volume over time</p>
+                  </div>
+                </div>
+                <select 
+                  value={trendView} 
+                  onChange={(e) => setTrendView(e.target.value as 'daily' | 'period')}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    background: 'rgba(255,255,255,0.15)',
+                    color: oceanColors.white,
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="period" style={{ color: oceanColors.textDark }}>By EAP Period</option>
+                  <option value="daily" style={{ color: oceanColors.textDark }}>Daily View</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ padding: '20px' }}>
+              {isLoading ? (
+                <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : participationData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={participationData} margin={{ top: 10, right: 30, left: 0, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis 
+                      dataKey="label" 
+                      tick={{ fill: oceanColors.white, fontSize: '10px' }}
+                      axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                      angle={-30}
+                      textAnchor="end"
+                      height={50}
+                    />
+                    <YAxis 
+                      tick={{ fill: oceanColors.white, fontSize: '10px' }}
+                      axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        borderRadius: '8px', 
+                        background: 'rgba(10,28,64,0.98)', 
+                        border: '1px solid rgba(255,215,0,0.5)', 
+                        color: oceanColors.white,
+                        fontSize: '12px',
+                        padding: '8px 12px'
+                      }}
+                      labelStyle={{ color: oceanColors.white, fontWeight: 'bold' }}
+                      itemStyle={{ color: oceanColors.white }}
+                    />
+                    <Legend 
+                      verticalAlign="top" 
+                      height={36}
+                      formatter={(v) => <span style={{ color: oceanColors.white, fontSize: '11px' }}>{v}</span>}
+                    />
+                    <Bar dataKey="tallies" fill={oceanColors.gold} radius={[4, 4, 0, 0]} name="Total Screenings" />
+                    <Bar dataKey="clients" fill={oceanColors.success} radius={[4, 4, 0, 0]} name="Unique Clients" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: oceanColors.white, fontSize: '12px' }}>No participation data</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Row 2 - Station */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '20px', marginBottom: '24px' }}>
           
           {/* Station Distribution - Simple Inverted Funnel */}
@@ -553,7 +662,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Charts Row 2 - Category & Gender Distribution */}
+        {/* Charts Row 3 - Category & Gender Distribution */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
 
           {/* Category Distribution - Pie Chart */}
@@ -676,7 +785,7 @@ export default function Dashboard() {
 
         </div>
 
-        {/* Charts Row 3 - Health Score & BP (Row 1) */}
+        {/* Charts Row 4 - Health Score & BP (Row 1) */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
           
           {/* Health Score - Donut */}
@@ -744,7 +853,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Charts Row 4 - BMI & RBS (Row 2) */}
+        {/* Charts Row 5 - BMI & RBS (Row 2) */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '32px' }}>
           
           {/* BMI - Horizontal Bar */}
