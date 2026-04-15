@@ -501,7 +501,10 @@ export default function Dashboard() {
                         fontSize: '12px',
                         padding: '8px 12px'
                       }}
+                      labelStyle={{ color: oceanColors.white, fontWeight: 'bold' }}   // 👈 White label text
+                      itemStyle={{ color: oceanColors.white }}                          // 👈 White value text
                       formatter={(value: any) => [`${value} clients`, '']}
+                      cursor={{ fill: 'rgba(255,255,255,0.1)' }}
                     />
                     <Bar 
                       dataKey="count" 
