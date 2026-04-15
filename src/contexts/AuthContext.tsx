@@ -1,6 +1,7 @@
 // kpa_health_ui/src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import api from '../api/client';
+import { useNavigate } from 'react-router-dom';
 
 interface User {
   Id: number;

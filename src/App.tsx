@@ -25,6 +25,7 @@ import aiService from './api/aiService';
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import LoadingSpinner from "./components/LoadingSpinner";
 import Login from "./pages/Login";
+import FieldDataCapture from "./pages/FieldDataCapture";
 
 const queryClient = new QueryClient();
 
@@ -501,6 +502,11 @@ function AppContent() {
           <Route path="/analytics" element={
             <ProtectedRoute>
               <AdvancedAnalytics />
+            </ProtectedRoute>
+          } />
+          <Route path="/field-capture" element={
+            <ProtectedRoute>
+              <FieldDataCapture />
             </ProtectedRoute>
           } />
         </Routes>
