@@ -33,44 +33,44 @@ const oceanColors = {
 const queryTemplates = [
   {
     icon: Users,
-    title: 'High Risk Clients',
-    description: 'Clients with 2+ abnormal conditions requiring follow-up',
-    query: 'Show me all high risk clients with their current health status and risk factors',
+    title: 'High Risk Employees',
+    description: 'Employees with 2+ abnormal conditions',
+    query: 'Show me all high risk employees',
     color: oceanColors.danger
   },
   {
     icon: Activity,
-    title: 'Hypertension Patients',
-    description: 'Clients with elevated blood pressure readings',
-    query: 'List all clients with hypertension or pre-hypertension, including their BP trends',
+    title: 'Consecutive Abnormal BP',
+    description: 'Employees with abnormal BP in 3 consecutive visits',
+    query: 'Show employees who have abnormal blood pressure readings in 3 consecutive visits',
     color: '#F97316'
   },
   {
-    icon: Scale,
-    title: 'BMI Concerns',
-    description: 'Overweight and obese clients requiring intervention',
-    query: 'Show me clients with abnormal BMI (overweight, obese, very obese) and their visit history',
+    icon: TrendingUp,
+    title: 'Latest EAP - Abnormal BMI',
+    description: 'Clients with abnormal BMI in the latest EAP period',
+    query: 'Show all clients with abnormal BMI in the latest EAP period',
     color: oceanColors.warning
   },
   {
-    icon: Droplets,
-    title: 'Blood Sugar Issues',
-    description: 'Pre-diabetic and diabetic clients',
-    query: 'List all clients with abnormal blood sugar readings (pre-diabetic or diabetic)',
+    icon: Calendar,
+    title: 'Latest Period - Hypertension',
+    description: 'Employees with hypertension in the latest screening',
+    query: 'List employees with hypertension in the latest EAP period',
     color: oceanColors.danger
   },
   {
     icon: Award,
-    title: 'Healthy Clients',
-    description: 'Clients with all normal readings across visits',
-    query: 'Show me all healthy clients with completely normal BP, BMI, and RBS readings',
+    title: 'Healthy Dependants',
+    description: 'Dependants with all normal readings',
+    query: 'Show me healthy dependants',
     color: oceanColors.success
   },
   {
-    icon: TrendingUp,
-    title: 'Multi-Visit Trends',
-    description: 'Clients with 3+ visits and their health progression',
-    query: 'List clients with 3 or more visits, showing their health trends over time',
+    icon: MapPin,
+    title: 'Port Users - High Risk',
+    description: 'Port users classified as high risk',
+    query: 'List high risk port users',
     color: oceanColors.info
   },
 ];
