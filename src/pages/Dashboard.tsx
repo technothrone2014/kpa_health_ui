@@ -477,16 +477,15 @@ export default function Dashboard() {
               ) : stationData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart 
-                    data={[...stationData].sort((a, b) => a.count - b.count)}
+                    data={[...stationData].sort((a: any, b: any) => a.count - b.count)}
                     layout="vertical" 
-                    margin={{ left: 100, right: 100 }}
+                    margin={{ left: 100, right: 20 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
                     <XAxis 
                       type="number" 
                       tick={{ fill: oceanColors.white, fontSize: '10px' }}
                       axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
-                      domain={[0, 'dataMax']}
                     />
                     <YAxis 
                       type="category" 
@@ -499,15 +498,21 @@ export default function Dashboard() {
                     <Tooltip 
                       contentStyle={{ 
                         borderRadius: '8px', 
-                        background: 'rgba(10,28,64,0.95)', 
-                        border: '1px solid rgba(255,215,0,0.3)', 
-                        color: oceanColors.white 
+                        background: 'rgba(10,28,64,0.98)', 
+                        border: '1px solid rgba(255,215,0,0.5)', 
+                        color: oceanColors.white,
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        padding: '8px 12px'
                       }}
+                      labelStyle={{ color: oceanColors.white, fontWeight: 'bold' }}
+                      itemStyle={{ color: oceanColors.white }}
+                      formatter={(value: any) => [`${value} clients`, '']}
+                      cursor={{ fill: 'rgba(255,255,255,0.1)' }}
                     />
-                    {/* Left side bars */}
                     <Bar dataKey="count" radius={[4, 0, 0, 4]} maxBarSize={25} barSize={20}>
                       {[...stationData]
-                        .sort((a, b) => a.count - b.count)
+                        .sort((a: any, b: any) => a.count - b.count)
                         .map((entry: any, index: number) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))
@@ -717,10 +722,16 @@ export default function Dashboard() {
                     <Tooltip 
                       contentStyle={{ 
                         borderRadius: '8px', 
-                        background: 'rgba(10,28,64,0.95)', 
-                        border: '1px solid rgba(255,215,0,0.3)', 
-                        color: oceanColors.white 
+                        background: 'rgba(10,28,64,0.98)', 
+                        border: '1px solid rgba(255,215,0,0.5)', 
+                        color: oceanColors.white,
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        padding: '8px 12px'
                       }}
+                      labelStyle={{ color: oceanColors.white, fontWeight: 'bold' }}
+                      itemStyle={{ color: oceanColors.white }}
+                      formatter={(value: any) => [`${value} clients`, '']}
                       cursor={{ fill: 'rgba(255,255,255,0.1)' }}
                     />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]}>
