@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useRef } from 'react';
 import { 
-  Filter, Calendar, Download, Search, TrendingUp, 
-  BarChart3, ChevronDown, RefreshCw, Activity, Heart,
-  Scale, Droplets, FileSpreadsheet, FileJson
+  Search, Download, FileText, FileSpreadsheet, FileJson,
+  Send, Sparkles, RefreshCw, Filter, X, Calendar,
+  Users, MapPin, ChevronDown, ChevronRight, Database,
+  Copy, CheckCircle, TrendingUp, Activity, Heart, Scale,
+  Droplets, AlertTriangle, Award, Clock, BarChart3
 } from 'lucide-react';
 import { format, subMonths, subYears } from 'date-fns';
 import * as XLSX from 'xlsx';
 import api from '../api/client';
+import toast from 'react-hot-toast';
 
 const oceanColors = {
   deep: '#0B2F9E',
@@ -27,139 +29,183 @@ const oceanColors = {
   textLight: '#6B7280',
 };
 
-interface FilterState {
-  startDate: string;
-  endDate: string;
-  category: string;
-  station: string;
-}
+// Pre-defined query templates for quick access
+const queryTemplates = [
+  {
+    icon: Users,
+    title: 'High Risk Clients',
+    description: 'Clients with 2+ abnormal conditions requiring follow-up',
+    query: 'Show me all high risk clients with their current health status and risk factors',
+    color: oceanColors.danger
+  },
+  {
+    icon: Activity,
+    title: 'Hypertension Patients',
+    description: 'Clients with elevated blood pressure readings',
+    query: 'List all clients with hypertension or pre-hypertension, including their BP trends',
+    color: '#F97316'
+  },
+  {
+    icon: Scale,
+    title: 'BMI Concerns',
+    description: 'Overweight and obese clients requiring intervention',
+    query: 'Show me clients with abnormal BMI (overweight, obese, very obese) and their visit history',
+    color: oceanColors.warning
+  },
+  {
+    icon: Droplets,
+    title: 'Blood Sugar Issues',
+    description: 'Pre-diabetic and diabetic clients',
+    query: 'List all clients with abnormal blood sugar readings (pre-diabetic or diabetic)',
+    color: oceanColors.danger
+  },
+  {
+    icon: Award,
+    title: 'Healthy Clients',
+    description: 'Clients with all normal readings across visits',
+    query: 'Show me all healthy clients with completely normal BP, BMI, and RBS readings',
+    color: oceanColors.success
+  },
+  {
+    icon: TrendingUp,
+    title: 'Multi-Visit Trends',
+    description: 'Clients with 3+ visits and their health progression',
+    query: 'List clients with 3 or more visits, showing their health trends over time',
+    color: oceanColors.info
+  },
+];
 
-// Date presets for quick selection
-const datePresets = [
-  { label: 'All Data (2021-Present)', start: '2021-03-01', end: format(new Date(), 'yyyy-MM-dd') },
-  { label: 'Last 6 Months', start: format(subMonths(new Date(), 6), 'yyyy-MM-dd'), end: format(new Date(), 'yyyy-MM-dd') },
-  { label: 'Last Year', start: format(subYears(new Date(), 1), 'yyyy-MM-dd'), end: format(new Date(), 'yyyy-MM-dd') },
-  { label: '2025', start: '2025-01-01', end: '2025-12-31' },
-  { label: '2024', start: '2024-01-01', end: '2024-12-31' },
-  { label: '2023', start: '2023-01-01', end: '2023-12-31' },
-  { label: '2022', start: '2022-01-01', end: '2022-12-31' },
-  { label: '2021 (Mar-Dec)', start: '2021-03-01', end: '2021-12-31' },
+// Available report fields for custom selection
+const availableFields = [
+  { group: 'Client Info', fields: ['FullName', 'IDNumber', 'PhoneNumber', 'Gender', 'Category', 'Station'] },
+  { group: 'Visit Info', fields: ['TotalVisits', 'FirstVisitDate', 'LastVisitDate', 'DaysSinceLastVisit'] },
+  { group: 'BP Status', fields: ['BPStatus', 'BPClassification', 'BPAbnormalCount', 'BPNormalCount'] },
+  { group: 'BMI Status', fields: ['BMIStatus', 'BMIClassification', 'BMIAbnormalCount', 'BMINormalCount'] },
+  { group: 'RBS Status', fields: ['RBSStatus', 'RBSClassification', 'RBSAbnormalCount', 'RBSNormalCount'] },
+  { group: 'Risk Assessment', fields: ['RiskLevel', 'ConditionsCount', 'AbnormalConditions', 'RiskScore'] },
 ];
 
 export default function AdvancedAnalytics() {
-  const [filters, setFilters] = useState<FilterState>({
+  const [query, setQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [queryResult, setQueryResult] = useState<any>(null);
+  const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  const [showFieldSelector, setShowFieldSelector] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | 'json'>('xlsx');
+  const [conversation, setConversation] = useState<Array<{ role: 'user' | 'assistant'; content: string; result?: any }>>([]);
+  const [activeFilters, setActiveFilters] = useState({
     startDate: format(subMonths(new Date(), 6), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
     category: 'all',
     station: 'all',
+    gender: 'all'
   });
-  
   const [showFilters, setShowFilters] = useState(false);
-  const [aiQuery, setAiQuery] = useState('');
-  const [aiResponse, setAiResponse] = useState<any>(null);
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [exportFormat, setExportFormat] = useState<'json' | 'csv' | 'xlsx'>('xlsx');
-  const [activeMetric, setActiveMetric] = useState<'bp' | 'bmi' | 'rbs'>('bp');
+  const queryEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch stations for filter dropdown
-  const { data: stations } = useQuery({
-    queryKey: ['stations'],
-    queryFn: async () => {
-      const response = await api.get('/analytics/stations');
-      return response.data.data || [];
-    },
-  });
-
-  // Fetch categories for filter dropdown
-  const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => {
-      const response = await api.get('/analytics/categories');
-      return response.data.data || [];
-    },
-  });
-
-  // Fetch health trends with filters
-  const { data: trends, isLoading: trendsLoading, refetch: refetchTrends } = useQuery({
-    queryKey: ['health-trends', filters],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (filters.startDate) params.append('startDate', filters.startDate);
-      if (filters.endDate) params.append('endDate', filters.endDate);
-      if (filters.category !== 'all') params.append('category', filters.category);
-      if (filters.station !== 'all') params.append('station', filters.station);
-      const response = await api.get(`/analytics/trends?${params}`);
-      return response.data;
-    },
-  });
-
-  // Apply date preset
-  const applyDatePreset = (preset: typeof datePresets[0]) => {
-    setFilters({ ...filters, startDate: preset.start, endDate: preset.end });
-  };
-
-  // AI Query handler
-  const handleAiQuery = async () => {
-    if (!aiQuery.trim()) return;
-    setIsAiLoading(true);
-    try {
-      const response = await api.post('/analytics/ai-query', { 
-        query: aiQuery,
-        filters: {
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-          category: filters.category,
-          station: filters.station
-        }
-      });
-      setAiResponse(response.data);
-    } catch (error) {
-      console.error('AI Query failed:', error);
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-
-  // Export handler
-  const handleExport = async () => {
-    const params = new URLSearchParams();
-    params.append('format', exportFormat);
-    if (filters.startDate) params.append('startDate', filters.startDate);
-    if (filters.endDate) params.append('endDate', filters.endDate);
-    if (filters.category !== 'all') params.append('category', filters.category);
-    if (filters.station !== 'all') params.append('station', filters.station);
+  // Execute natural language query
+  const executeQuery = async (queryText: string) => {
+    if (!queryText.trim()) return;
+    
+    setIsLoading(true);
+    
+    // Add user message
+    setConversation(prev => [...prev, { role: 'user', content: queryText }]);
     
     try {
-      const response = await api.get(`/analytics/export?${params}`, {
-        responseType: 'blob'
+      const response = await api.post('/analytics/intelligent-query', {
+        query: queryText,
+        filters: activeFilters,
+        selectedFields: selectedFields.length > 0 ? selectedFields : undefined
       });
       
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `health_analytics_${format(new Date(), 'yyyyMMdd')}.${exportFormat === 'xlsx' ? 'xlsx' : exportFormat}`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const result = response.data;
+      setQueryResult(result);
+      
+      // Add assistant response
+      setConversation(prev => [...prev, { 
+        role: 'assistant', 
+        content: result.insight || `Found ${result.count} records matching your query.`,
+        result: result.data 
+      }]);
+      
+      toast.success(`Query executed successfully! Found ${result.count} records.`);
     } catch (error) {
-      console.error('Export failed:', error);
+      console.error('Query failed:', error);
+      setConversation(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Sorry, I encountered an error processing your query. Please try rephrasing or check your filters.' 
+      }]);
+      toast.error('Query execution failed');
+    } finally {
+      setIsLoading(false);
+      setQuery('');
+      // Scroll to bottom
+      setTimeout(() => queryEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     }
   };
 
-  // Calculate summary statistics
-  const totalReadings = trends?.reduce((sum: number, day: any) => {
-    const dayTotal = parseInt(day.total_readings) || 0;
-    return sum + dayTotal;
-  }, 0) || 0;
+  // Export result data
+  const exportData = async () => {
+    if (!queryResult?.data || queryResult.data.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
 
-  const avgReadingsPerDay = trends?.length ? Math.round(totalReadings / trends.length) : 0;
-  const uniqueDates = trends?.length || 0;
+    try {
+      const data = queryResult.data;
+      
+      if (exportFormat === 'json') {
+        const jsonStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `health_report_${format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (exportFormat === 'csv') {
+        const headers = Object.keys(data[0]);
+        const csvRows = [headers.join(',')];
+        data.forEach((row: any) => {
+          const values = headers.map(h => {
+            const val = row[h];
+            return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
+          });
+          csvRows.push(values.join(','));
+        });
+        const csvStr = csvRows.join('\n');
+        const blob = new Blob([csvStr], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `health_report_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Health Data');
+        XLSX.writeFile(wb, `health_report_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
+      }
+      
+      toast.success(`Report exported as ${exportFormat.toUpperCase()}`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error('Export failed');
+    }
+  };
 
-  // Also calculate totals per category for additional insights
-  const totalNormalBP = trends?.reduce((sum: number, day: any) => sum + (parseInt(day.normal_bp) || 0), 0) || 0;
-  const totalPreHTN = trends?.reduce((sum: number, day: any) => sum + (parseInt(day.pre_hypertension) || 0), 0) || 0;
-  const totalHypertension = trends?.reduce((sum: number, day: any) => sum + (parseInt(day.hypertension) || 0), 0) || 0;
+  // Copy results to clipboard
+  const copyResults = () => {
+    if (queryResult?.data) {
+      navigator.clipboard.writeText(JSON.stringify(queryResult.data, null, 2));
+      setCopied(true);
+      toast.success('Copied to clipboard!');
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <div style={{ 
@@ -174,7 +220,7 @@ export default function AdvancedAnalytics() {
         {/* Hero Header */}
         <div style={{ 
           position: 'relative',
-          marginBottom: '32px',
+          marginBottom: '24px',
           overflow: 'hidden',
           borderRadius: '24px',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
@@ -195,7 +241,7 @@ export default function AdvancedAnalytics() {
             pointerEvents: 'none'
           }} />
           
-          <div style={{ position: 'relative', padding: '32px' }}>
+          <div style={{ position: 'relative', padding: '28px 32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{
@@ -209,22 +255,22 @@ export default function AdvancedAnalytics() {
                   boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
                   animation: 'float 3s ease-in-out infinite'
                 }}>
-                  <BarChart3 size={32} style={{ color: oceanColors.navy }} />
+                  <Search size={32} style={{ color: oceanColors.navy }} />
                 </div>
                 <div>
                   <h1 style={{ fontSize: 'clamp(28px, 4vw, 36px)', fontWeight: 'bold', color: oceanColors.white, margin: 0 }}>
-                    Advanced Health Analytics
-                    <span style={{ color: oceanColors.gold, marginLeft: '12px' }}>📊</span>
+                    Intelligent Query Engine
+                    <span style={{ color: oceanColors.gold, marginLeft: '12px' }}>🔍</span>
                   </h1>
                   <p style={{ color: 'rgba(255,255,255,0.8)', marginTop: '8px', fontSize: '15px' }}>
-                    Deep dive into health trends, export data, and AI-powered insights
+                    Ask natural language questions to generate custom health reports for download
                   </p>
                 </div>
               </div>
               
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button
-                  onClick={() => refetchTrends()}
+                  onClick={() => setShowFilters(!showFilters)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -239,648 +285,377 @@ export default function AdvancedAnalytics() {
                     fontWeight: '500'
                   }}
                 >
-                  <RefreshCw size={18} />
-                  Refresh
+                  <Filter size={18} />
+                  {showFilters ? 'Hide Filters' : 'Show Filters'}
+                  <ChevronDown size={16} style={{ transform: showFilters ? 'rotate(180deg)' : 'none' }} />
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Quick Stats Cards */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(4, 1fr)', 
-          gap: '20px', 
-          marginBottom: '24px' 
-        }}>
+        {/* Filters Panel */}
+        {showFilters && (
           <div style={{
             background: 'rgba(255,255,255,0.95)',
             backdropFilter: 'blur(8px)',
             borderRadius: '16px',
             padding: '20px',
-            border: `1px solid ${oceanColors.wave}30`,
-            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+            marginBottom: '24px',
+            border: `1px solid ${oceanColors.wave}30`
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Activity size={20} style={{ color: oceanColors.gold }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark }}>Start Date</label>
+                <input type="date" value={activeFilters.startDate} onChange={(e) => setActiveFilters({...activeFilters, startDate: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${oceanColors.surface}40`, fontSize: '14px' }} />
               </div>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Total Readings</h3>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark }}>End Date</label>
+                <input type="date" value={activeFilters.endDate} onChange={(e) => setActiveFilters({...activeFilters, endDate: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${oceanColors.surface}40`, fontSize: '14px' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark }}>Category</label>
+                <select value={activeFilters.category} onChange={(e) => setActiveFilters({...activeFilters, category: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${oceanColors.surface}40`, fontSize: '14px', background: 'white' }}>
+                  <option value="all">All Categories</option>
+                  <option value="EMPLOYEE">Employee</option>
+                  <option value="DEPENDENT">Dependant</option>
+                  <option value="PORT USER">Port User</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark }}>Station</label>
+                <select value={activeFilters.station} onChange={(e) => setActiveFilters({...activeFilters, station: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${oceanColors.surface}40`, fontSize: '14px', background: 'white' }}>
+                  <option value="all">All Stations</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark }}>Gender</label>
+                <select value={activeFilters.gender} onChange={(e) => setActiveFilters({...activeFilters, gender: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${oceanColors.surface}40`, fontSize: '14px', background: 'white' }}>
+                  <option value="all">All Genders</option>
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                </select>
+              </div>
             </div>
-            <p style={{ fontSize: '32px', fontWeight: 'bold', color: oceanColors.deep, margin: 0 }}>
-              {trendsLoading ? '...' : totalReadings.toLocaleString()}
-            </p>
-            <p style={{ fontSize: '13px', color: oceanColors.textLight, marginTop: '4px' }}>
-              Across {uniqueDates} screening days
+            <p style={{ fontSize: '12px', color: oceanColors.textLight, marginTop: '12px' }}>
+              <Filter size={12} style={{ display: 'inline', marginRight: '4px' }} />
+              Filters apply to all queries. Active: {activeFilters.startDate} → {activeFilters.endDate}
             </p>
           </div>
-          
-          <div style={{
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(8px)',
-            borderRadius: '16px',
-            padding: '20px',
-            border: `1px solid ${oceanColors.wave}30`,
-            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: `linear-gradient(135deg, ${oceanColors.success}, ${oceanColors.wave})`,
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <TrendingUp size={20} style={{ color: 'white' }} />
-              </div>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Avg Daily Readings</h3>
-            </div>
-            <p style={{ fontSize: '32px', fontWeight: 'bold', color: oceanColors.success, margin: 0 }}>
-              {trendsLoading ? '...' : avgReadingsPerDay.toLocaleString()}
-            </p>
-            <p style={{ fontSize: '13px', color: oceanColors.textLight, marginTop: '4px' }}>
-              Per screening day
-            </p>
-          </div>
-          
-          <div style={{
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(8px)',
-            borderRadius: '16px',
-            padding: '20px',
-            border: `1px solid ${oceanColors.wave}30`,
-            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: `linear-gradient(135deg, ${oceanColors.warning}, ${oceanColors.gold})`,
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Heart size={20} style={{ color: oceanColors.navy }} />
-              </div>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Normal BP</h3>
-            </div>
-            <p style={{ fontSize: '32px', fontWeight: 'bold', color: oceanColors.success, margin: 0 }}>
-              {trendsLoading ? '...' : totalNormalBP.toLocaleString()}
-            </p>
-            <p style={{ fontSize: '13px', color: oceanColors.textLight, marginTop: '4px' }}>
-              {totalReadings > 0 ? `${((totalNormalBP / totalReadings) * 100).toFixed(1)}% of readings` : 'No data'}
-            </p>
-          </div>
-          
-          <div style={{
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(8px)',
-            borderRadius: '16px',
-            padding: '20px',
-            border: `1px solid ${oceanColors.wave}30`,
-            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: `linear-gradient(135deg, ${oceanColors.danger}, ${oceanColors.warning})`,
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Calendar size={20} style={{ color: 'white' }} />
-              </div>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>Hypertension</h3>
-            </div>
-            <p style={{ fontSize: '32px', fontWeight: 'bold', color: oceanColors.danger, margin: 0 }}>
-              {trendsLoading ? '...' : totalHypertension.toLocaleString()}
-            </p>
-            <p style={{ fontSize: '13px', color: oceanColors.textLight, marginTop: '4px' }}>
-              {totalReadings > 0 ? `${((totalHypertension / totalReadings) * 100).toFixed(1)}% of readings` : 'No data'}
-            </p>
-          </div>
-        </div>
+        )}
 
-        {/* Filter Bar */}
+        {/* Main Query Interface */}
         <div style={{
           background: 'rgba(255,255,255,0.95)',
           backdropFilter: 'blur(8px)',
-          borderRadius: '16px',
-          padding: '20px',
-          marginBottom: '24px',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-          border: `1px solid ${oceanColors.wave}30`
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 20px',
-                background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
-                border: 'none',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                color: oceanColors.navy
-              }}
-            >
-              <Filter size={18} />
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-              <ChevronDown size={16} style={{ transform: showFilters ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-            </button>
-            
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <select
-                value={exportFormat}
-                onChange={(e) => setExportFormat(e.target.value as any)}
-                style={{
-                  padding: '10px 16px',
-                  border: `1px solid ${oceanColors.surface}40`,
-                  borderRadius: '10px',
-                  background: 'white',
-                  fontSize: '14px',
-                  cursor: 'pointer'
-                }}
-              >
-                <option value="json">JSON Format</option>
-                <option value="csv">CSV Format</option>
-                <option value="xlsx">Excel (XLSX)</option>
-              </select>
-              <button
-                onClick={handleExport}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 20px',
-                  background: oceanColors.success,
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontWeight: '500'
-                }}
-              >
-                <Download size={18} />
-                Export Data
-              </button>
-            </div>
-          </div>
-
-          {/* Date Presets */}
-          <div style={{ marginBottom: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {datePresets.map((preset, idx) => (
-              <button
-                key={idx}
-                onClick={() => applyDatePreset(preset)}
-                style={{
-                  padding: '6px 14px',
-                  background: filters.startDate === preset.start && filters.endDate === preset.end 
-                    ? oceanColors.deep 
-                    : '#f1f5f9',
-                  color: filters.startDate === preset.start && filters.endDate === preset.end 
-                    ? 'white' 
-                    : oceanColors.textDark,
-                  border: 'none',
-                  borderRadius: '20px',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  fontWeight: filters.startDate === preset.start && filters.endDate === preset.end ? '600' : '400'
-                }}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-
-          {showFilters && (
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-              gap: '16px', 
-              marginTop: '16px',
-              padding: '16px',
-              background: '#f8fafc',
-              borderRadius: '12px'
-            }}>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark, display: 'block', marginBottom: '6px' }}>
-                  <Calendar size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={filters.startDate}
-                  onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                  style={{ 
-                    width: '100%', 
-                    padding: '10px', 
-                    borderRadius: '8px', 
-                    border: `1px solid ${oceanColors.surface}40`,
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark, display: 'block', marginBottom: '6px' }}>
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={filters.endDate}
-                  onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                  style={{ 
-                    width: '100%', 
-                    padding: '10px', 
-                    borderRadius: '8px', 
-                    border: `1px solid ${oceanColors.surface}40`,
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark, display: 'block', marginBottom: '6px' }}>
-                  Category
-                </label>
-                <select
-                  value={filters.category}
-                  onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-                  style={{ 
-                    width: '100%', 
-                    padding: '10px', 
-                    borderRadius: '8px', 
-                    border: `1px solid ${oceanColors.surface}40`,
-                    fontSize: '14px',
-                    background: 'white'
-                  }}
-                >
-                  <option value="all">All Categories</option>
-                  {categories?.map((cat: any) => (
-                    <option key={cat.Id} value={cat.Title}>{cat.Title}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark, display: 'block', marginBottom: '6px' }}>
-                  Station
-                </label>
-                <select
-                  value={filters.station}
-                  onChange={(e) => setFilters({ ...filters, station: e.target.value })}
-                  style={{ 
-                    width: '100%', 
-                    padding: '10px', 
-                    borderRadius: '8px', 
-                    border: `1px solid ${oceanColors.surface}40`,
-                    fontSize: '14px',
-                    background: 'white'
-                  }}
-                >
-                  <option value="all">All Stations</option>
-                  {stations?.map((station: any) => (
-                    <option key={station.Id} value={station.Title}>{station.Title}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Health Trends Table - Full Width */}
-        <div style={{ 
-          background: 'rgba(255,255,255,0.95)',
-          backdropFilter: 'blur(8px)',
-          borderRadius: '16px',
+          borderRadius: '20px',
           padding: '24px',
           marginBottom: '24px',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-          border: `1px solid ${oceanColors.wave}30`
+          border: `1px solid ${oceanColors.wave}30`,
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: `linear-gradient(135deg, ${oceanColors.deep}, ${oceanColors.mid})`,
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <TrendingUp size={20} style={{ color: oceanColors.gold }} />
-              </div>
-              <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: oceanColors.textDark, margin: 0 }}>
-                Daily Health Trends
-              </h3>
-            </div>
-            
-            {/* Metric Toggle */}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {[
-                { value: 'bp', label: 'Blood Pressure', icon: Heart },
-                { value: 'bmi', label: 'BMI', icon: Scale },
-                { value: 'rbs', label: 'Blood Sugar', icon: Droplets }
-              ].map((metric) => (
-                <button
-                  key={metric.value}
-                  onClick={() => setActiveMetric(metric.value as any)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 16px',
-                    background: activeMetric === metric.value ? oceanColors.deep : '#f1f5f9',
-                    color: activeMetric === metric.value ? 'white' : oceanColors.textDark,
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <metric.icon size={14} />
-                  {metric.label}
-                </button>
-              ))}
-            </div>
-          </div>
           
-          {trendsLoading ? (
-            <div style={{ textAlign: 'center', padding: '60px' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                border: '3px solid rgba(11, 47, 158, 0.2)',
-                borderTop: `3px solid ${oceanColors.deep}`,
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-                margin: '0 auto 16px'
-              }} />
-              <p style={{ color: oceanColors.textLight }}>Loading trend data...</p>
-            </div>
-          ) : trends && trends.length > 0 ? (
-            <div style={{ overflow: 'auto', maxHeight: '400px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead style={{ position: 'sticky', top: 0, background: '#f8fafc' }}>
-                  <tr style={{ borderBottom: `2px solid ${oceanColors.surface}30` }}>
-                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: oceanColors.textDark }}>Date</th>
-                    {activeMetric === 'bp' && (
-                      <>
-                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Normal BP</th>
-                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Pre-HTN</th>
-                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Hypertension</th>
-                      </>
-                    )}
-                    {activeMetric === 'bmi' && (
-                      <>
-                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Normal BMI</th>
-                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Overweight</th>
-                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Obese</th>
-                      </>
-                    )}
-                    {activeMetric === 'rbs' && (
-                      <>
-                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Normal RBS</th>
-                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Hypoglycemia</th>
-                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Pre-Diabetic</th>
-                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Diabetic</th>
-                      </>
-                    )}
-                    <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: oceanColors.textDark }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trends.map((day: any, idx: number) => (
-                    <tr key={day.date} style={{ 
-                      borderBottom: `1px solid ${oceanColors.surface}20`,
-                      background: idx % 2 === 0 ? 'white' : '#fafafa'
-                    }}>
-                      <td style={{ padding: '10px 12px', fontWeight: '500' }}>
-                        {format(new Date(day.date), 'MMM dd, yyyy')}
-                      </td>
-                      {activeMetric === 'bp' && (
-                        <>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: oceanColors.success }}>
-                            {day.normal_bp || 0}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: oceanColors.warning }}>
-                            {day.pre_hypertension || 0}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: oceanColors.danger }}>
-                            {day.hypertension || 0}
-                          </td>
-                        </>
-                      )}
-                      {activeMetric === 'bmi' && (
-                        <>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: oceanColors.success }}>
-                            {day.normal_bmi || 0}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: oceanColors.warning }}>
-                            {day.overweight || 0}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: oceanColors.danger }}>
-                            {day.obese || 0}
-                          </td>
-                        </>
-                      )}
-                      {activeMetric === 'rbs' && (
-                        <>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: oceanColors.success }}>
-                            {day.normal_rbs || 0}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: oceanColors.info }}>
-                            {day.hypoglycemia || 0}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: oceanColors.warning }}>
-                            {day.pre_diabetic || 0}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: oceanColors.danger }}>
-                            {day.diabetic || 0}
-                          </td>
-                        </>
-                      )}
-                      <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 'bold' }}>
-                        {day.total_readings || 0}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '60px', color: oceanColors.textLight }}>
-              <BarChart3 size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-              <p>No data available for the selected date range</p>
-              <p style={{ fontSize: '13px', marginTop: '8px' }}>Try adjusting your filters</p>
+          {/* Conversation Area */}
+          {conversation.length > 0 && (
+            <div style={{
+              maxHeight: '400px',
+              overflowY: 'auto',
+              marginBottom: '20px',
+              padding: '16px',
+              background: '#f8fafc',
+              borderRadius: '16px'
+            }}>
+              {conversation.map((msg, idx) => (
+                <div key={idx} style={{ marginBottom: '16px' }}>
+                  {/* User Message */}
+                  {msg.role === 'user' && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <div style={{
+                        maxWidth: '70%',
+                        padding: '12px 16px',
+                        background: oceanColors.deep,
+                        color: 'white',
+                        borderRadius: '20px 20px 4px 20px',
+                        fontSize: '14px'
+                      }}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Assistant Message */}
+                  {msg.role === 'assistant' && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                      <div style={{
+                        maxWidth: '80%',
+                        padding: '12px 16px',
+                        background: '#e2e8f0',
+                        color: oceanColors.textDark,
+                        borderRadius: '20px 20px 20px 4px',
+                        fontSize: '14px'
+                      }}>
+                        <Sparkles size={14} style={{ display: 'inline', marginRight: '6px', color: oceanColors.gold }} />
+                        {msg.content}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div ref={queryEndRef} />
             </div>
           )}
-        </div>
 
-        {/* AI Natural Language Query Section */}
-        <div style={{
-          background: `linear-gradient(135deg, ${oceanColors.navy}, ${oceanColors.deep})`,
-          borderRadius: '20px',
-          padding: '28px',
-          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.2)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{
-              width: '44px',
-              height: '44px',
-              background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
-              borderRadius: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Search size={22} style={{ color: oceanColors.navy }} />
+          {/* Query Input */}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: oceanColors.textLight }} />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && executeQuery(query)}
+                placeholder="Ask anything about your health data... e.g., 'Show me all high risk employees' or 'List clients with hypertension'"
+                style={{
+                  width: '100%',
+                  padding: '16px 16px 16px 48px',
+                  borderRadius: '14px',
+                  border: `1px solid ${oceanColors.surface}40`,
+                  fontSize: '15px',
+                  outline: 'none',
+                  background: 'white'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = oceanColors.gold}
+                onBlur={(e) => e.currentTarget.style.borderColor = `${oceanColors.surface}40`}
+              />
             </div>
-            <div>
-              <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white', margin: 0 }}>
-                AI Health Assistant
-              </h3>
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', marginTop: '2px' }}>
-                Ask natural language questions about your health data
-              </p>
-            </div>
-            <span style={{
-              background: 'rgba(255,215,0,0.2)',
-              color: oceanColors.gold,
-              padding: '4px 10px',
-              borderRadius: '20px',
-              fontSize: '11px',
-              fontWeight: '500',
-              marginLeft: 'auto'
-            }}>
-              AI-Powered
-            </span>
-          </div>
-          
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', marginBottom: '20px' }}>
-            Example: "Show me all employees with high blood pressure" or "List patients with abnormal BMI"
-          </p>
-          
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <input
-              type="text"
-              value={aiQuery}
-              onChange={(e) => setAiQuery(e.target.value)}
-              placeholder="Ask a question about your health data..."
-              style={{
-                flex: 1,
-                padding: '14px 18px',
-                borderRadius: '14px',
-                border: 'none',
-                outline: 'none',
-                fontSize: '14px',
-                background: 'white'
-              }}
-              onKeyPress={(e) => e.key === 'Enter' && handleAiQuery()}
-            />
             <button
-              onClick={handleAiQuery}
-              disabled={isAiLoading}
+              onClick={() => executeQuery(query)}
+              disabled={isLoading || !query.trim()}
               style={{
-                padding: '14px 28px',
+                padding: '16px 28px',
                 background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
                 border: 'none',
                 borderRadius: '14px',
                 fontWeight: 'bold',
                 color: oceanColors.navy,
-                cursor: isAiLoading ? 'not-allowed' : 'pointer',
-                opacity: isAiLoading ? 0.7 : 1,
+                cursor: isLoading || !query.trim() ? 'not-allowed' : 'pointer',
+                opacity: isLoading || !query.trim() ? 0.6 : 1,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px'
               }}
             >
-              {isAiLoading ? (
+              {isLoading ? (
                 <>
-                  <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                  Thinking...
+                  <RefreshCw size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                  Processing...
                 </>
               ) : (
                 <>
-                  <Search size={16} />
-                  Ask AI
+                  <Send size={18} />
+                  Execute
                 </>
               )}
             </button>
           </div>
-          
-          {aiResponse && (
-            <div style={{
-              marginTop: '24px',
-              padding: '20px',
-              background: 'rgba(255,255,255,0.1)',
-              borderRadius: '16px',
-              backdropFilter: 'blur(8px)'
-            }}>
-              <p style={{ color: oceanColors.gold, fontWeight: 'bold', marginBottom: '12px', fontSize: '16px' }}>
-                💡 Insight: {aiResponse.insight}
-              </p>
-              {aiResponse.result && aiResponse.result.length > 0 && (
-                <div style={{ maxHeight: '250px', overflow: 'auto', marginTop: '16px' }}>
-                  <table style={{ width: '100%', fontSize: '13px', color: 'white' }}>
-                    <thead>
-                      <tr>
-                        {Object.keys(aiResponse.result[0]).map(key => (
-                          <th key={key} style={{ 
-                            padding: '10px 8px', 
-                            textAlign: 'left', 
-                            borderBottom: '1px solid rgba(255,255,255,0.2)',
-                            fontWeight: '600'
-                          }}>
-                            {key}
-                          </th>
+
+          {/* Query Templates */}
+          <div>
+            <p style={{ fontSize: '13px', color: oceanColors.textLight, marginBottom: '12px' }}>
+              Quick queries:
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
+              {queryTemplates.map((template, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setQuery(template.query);
+                    executeQuery(template.query);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px 14px',
+                    background: 'white',
+                    border: `1px solid ${template.color}30`,
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    textAlign: 'left'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = `${template.color}10`;
+                    e.currentTarget.style.borderColor = template.color;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'white';
+                    e.currentTarget.style.borderColor = `${template.color}30`;
+                  }}
+                >
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    background: `${template.color}20`,
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <template.icon size={16} style={{ color: template.color }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark, margin: 0 }}>{template.title}</p>
+                    <p style={{ fontSize: '11px', color: oceanColors.textLight, margin: '2px 0 0 0' }}>{template.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Results Section */}
+        {queryResult && (
+          <div style={{
+            background: 'rgba(255,255,255,0.95)',
+            backdropFilter: 'blur(8px)',
+            borderRadius: '20px',
+            padding: '24px',
+            border: `1px solid ${oceanColors.wave}30`,
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+          }}>
+            {/* Results Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  background: `linear-gradient(135deg, ${oceanColors.success}, ${oceanColors.wave})`,
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Database size={20} style={{ color: 'white' }} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: oceanColors.textDark, margin: 0 }}>
+                    Query Results
+                  </h3>
+                  <p style={{ fontSize: '13px', color: oceanColors.textLight, margin: '2px 0 0 0' }}>
+                    {queryResult.count} records found • {queryResult.executionTime}
+                  </p>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={copyResults}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 16px',
+                    background: oceanColors.white,
+                    border: `1px solid ${oceanColors.surface}40`,
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    fontSize: '13px'
+                  }}
+                >
+                  {copied ? <CheckCircle size={16} style={{ color: oceanColors.success }} /> : <Copy size={16} />}
+                  {copied ? 'Copied!' : 'Copy JSON'}
+                </button>
+                
+                <select
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value as any)}
+                  style={{
+                    padding: '10px 16px',
+                    border: `1px solid ${oceanColors.surface}40`,
+                    borderRadius: '10px',
+                    background: 'white',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="xlsx">Excel (.xlsx)</option>
+                  <option value="csv">CSV (.csv)</option>
+                  <option value="json">JSON (.json)</option>
+                </select>
+                
+                <button
+                  onClick={exportData}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 20px',
+                    background: oceanColors.success,
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                    fontSize: '13px'
+                  }}
+                >
+                  <Download size={16} />
+                  Download Report
+                </button>
+              </div>
+            </div>
+
+            {/* Insight Summary */}
+            {queryResult.insight && (
+              <div style={{
+                padding: '16px',
+                background: `${oceanColors.info}10`,
+                borderLeft: `4px solid ${oceanColors.gold}`,
+                borderRadius: '8px',
+                marginBottom: '20px'
+              }}>
+                <p style={{ fontSize: '14px', color: oceanColors.textDark, margin: 0 }}>
+                  <Sparkles size={16} style={{ display: 'inline', marginRight: '8px', color: oceanColors.gold }} />
+                  <strong>AI Insight:</strong> {queryResult.insight}
+                </p>
+              </div>
+            )}
+
+            {/* Data Table */}
+            {queryResult.data && queryResult.data.length > 0 && (
+              <div style={{ overflow: 'auto', maxHeight: '400px', borderRadius: '12px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead style={{ position: 'sticky', top: 0, background: '#f1f5f9' }}>
+                    <tr>
+                      {Object.keys(queryResult.data[0]).map(key => (
+                        <th key={key} style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: oceanColors.textDark, borderBottom: `2px solid ${oceanColors.surface}30`, whiteSpace: 'nowrap' }}>
+                          {key}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {queryResult.data.slice(0, 50).map((row: any, idx: number) => (
+                      <tr key={idx} style={{ borderBottom: `1px solid ${oceanColors.surface}20`, background: idx % 2 === 0 ? 'white' : '#fafafa' }}>
+                        {Object.values(row).map((val: any, i: number) => (
+                          <td key={i} style={{ padding: '10px 12px', color: oceanColors.textDark }}>
+                            {typeof val === 'object' ? JSON.stringify(val) : String(val)}
+                          </td>
                         ))}
                       </tr>
-                    </thead>
-                    <tbody>
-                      {aiResponse.result.slice(0, 10).map((row: any, idx: number) => (
-                        <tr key={idx}>
-                          {Object.values(row).map((val: any, i: number) => (
-                            <td key={i} style={{ 
-                              padding: '8px', 
-                              borderBottom: '1px solid rgba(255,255,255,0.1)' 
-                            }}>
-                              {String(val).substring(0, 50)}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {aiResponse.result.length > 10 && (
-                    <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', marginTop: '12px', textAlign: 'center' }}>
-                      Showing 10 of {aiResponse.result.length} results
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                    ))}
+                  </tbody>
+                </table>
+                {queryResult.data.length > 50 && (
+                  <p style={{ textAlign: 'center', padding: '16px', color: oceanColors.textLight, fontSize: '12px' }}>
+                    Showing 50 of {queryResult.data.length} records. Export to see all.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <style>{`
