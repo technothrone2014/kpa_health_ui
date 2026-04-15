@@ -837,26 +837,41 @@ export default function Dashboard() {
 
   const isLoading = metricsLoading || highRiskLoading || bpLoading || bmiLoading || rbsLoading;
 
-  // Prepare chart data
-  const bpData = bloodPressure?.map((item: any) => ({
-    name: item.BloodPressureCategory,
-    value: Number(item.Count),
-    color: item.BloodPressureCategory === 'NORMAL' ? oceanColors.success :
-           item.BloodPressureCategory === 'PRE-HYPERTENSION' ? oceanColors.warning : oceanColors.danger,
-  })).filter((item: any) => item.value > 0) || [];
+  // Prepare chart data with proper reactivity to filters
+  const bpData = React.useMemo(() => {
+    if (!bloodPressure) return [];
+    return bloodPressure
+      .map((item: any) => ({
+        name: item.BloodPressureCategory,
+        value: Number(item.Count),
+        color: item.BloodPressureCategory === 'NORMAL' ? oceanColors.success :
+              item.BloodPressureCategory === 'PRE-HYPERTENSION' ? oceanColors.warning : oceanColors.danger,
+      }))
+      .filter((item: any) => item.value > 0);
+  }, [bloodPressure, filters]); // Add filters to dependency array
 
-  const bmiData = bmi?.map((item: any) => ({
-    name: item.BMICategory,
-    value: Number(item.Count),
-  })).filter((item: any) => item.value > 0) || [];
+  const bmiData = React.useMemo(() => {
+    if (!bmi) return [];
+    return bmi
+      .map((item: any) => ({
+        name: item.BMICategory,
+        value: Number(item.Count),
+      }))
+      .filter((item: any) => item.value > 0);
+  }, [bmi, filters]); // Add filters to dependency array
 
-  const rbsData = rbs?.map((item: any) => ({
-    name: item.RBSCategory,
-    value: Number(item.Count),
-    color: item.RBSCategory === 'NORMAL' ? oceanColors.success :
-           item.RBSCategory === 'HYPOGLYCEMIA' ? oceanColors.info :
-           item.RBSCategory === 'PRE-DIABETIC' ? oceanColors.warning : oceanColors.danger,
-  })).filter((item: any) => item.value > 0) || [];
+  const rbsData = React.useMemo(() => {
+    if (!rbs) return [];
+    return rbs
+      .map((item: any) => ({
+        name: item.RBSCategory,
+        value: Number(item.Count),
+        color: item.RBSCategory === 'NORMAL' ? oceanColors.success :
+              item.RBSCategory === 'HYPOGLYCEMIA' ? oceanColors.info :
+              item.RBSCategory === 'PRE-DIABETIC' ? oceanColors.warning : oceanColors.danger,
+      }))
+      .filter((item: any) => item.value > 0);
+  }, [rbs, filters]); // Add filters to dependency array
 
   // Summary cards
   const summaryCards = [
@@ -1047,6 +1062,85 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Active Filters Summary - Add this right after the Filters Panel */}
+      {(filters.category !== 'all' || filters.station !== 'all' || filters.gender !== 'all') && (
+        <div style={{ 
+          margin: '0 24px 16px 24px', 
+          padding: '8px 16px', 
+          background: 'rgba(255,215,0,0.15)', 
+          backdropFilter: 'blur(8px)', 
+          borderRadius: '12px',
+          border: '1px solid rgba(255,215,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap'
+        }}>
+          <Filter size={14} style={{ color: oceanColors.gold }} />
+          <span style={{ color: 'white', fontSize: '13px' }}>Active Filters:</span>
+          {filters.category !== 'all' && (
+            <span style={{ 
+              background: oceanColors.deep, 
+              color: 'white', 
+              padding: '4px 12px', 
+              borderRadius: '20px', 
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              Category: {filters.category}
+              <X size={14} style={{ cursor: 'pointer' }} onClick={() => setFilters({...filters, category: 'all'})} />
+            </span>
+          )}
+          {filters.station !== 'all' && (
+            <span style={{ 
+              background: oceanColors.deep, 
+              color: 'white', 
+              padding: '4px 12px', 
+              borderRadius: '20px', 
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              Station: {filters.station}
+              <X size={14} style={{ cursor: 'pointer' }} onClick={() => setFilters({...filters, station: 'all'})} />
+            </span>
+          )}
+          {filters.gender !== 'all' && (
+            <span style={{ 
+              background: oceanColors.deep, 
+              color: 'white', 
+              padding: '4px 12px', 
+              borderRadius: '20px', 
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              Gender: {filters.gender}
+              <X size={14} style={{ cursor: 'pointer' }} onClick={() => setFilters({...filters, gender: 'all'})} />
+            </span>
+          )}
+          <button
+            onClick={() => setFilters({...filters, category: 'all', station: 'all', gender: 'all'})}
+            style={{
+              marginLeft: 'auto',
+              padding: '4px 12px',
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: '20px',
+              color: 'white',
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
+          >
+            Clear All
+          </button>
+        </div>
+      )}
+
       <div style={{ padding: '0 24px 32px 24px' }}>
         
         {/* Summary Cards Grid */}
@@ -1126,20 +1220,28 @@ export default function Dashboard() {
 
         {/* Charts Row - 3 Column Grid for BP, BMI, and RBS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '32px' }}>
-          
           {/* Blood Pressure Distribution */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <HeartPulse size={20} style={{ color: oceanColors.gold }} />
-                <div>
-                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Pressure</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BP categories distribution</p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <HeartPulse size={20} style={{ color: oceanColors.gold }} />
+                  <div>
+                    <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Pressure</h3>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BP categories distribution</p>
+                  </div>
                 </div>
+                {bpLoading && (
+                  <RefreshCw size={16} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                )}
               </div>
             </div>
             <div style={{ padding: '16px' }}>
-              {bpData.length > 0 ? (
+              {bpLoading ? (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : bpData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie 
@@ -1165,7 +1267,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               ) : (
                 <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BP data available</p>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BP data available for selected filters</p>
                 </div>
               )}
             </div>
@@ -1174,16 +1276,25 @@ export default function Dashboard() {
           {/* BMI Distribution */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Scale size={20} style={{ color: oceanColors.gold }} />
-                <div>
-                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>BMI</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BMI categories breakdown</p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Scale size={20} style={{ color: oceanColors.gold }} />
+                  <div>
+                    <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>BMI</h3>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>BMI categories breakdown</p>
+                  </div>
                 </div>
+                {bmiLoading && (
+                  <RefreshCw size={16} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                )}
               </div>
             </div>
             <div style={{ padding: '16px' }}>
-              {bmiData.length > 0 ? (
+              {bmiLoading ? (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : bmiData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={bmiData} layout="vertical" margin={{ left: 80 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -1195,7 +1306,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               ) : (
                 <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BMI data available</p>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No BMI data available for selected filters</p>
                 </div>
               )}
             </div>
@@ -1204,16 +1315,25 @@ export default function Dashboard() {
           {/* RBS Distribution */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Droplets size={20} style={{ color: oceanColors.gold }} />
-                <div>
-                  <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Sugar (RBS)</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>RBS categories distribution</p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Droplets size={20} style={{ color: oceanColors.gold }} />
+                  <div>
+                    <h3 style={{ fontWeight: 'bold', color: 'white', fontSize: '16px', margin: 0 }}>Blood Sugar (RBS)</h3>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>RBS categories distribution</p>
+                  </div>
                 </div>
+                {rbsLoading && (
+                  <RefreshCw size={16} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                )}
               </div>
             </div>
             <div style={{ padding: '16px' }}>
-              {rbsData.length > 0 ? (
+              {rbsLoading ? (
+                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : rbsData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie 
@@ -1239,7 +1359,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               ) : (
                 <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No RBS data available</p>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>No RBS data available for selected filters</p>
                 </div>
               )}
             </div>
