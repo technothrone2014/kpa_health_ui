@@ -211,6 +211,36 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState<{ earliest: string; latest: string }>({ earliest: '', latest: '' });
   const [trendView, setTrendView] = useState<'daily' | 'period'>('period');
 
+  // Add this state with other useState declarations
+  const [autoAdaptedView, setAutoAdaptedView] = useState<boolean>(false);
+
+  // Add this effect with other useEffect hooks
+  useEffect(() => {
+    if (filters.startDate && filters.endDate) {
+      const start = new Date(filters.startDate);
+      const end = new Date(filters.endDate);
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+      
+      let recommendedView: 'daily' | 'period' = 'period';
+      
+      if (daysDiff < 45) {
+        recommendedView = 'daily';
+      } else if (monthsDiff === 0 && daysDiff <= 31) {
+        recommendedView = 'daily';
+      } else if (daysDiff < 90 && monthsDiff <= 2) {
+        recommendedView = 'daily';
+      } else {
+        recommendedView = 'period';
+      }
+      
+      if (recommendedView !== trendView) {
+        setTrendView(recommendedView);
+        setAutoAdaptedView(true);
+      }
+    }
+  }, [filters.startDate, filters.endDate]);
+
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting("Good morning");
@@ -509,33 +539,57 @@ export default function Dashboard() {
         {/* Charts Row 1 - Participation trends */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '20px', marginBottom: '24px' }}>
 
-          {/* Participation Trends Over Time - Area Chart */}
+          {/* Participation Trends Over Time - Adaptive Area Chart */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <TrendingUp size={20} style={{ color: oceanColors.gold }} />
                   <div>
                     <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Participation Trends</h3>
-                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Unique clients screened per EAP period</p>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>
+                      {trendView === 'daily' 
+                        ? `Daily screening volume (${filters.startDate || '...'} → ${filters.endDate || '...'})` 
+                        : 'Unique clients per EAP period'}
+                    </p>
                   </div>
                 </div>
-                <select 
-                  value={trendView} 
-                  onChange={(e) => setTrendView(e.target.value as 'daily' | 'period')}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    background: 'rgba(255,255,255,0.15)',
-                    color: oceanColors.white,
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="period" style={{ color: oceanColors.textDark }}>By EAP Period</option>
-                  <option value="daily" style={{ color: oceanColors.textDark }}>Daily View</option>
-                </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {autoAdaptedView && (
+                    <span style={{ 
+                      fontSize: '10px', 
+                      color: oceanColors.gold, 
+                      background: 'rgba(255,215,0,0.15)',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <Settings size={10} />
+                      Auto-adapted
+                    </span>
+                  )}
+                  <select 
+                    value={trendView} 
+                    onChange={(e) => {
+                      setTrendView(e.target.value as 'daily' | 'period');
+                      setAutoAdaptedView(false);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      background: 'rgba(255,255,255,0.15)',
+                      color: oceanColors.white,
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="period" style={{ color: oceanColors.textDark }}>By EAP Period</option>
+                    <option value="daily" style={{ color: oceanColors.textDark }}>Daily View</option>
+                  </select>
+                </div>
               </div>
             </div>
             <div style={{ padding: '20px' }}>
@@ -544,106 +598,142 @@ export default function Dashboard() {
                   <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : participationData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={participationData} margin={{ top: 20, right: 30, left: 0, bottom: 10 }}>
-                    <defs>
-                      <linearGradient id="colorClients" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={oceanColors.gold} stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor={oceanColors.gold} stopOpacity={0.1}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis 
-                      dataKey="label" 
-                      tick={{ fill: oceanColors.white, fontSize: '11px' }}
-                      axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
-                      angle={trendView === 'daily' ? -45 : 0}
-                      textAnchor={trendView === 'daily' ? 'end' : 'middle'}
-                      height={trendView === 'daily' ? 60 : 40}
-                    />
-                    <YAxis 
-                      tick={{ fill: oceanColors.white, fontSize: '10px' }}
-                      axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
-                      domain={[0, 'auto']}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        borderRadius: '8px', 
-                        background: 'rgba(10,28,64,0.98)', 
-                        border: '1px solid rgba(255,215,0,0.5)', 
-                        color: oceanColors.white,
-                        fontSize: '12px',
-                        padding: '8px 12px'
-                      }}
-                      labelStyle={{ color: oceanColors.white, fontWeight: 'bold' }}
-                      itemStyle={{ color: oceanColors.white }}
-                      formatter={(value: any) => [`${value} unique clients`, '']}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="clients" 
-                      stroke={oceanColors.gold} 
-                      strokeWidth={3}
-                      fill="url(#colorClients)"
-                      name="Unique Clients"
-                      dot={{ fill: oceanColors.gold, r: 5, strokeWidth: 2, stroke: oceanColors.white }}
-                      activeDot={{ r: 8, fill: oceanColors.gold, stroke: oceanColors.white, strokeWidth: 2 }}
-                    />
-                    {/* Optional: Add a reference line for average */}
-                    <ReferenceLine 
-                      y={participationData.reduce((sum: any, d: { clients: any; }) => sum + d.clients, 0) / participationData.length} 
-                      stroke={oceanColors.info} 
-                      strokeDasharray="3 3" 
-                      label={{ 
-                        value: 'Avg', 
-                        fill: oceanColors.info, 
-                        fontSize: 10,
-                        position: 'right'
-                      }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart data={participationData} margin={{ top: 20, right: 30, left: 0, bottom: 10 }}>
+                      <defs>
+                        <linearGradient id="colorClients" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={oceanColors.gold} stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor={oceanColors.gold} stopOpacity={0.1}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis 
+                        dataKey="label" 
+                        tick={{ fill: oceanColors.white, fontSize: '11px' }}
+                        axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                        angle={trendView === 'daily' ? -45 : 0}
+                        textAnchor={trendView === 'daily' ? 'end' : 'middle'}
+                        height={trendView === 'daily' ? 60 : 40}
+                        interval={trendView === 'daily' ? Math.floor(participationData.length / 12) : 0}
+                      />
+                      <YAxis 
+                        tick={{ fill: oceanColors.white, fontSize: '10px' }}
+                        axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                        domain={[0, 'auto']}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          borderRadius: '8px', 
+                          background: 'rgba(10,28,64,0.98)', 
+                          border: '1px solid rgba(255,215,0,0.5)', 
+                          color: oceanColors.white,
+                          fontSize: '12px',
+                          padding: '8px 12px'
+                        }}
+                        labelStyle={{ color: oceanColors.white, fontWeight: 'bold' }}
+                        itemStyle={{ color: oceanColors.white }}
+                        formatter={(value: any) => [`${value} unique clients`, '']}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="clients" 
+                        stroke={oceanColors.gold} 
+                        strokeWidth={3}
+                        fill="url(#colorClients)"
+                        name="Unique Clients"
+                        dot={trendView === 'period' ? { fill: oceanColors.gold, r: 5, strokeWidth: 2, stroke: oceanColors.white } : false}
+                        activeDot={{ r: 8, fill: oceanColors.gold, stroke: oceanColors.white, strokeWidth: 2 }}
+                      />
+                      <ReferenceLine 
+                        y={participationData.reduce((sum: number, d: any) => sum + d.clients, 0) / participationData.length} 
+                        stroke={oceanColors.info} 
+                        strokeDasharray="3 3" 
+                        label={{ 
+                          value: 'Avg', 
+                          fill: oceanColors.info, 
+                          fontSize: 10,
+                          position: 'right'
+                        }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                  
+                  {/* Summary Stats Bar */}
+                  <div style={{ 
+                    marginTop: '16px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    padding: '10px 16px',
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: '10px',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}>
+                    <div style={{ display: 'flex', gap: '24px' }}>
+                      <div>
+                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px' }}>
+                          {trendView === 'daily' ? 'Total Days' : 'Total Periods'}
+                        </span>
+                        <p style={{ color: oceanColors.white, fontSize: '15px', fontWeight: 'bold', margin: 0 }}>
+                          {participationData.length}
+                        </p>
+                      </div>
+                      <div>
+                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px' }}>Total Clients</span>
+                        <p style={{ color: oceanColors.white, fontSize: '15px', fontWeight: 'bold', margin: 0 }}>
+                          {participationData.reduce((sum: number, d: any) => sum + d.clients, 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px' }}>
+                          {trendView === 'daily' ? 'Peak Day' : 'Peak Period'}
+                        </span>
+                        <p style={{ color: oceanColors.gold, fontSize: '15px', fontWeight: 'bold', margin: 0 }}>
+                          {Math.max(...participationData.map((d: any) => d.clients)).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {participationData.length >= 2 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px' }}>
+                          {trendView === 'period' ? 'vs Previous Period' : 'vs Previous Day'}
+                        </span>
+                        {(() => {
+                          const latest = participationData[participationData.length - 1]?.clients || 0;
+                          const previous = participationData[participationData.length - 2]?.clients || 0;
+                          const change = latest - previous;
+                          const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0';
+                          return (
+                            <span style={{ 
+                              color: change >= 0 ? oceanColors.success : oceanColors.danger, 
+                              fontSize: '13px',
+                              fontWeight: 'bold',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: change >= 0 ? `${oceanColors.success}20` : `${oceanColors.danger}20`,
+                              padding: '4px 10px',
+                              borderRadius: '16px'
+                            }}>
+                              {change >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                              {change >= 0 ? '+' : ''}{change} ({change >= 0 ? '+' : ''}{percentChange}%)
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
                 <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: oceanColors.white, fontSize: '12px' }}>No participation data</p>
+                  <p style={{ color: oceanColors.white, fontSize: '12px' }}>No participation data for selected filters</p>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Quick Trend Indicator */}
-          {participationData.length >= 2 && (
-            <div style={{ 
-              marginTop: '8px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'flex-end',
-              gap: '16px',
-              padding: '0 8px'
-            }}>
-              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>
-                Latest: {participationData[participationData.length - 1]?.clients || 0} clients
-              </span>
-              {(() => {
-                const latest = participationData[participationData.length - 1]?.clients || 0;
-                const previous = participationData[participationData.length - 2]?.clients || 0;
-                const change = latest - previous;
-                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0';
-                return (
-                  <span style={{ 
-                    color: change >= 0 ? oceanColors.success : oceanColors.danger, 
-                    fontSize: '11px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
-                    {change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                    {change >= 0 ? '+' : ''}{change} ({change >= 0 ? '+' : ''}{percentChange}%)
-                  </span>
-                );
-              })()}
-            </div>
-          )}
         </div>
 
         {/* Charts Row 2 - Station */}
