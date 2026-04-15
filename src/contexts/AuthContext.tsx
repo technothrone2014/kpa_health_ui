@@ -178,6 +178,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (response.data.user) {
           saveUserData(response.data.user);
         }
+        
+        // Role-based redirection
+        const roles = response.data.roles || [];
+        const isFieldAgent = roles.includes('FieldAgent') || roles.includes('FIELDAGENT');
+        
+        if (isFieldAgent) {
+          window.location.href = '/field-capture'; // Use window.location for full redirect
+        } else {
+          window.location.href = '/';
+        }
+        return response.data;
       }
       return response.data;
     } catch (error: any) {
