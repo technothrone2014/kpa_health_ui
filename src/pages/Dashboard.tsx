@@ -261,6 +261,30 @@ export default function Dashboard() {
   if (filters.gender !== 'all') categoryParams.append('gender', filters.gender);
   const categoryParamString = categoryParams.toString();
 
+  // Fetch gender distribution
+  const { data: genderDistribution } = useQuery({
+    queryKey: ['gender-distribution', filters],
+    queryFn: async () => {
+      const response = await api.get(`/analytics/clients/gender-distribution?${paramString}`);
+      console.log('Gender Distribution Response:', response.data);
+      return response.data.data || [];
+    },
+    enabled: !!filters.startDate,
+  });
+
+  // Gender Data for Chart
+  const genderData = React.useMemo(() => {
+    if (!genderDistribution) return [];
+    const colors = [oceanColors.info, '#EC4899']; // Blue for Male, Pink for Female
+    return genderDistribution
+      .map((g: any, idx: number) => ({
+        name: g.gender,
+        value: parseInt(g.count) || 0,
+        color: colors[idx % colors.length]
+      }))
+      .sort((a: any, b: any) => b.value - a.value);
+  }, [genderDistribution]);
+
   // Fetch client health status
   const { data: healthStatus, isLoading: healthLoading, refetch: refetchHealth } = useQuery({
     queryKey: ['client-health-status', filters],
@@ -584,6 +608,68 @@ export default function Dashboard() {
               )}
             </div>
           </div>
+
+          {/* Gender Distribution - Donut Chart */}
+          <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
+            <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Users size={20} style={{ color: oceanColors.gold }} />
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Gender Distribution</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Male vs Female client ratio</p>
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: '20px' }}>
+              {isLoading ? (
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : genderData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie 
+                      data={genderData} 
+                      cx="50%" 
+                      cy="50%" 
+                      innerRadius={40} 
+                      outerRadius={70} 
+                      paddingAngle={2} 
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
+                      labelLine={{ stroke: 'rgba(255,255,255,0.5)' }}
+                    >
+                      {genderData.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        borderRadius: '8px', 
+                        background: 'rgba(10,28,64,0.98)', 
+                        border: '1px solid rgba(255,215,0,0.5)', 
+                        color: oceanColors.white,
+                        fontSize: '12px',
+                        padding: '8px 12px'
+                      }}
+                      labelStyle={{ color: oceanColors.white, fontWeight: 'bold' }}
+                      itemStyle={{ color: oceanColors.white }}
+                      formatter={(value: any) => {
+                        const total = genderData.reduce((sum: number, d: any) => sum + d.value, 0);
+                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
+                        return `${value} clients (${percentage}%)`;
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: oceanColors.white, fontSize: '12px' }}>No gender data</p>
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
 
         {/* Charts Row 2 - Health Score & BP (Row 1) */}
