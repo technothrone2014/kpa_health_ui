@@ -458,43 +458,50 @@ export default function Dashboard() {
         {/* Charts Row 1 - Station & Category Distribution */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
           
-          {/* Station Distribution - True Population Pyramid (Mirrored) */}
+          {/* Station Distribution - Inverted Funnel Chart */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <MapPin size={20} style={{ color: oceanColors.gold }} />
                 <div>
                   <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Clients per Station</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Active client distribution by station</p>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Active client distribution by station (funnel view)</p>
                 </div>
               </div>
             </div>
             <div style={{ padding: '20px' }}>
               {isLoading ? (
-                <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : stationData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={[...stationData].sort((a: any, b: any) => a.count - b.count)}
+                    data={[...stationData].sort((a: any, b: any) => b.count - a.count)}  // 👈 Descending order (largest to smallest)
                     layout="vertical" 
-                    margin={{ left: 100, right: 20 }}
+                    margin={{ left: 100, right: 100 }}  // 👈 Symmetric margins for centered appearance
+                    barCategoryGap={8}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
+                    
+                    {/* XAxis - hidden but needed for scaling */}
                     <XAxis 
                       type="number" 
-                      tick={{ fill: oceanColors.white, fontSize: '10px' }}
-                      axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                      hide
+                      domain={[0, 'dataMax']}
                     />
+                    
+                    {/* YAxis - shows station names */}
                     <YAxis 
                       type="category" 
                       dataKey="station" 
                       width={100} 
                       tick={{ fill: oceanColors.white, fontSize: '10px' }}
                       axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                      tickLine={false}
                       tickFormatter={(value) => value.length > 14 ? value.substring(0, 12) + '...' : value}
                     />
+                    
                     <Tooltip 
                       contentStyle={{ 
                         borderRadius: '8px', 
@@ -510,9 +517,35 @@ export default function Dashboard() {
                       formatter={(value: any) => [`${value} clients`, '']}
                       cursor={{ fill: 'rgba(255,255,255,0.1)' }}
                     />
-                    <Bar dataKey="count" radius={[4, 0, 0, 4]} maxBarSize={25} barSize={20}>
+                    
+                    {/* Centered bars with decreasing width effect */}
+                    <Bar 
+                      dataKey="count" 
+                      radius={[4, 4, 4, 4]}  // 👈 Rounded corners on all sides
+                      maxBarSize={40}
+                      barSize={30}
+                      // 👇 Dynamic bar sizing based on value to create funnel effect
+                      shape={(props: any) => {
+                        const { x, y, width, height, fill } = props;
+                        const maxValue = Math.max(...stationData.map((d: any) => d.count));
+                        const ratio = props.value / maxValue;
+                        const funnelWidth = width * (0.4 + ratio * 0.6); // 👈 Bars get wider as values increase
+                        const centerX = x + (width - funnelWidth) / 2;
+                        return (
+                          <rect
+                            x={centerX}
+                            y={y}
+                            width={funnelWidth}
+                            height={height}
+                            fill={fill}
+                            rx={4}
+                            ry={4}
+                          />
+                        );
+                      }}
+                    >
                       {[...stationData]
-                        .sort((a: any, b: any) => a.count - b.count)
+                        .sort((a: any, b: any) => b.count - a.count)  // 👈 Largest at top
                         .map((entry: any, index: number) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))
@@ -521,7 +554,7 @@ export default function Dashboard() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <p style={{ color: oceanColors.white, fontSize: '12px' }}>No station data</p>
                 </div>
               )}
