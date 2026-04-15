@@ -352,11 +352,13 @@ export default function Dashboard() {
 
   const stationData = React.useMemo(() => {
     if (!stationDistribution) return [];
-    return stationDistribution.map((s: any, idx: number) => ({ 
-      ...s, 
-      count: parseInt(s.count) || 0,  // Convert string to number!
-      color: stationColors[idx % stationColors.length] 
-    }));
+    return stationDistribution
+      .map((s: any, idx: number) => ({ 
+        ...s, 
+        count: parseInt(s.count) || 0,
+        color: stationColors[idx % stationColors.length] 
+      }))
+      .sort((a: any, b: any) => a.count - b.count);  // 👈 Add explicit types
   }, [stationDistribution]);
 
   const categoryData = React.useMemo(() => {
@@ -456,7 +458,7 @@ export default function Dashboard() {
         {/* Charts Row 1 - Station & Category Distribution */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
           
-          {/* Station Distribution - Population Pyramid Style */}
+          {/* Station Distribution - True Population Pyramid (Mirrored) */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -469,31 +471,52 @@ export default function Dashboard() {
             </div>
             <div style={{ padding: '20px' }}>
               {isLoading ? (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : stationData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={stationData} layout="vertical" margin={{ left: 100, right: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis type="number" tick={{ fill: oceanColors.white, fontSize: '9px' }} />
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart 
+                    data={[...stationData].sort((a, b) => a.count - b.count)}
+                    layout="vertical" 
+                    margin={{ left: 100, right: 100 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
+                    <XAxis 
+                      type="number" 
+                      tick={{ fill: oceanColors.white, fontSize: '10px' }}
+                      axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                      domain={[0, 'dataMax']}
+                    />
                     <YAxis 
                       type="category" 
                       dataKey="station" 
                       width={100} 
-                      tick={{ fill: oceanColors.white, fontSize: '9px' }}
-                      tickFormatter={(value) => value.length > 15 ? value.substring(0, 12) + '...' : value}
+                      tick={{ fill: oceanColors.white, fontSize: '10px' }}
+                      axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                      tickFormatter={(value) => value.length > 14 ? value.substring(0, 12) + '...' : value}
                     />
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white }} />
-                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                      {stationData.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
+                    <Tooltip 
+                      contentStyle={{ 
+                        borderRadius: '8px', 
+                        background: 'rgba(10,28,64,0.95)', 
+                        border: '1px solid rgba(255,215,0,0.3)', 
+                        color: oceanColors.white 
+                      }}
+                    />
+                    {/* Left side bars */}
+                    <Bar dataKey="count" radius={[4, 0, 0, 4]} maxBarSize={25} barSize={20}>
+                      {[...stationData]
+                        .sort((a, b) => a.count - b.count)
+                        .map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))
+                      }
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <p style={{ color: oceanColors.white, fontSize: '12px' }}>No station data</p>
                 </div>
               )}
@@ -679,9 +702,27 @@ export default function Dashboard() {
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={rbsData} layout="vertical" margin={{ left: 95 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis type="number" tick={{ fill: oceanColors.white, fontSize: '10px' }} />
-                    <YAxis type="category" dataKey="name" width={95} tick={{ fill: oceanColors.white, fontSize: '10px' }} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', background: 'rgba(10,28,64,0.95)', border: '1px solid rgba(255,215,0,0.3)', color: oceanColors.white }} />
+                    <XAxis 
+                      type="number" 
+                      tick={{ fill: oceanColors.white, fontSize: '10px' }}
+                      axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                    />
+                    <YAxis 
+                      type="category" 
+                      dataKey="name" 
+                      width={95} 
+                      tick={{ fill: oceanColors.white, fontSize: '10px' }}
+                      axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        borderRadius: '8px', 
+                        background: 'rgba(10,28,64,0.95)', 
+                        border: '1px solid rgba(255,215,0,0.3)', 
+                        color: oceanColors.white 
+                      }}
+                      cursor={{ fill: 'rgba(255,255,255,0.1)' }}
+                    />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                       {rbsData.map((entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
