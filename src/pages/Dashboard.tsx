@@ -458,14 +458,14 @@ export default function Dashboard() {
         {/* Charts Row 1 - Station & Category Distribution */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
           
-          {/* Station Distribution - Inverted Funnel Chart */}
+          {/* Station Distribution - Simple Inverted Funnel */}
           <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <MapPin size={20} style={{ color: oceanColors.gold }} />
                 <div>
                   <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Clients per Station</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Active client distribution by station (funnel view)</p>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Active client distribution (funnel view)</p>
                 </div>
               </div>
             </div>
@@ -477,31 +477,21 @@ export default function Dashboard() {
               ) : stationData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={[...stationData].sort((a: any, b: any) => b.count - a.count)}  // 👈 Descending order (largest to smallest)
+                    data={[...stationData].sort((a: any, b: any) => b.count - a.count)}
                     layout="vertical" 
-                    margin={{ left: 100, right: 100 }}  // 👈 Symmetric margins for centered appearance
-                    barCategoryGap={8}
+                    margin={{ left: 100, right: 100 }}
+                    barCategoryGap={6}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
-                    
-                    {/* XAxis - hidden but needed for scaling */}
-                    <XAxis 
-                      type="number" 
-                      hide
-                      domain={[0, 'dataMax']}
-                    />
-                    
-                    {/* YAxis - shows station names */}
+                    <XAxis type="number" hide domain={[0, 'dataMax']} />
                     <YAxis 
                       type="category" 
                       dataKey="station" 
                       width={100} 
                       tick={{ fill: oceanColors.white, fontSize: '10px' }}
                       axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
-                      tickLine={false}
                       tickFormatter={(value) => value.length > 14 ? value.substring(0, 12) + '...' : value}
                     />
-                    
                     <Tooltip 
                       contentStyle={{ 
                         borderRadius: '8px', 
@@ -509,43 +499,17 @@ export default function Dashboard() {
                         border: '1px solid rgba(255,215,0,0.5)', 
                         color: oceanColors.white,
                         fontSize: '12px',
-                        fontWeight: '500',
                         padding: '8px 12px'
                       }}
-                      labelStyle={{ color: oceanColors.white, fontWeight: 'bold' }}
-                      itemStyle={{ color: oceanColors.white }}
                       formatter={(value: any) => [`${value} clients`, '']}
-                      cursor={{ fill: 'rgba(255,255,255,0.1)' }}
                     />
-                    
-                    {/* Centered bars with decreasing width effect */}
                     <Bar 
                       dataKey="count" 
-                      radius={[4, 4, 4, 4]}  // 👈 Rounded corners on all sides
-                      maxBarSize={40}
-                      barSize={30}
-                      // 👇 Dynamic bar sizing based on value to create funnel effect
-                      shape={(props: any) => {
-                        const { x, y, width, height, fill } = props;
-                        const maxValue = Math.max(...stationData.map((d: any) => d.count));
-                        const ratio = props.value / maxValue;
-                        const funnelWidth = width * (0.4 + ratio * 0.6); // 👈 Bars get wider as values increase
-                        const centerX = x + (width - funnelWidth) / 2;
-                        return (
-                          <rect
-                            x={centerX}
-                            y={y}
-                            width={funnelWidth}
-                            height={height}
-                            fill={fill}
-                            rx={4}
-                            ry={4}
-                          />
-                        );
-                      }}
+                      radius={[4, 4, 4, 4]}
+                      maxBarSize={35}
                     >
                       {[...stationData]
-                        .sort((a: any, b: any) => b.count - a.count)  // 👈 Largest at top
+                        .sort((a: any, b: any) => b.count - a.count)
                         .map((entry: any, index: number) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))
