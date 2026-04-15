@@ -6,11 +6,12 @@ import {
   Droplets, Thermometer, Calendar, Clock, TrendingUp, Award,
   AlertTriangle, Filter, Download, FileText, X, Printer,
   Search, ChevronDown, ChevronUp, Settings, Sliders, Info,
-  MapPin, PieChart as PieChartIcon, BarChart3
+  MapPin, PieChart as PieChartIcon, BarChart3,
+  TrendingDown
 } from "lucide-react";
 import { 
   PieChart, Pie, Cell, BarChart, Bar, Tooltip, ResponsiveContainer, Legend,
-  CartesianGrid, XAxis, YAxis, RadialBarChart, RadialBar
+  CartesianGrid, XAxis, YAxis, AreaChart, Area, ReferenceLine
 } from "recharts";
 import { format } from "date-fns";
 import api from "../api/client";
@@ -508,15 +509,15 @@ export default function Dashboard() {
         {/* Charts Row 1 - Participation trends */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '20px', marginBottom: '24px' }}>
 
-          {/* Participation Trends Over Time */}
-          <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)', gridColumn: 'span 2' }}>
+          {/* Participation Trends Over Time - Area Chart */}
+          <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
             <div style={{ background: 'linear-gradient(90deg, rgba(10,28,64,0.5), rgba(26,77,140,0.5))', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <TrendingUp size={20} style={{ color: oceanColors.gold }} />
                   <div>
                     <h3 style={{ fontWeight: 'bold', color: oceanColors.white, fontSize: '16px', margin: 0 }}>Participation Trends</h3>
-                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>EAP screening volume over time</p>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Unique clients screened per EAP period</p>
                   </div>
                 </div>
                 <select 
@@ -539,24 +540,31 @@ export default function Dashboard() {
             </div>
             <div style={{ padding: '20px' }}>
               {isLoading ? (
-                <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <RefreshCw size={32} style={{ color: oceanColors.gold, animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : participationData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={participationData} margin={{ top: 10, right: 30, left: 0, bottom: 10 }}>
+                <ResponsiveContainer width="100%" height={280}>
+                  <AreaChart data={participationData} margin={{ top: 20, right: 30, left: 0, bottom: 10 }}>
+                    <defs>
+                      <linearGradient id="colorClients" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={oceanColors.gold} stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor={oceanColors.gold} stopOpacity={0.1}/>
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                     <XAxis 
                       dataKey="label" 
-                      tick={{ fill: oceanColors.white, fontSize: '10px' }}
+                      tick={{ fill: oceanColors.white, fontSize: '11px' }}
                       axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
-                      angle={-30}
-                      textAnchor="end"
-                      height={50}
+                      angle={trendView === 'daily' ? -45 : 0}
+                      textAnchor={trendView === 'daily' ? 'end' : 'middle'}
+                      height={trendView === 'daily' ? 60 : 40}
                     />
                     <YAxis 
                       tick={{ fill: oceanColors.white, fontSize: '10px' }}
                       axisLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                      domain={[0, 'auto']}
                     />
                     <Tooltip 
                       contentStyle={{ 
@@ -569,23 +577,73 @@ export default function Dashboard() {
                       }}
                       labelStyle={{ color: oceanColors.white, fontWeight: 'bold' }}
                       itemStyle={{ color: oceanColors.white }}
+                      formatter={(value: any) => [`${value} unique clients`, '']}
                     />
-                    <Legend 
-                      verticalAlign="top" 
-                      height={36}
-                      formatter={(v) => <span style={{ color: oceanColors.white, fontSize: '11px' }}>{v}</span>}
+                    <Area 
+                      type="monotone" 
+                      dataKey="clients" 
+                      stroke={oceanColors.gold} 
+                      strokeWidth={3}
+                      fill="url(#colorClients)"
+                      name="Unique Clients"
+                      dot={{ fill: oceanColors.gold, r: 5, strokeWidth: 2, stroke: oceanColors.white }}
+                      activeDot={{ r: 8, fill: oceanColors.gold, stroke: oceanColors.white, strokeWidth: 2 }}
                     />
-                    <Bar dataKey="tallies" fill={oceanColors.gold} radius={[4, 4, 0, 0]} name="Total Screenings" />
-                    <Bar dataKey="clients" fill={oceanColors.success} radius={[4, 4, 0, 0]} name="Unique Clients" />
-                  </BarChart>
+                    {/* Optional: Add a reference line for average */}
+                    <ReferenceLine 
+                      y={participationData.reduce((sum: any, d: { clients: any; }) => sum + d.clients, 0) / participationData.length} 
+                      stroke={oceanColors.info} 
+                      strokeDasharray="3 3" 
+                      label={{ 
+                        value: 'Avg', 
+                        fill: oceanColors.info, 
+                        fontSize: 10,
+                        position: 'right'
+                      }}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <p style={{ color: oceanColors.white, fontSize: '12px' }}>No participation data</p>
                 </div>
               )}
             </div>
           </div>
+
+          {/* Quick Trend Indicator */}
+          {participationData.length >= 2 && (
+            <div style={{ 
+              marginTop: '8px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'flex-end',
+              gap: '16px',
+              padding: '0 8px'
+            }}>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>
+                Latest: {participationData[participationData.length - 1]?.clients || 0} clients
+              </span>
+              {(() => {
+                const latest = participationData[participationData.length - 1]?.clients || 0;
+                const previous = participationData[participationData.length - 2]?.clients || 0;
+                const change = latest - previous;
+                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0';
+                return (
+                  <span style={{ 
+                    color: change >= 0 ? oceanColors.success : oceanColors.danger, 
+                    fontSize: '11px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    {change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                    {change >= 0 ? '+' : ''}{change} ({change >= 0 ? '+' : ''}{percentChange}%)
+                  </span>
+                );
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Charts Row 2 - Station */}
