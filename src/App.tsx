@@ -84,7 +84,6 @@ function RoleBasedRedirect() {
   return <Navigate to="/dashboard" replace />;
 }
 
-// Main App Content (requires auth context)
 function AppContent() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -124,13 +123,11 @@ function AppContent() {
     await logout();
   };
 
-  // Role-based menu items
+  // Role-based menu items (only for non-field-agents)
   const getMenuItems = () => {
+    // Field agents don't get a sidebar at all
     if (isFieldAgent) {
-      // Field agents only see field capture
-      return [
-        { text: 'Field Capture', icon: <PeopleIcon />, path: '/field-capture', nauticalIcon: '📋' },
-      ];
+      return [];
     }
     
     // Regular users see full menu
@@ -144,7 +141,190 @@ function AppContent() {
 
   const menuItems = getMenuItems();
 
-  const drawer = (
+  // Field Agent Header Component
+  const FieldAgentHeader = () => (
+    <Box sx={{
+      background: `linear-gradient(135deg, ${oceanTheme.deep}, ${oceanTheme.mid})`,
+      color: oceanTheme.white,
+      px: { xs: 2, sm: 4 },
+      py: { xs: 1.5, sm: 2 },
+      mb: 3,
+      borderRadius: { xs: '0 0 16px 16px', sm: '16px' },
+      boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+      borderBottom: `2px solid ${oceanTheme.gold}`
+    }}>
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 2
+      }}>
+        {/* Logo and Title */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{
+            width: 48,
+            height: 48,
+            background: `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`,
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+          }}>
+            <AnchorIcon sx={{ color: oceanTheme.navy, fontSize: 28 }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: oceanTheme.white, lineHeight: 1.2 }}>
+              KPA Field Capture
+            </Typography>
+            <Typography variant="caption" sx={{ color: oceanTheme.foam }}>
+              EAP Health Week • Field Agent Portal
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* User Info and Actions */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {/* User Info */}
+          <Box sx={{ 
+            display: { xs: 'none', sm: 'flex' }, 
+            alignItems: 'center', 
+            gap: 1.5,
+            background: 'rgba(255,255,255,0.1)',
+            borderRadius: '30px',
+            px: 2,
+            py: 1
+          }}>
+            <Box sx={{
+              width: 36,
+              height: 36,
+              background: oceanTheme.surface,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Typography sx={{ color: oceanTheme.white, fontWeight: 'bold', fontSize: '14px' }}>
+                {user?.FirstName?.charAt(0) || 'F'}
+                {user?.LastName?.charAt(0) || 'A'}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography sx={{ color: oceanTheme.white, fontSize: '14px', fontWeight: 'bold' }}>
+                {user?.FirstName} {user?.LastName}
+              </Typography>
+              <Box sx={{ 
+                display: 'inline-block',
+                px: 1,
+                py: 0.25,
+                background: oceanTheme.gold,
+                borderRadius: '10px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                color: oceanTheme.navy,
+                textTransform: 'uppercase'
+              }}>
+                Field Agent
+              </Box>
+            </Box>
+          </Box>
+
+          {/* AI Assistant Toggle */}
+          <IconButton
+            onClick={() => setShowGlobalAI(!showGlobalAI)}
+            sx={{
+              background: showGlobalAI ? oceanTheme.gold : 'rgba(255,255,255,0.15)',
+              color: showGlobalAI ? oceanTheme.navy : oceanTheme.white,
+              '&:hover': {
+                background: oceanTheme.gold,
+                color: oceanTheme.navy
+              }
+            }}
+          >
+            <SmartToyIcon />
+            {aiStatus === 'online' && (
+              <Box sx={{
+                position: 'absolute',
+                top: 4,
+                right: 4,
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: oceanTheme.surface,
+                border: '1px solid white'
+              }} />
+            )}
+          </IconButton>
+
+          {/* Logout Button */}
+          <IconButton
+            onClick={handleLogout}
+            sx={{
+              background: 'rgba(255,255,255,0.15)',
+              color: oceanTheme.white,
+              '&:hover': {
+                background: oceanTheme.danger,
+                color: oceanTheme.white
+              }
+            }}
+            title="Logout"
+          >
+            <LogoutIcon />
+          </IconButton>
+        </Box>
+      </Box>
+
+      {/* Mobile User Info (visible only on small screens) */}
+      <Box sx={{ 
+        display: { xs: 'flex', sm: 'none' }, 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        mt: 1.5,
+        pt: 1.5,
+        borderTop: `1px solid ${oceanTheme.gold}30`
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{
+            width: 32,
+            height: 32,
+            background: oceanTheme.surface,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Typography sx={{ color: oceanTheme.white, fontWeight: 'bold', fontSize: '12px' }}>
+              {user?.FirstName?.charAt(0) || 'F'}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography sx={{ color: oceanTheme.white, fontSize: '13px', fontWeight: 'bold' }}>
+              {user?.FirstName} {user?.LastName}
+            </Typography>
+            <Box sx={{ 
+              display: 'inline-block',
+              px: 1,
+              py: 0.25,
+              background: oceanTheme.gold,
+              borderRadius: '10px',
+              fontSize: '9px',
+              fontWeight: 'bold',
+              color: oceanTheme.navy
+            }}>
+              Field Agent
+            </Box>
+          </Box>
+        </Box>
+        <Typography sx={{ color: oceanTheme.foam, fontSize: '11px' }}>
+          {user?.Email}
+        </Typography>
+      </Box>
+    </Box>
+  );
+
+  // Regular Sidebar Drawer (only for non-field-agents)
+  const drawer = isFieldAgent ? null : (
     <Box sx={{ 
       height: '100%', 
       background: `linear-gradient(180deg, ${oceanTheme.navy} 0%, ${oceanTheme.deep} 50%, ${oceanTheme.mid} 100%)`,
@@ -236,21 +416,20 @@ function AppContent() {
           <Typography sx={{ color: oceanTheme.foam, fontSize: '12px' }}>
             {user.Email}
           </Typography>
-          {/* Role Badge */}
           <Box sx={{ 
             mt: 1,
             display: 'inline-block',
             px: 1.5,
             py: 0.5,
-            background: isFieldAgent ? oceanTheme.surface : oceanTheme.gold,
+            background: oceanTheme.gold,
             borderRadius: '12px',
             fontSize: '10px',
             fontWeight: 'bold',
-            color: isFieldAgent ? oceanTheme.white : oceanTheme.navy,
+            color: oceanTheme.navy,
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
           }}>
-            {isFieldAgent ? 'Field Agent' : 'Staff'}
+            Staff
           </Box>
         </Box>
       )}
@@ -313,7 +492,6 @@ function AppContent() {
                 }} 
               />
               
-              {/* Active Indicator */}
               {activePath === item.path && (
                 <Box sx={{
                   position: 'absolute',
@@ -329,7 +507,7 @@ function AppContent() {
           </ListItem>
         ))}
         
-        {/* AI Assistant Menu Item - Available to all roles */}
+        {/* AI Assistant Menu Item */}
         <ListItem disablePadding sx={{ mb: 1, mt: 2 }}>
           <ListItemButton 
             onClick={() => setShowGlobalAI(!showGlobalAI)}
@@ -441,8 +619,8 @@ function AppContent() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
-      {/* Desktop Sidebar - Only show when authenticated */}
-      {isAuthenticated && (
+      {/* Desktop Sidebar - Only show for non-field-agents */}
+      {isAuthenticated && !isFieldAgent && (
         <Box
           component="nav"
           sx={{
@@ -457,21 +635,28 @@ function AppContent() {
         </Box>
       )}
 
-      {/* Mobile drawer */}
-      <Drawer
-        variant="temporary"
-        open={mobileOpen}
-        onClose={handleDrawerToggle}
-        ModalProps={{ keepMounted: true }}
-        sx={{ display: { xs: 'block', sm: 'none' } }}
-      >
-        {drawer}
-      </Drawer>
+      {/* Mobile drawer - Only for non-field-agents */}
+      {!isFieldAgent && (
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{ keepMounted: true }}
+          sx={{ display: { xs: 'block', sm: 'none' } }}
+        >
+          {drawer}
+        </Drawer>
+      )}
 
       {/* Main content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
-        {/* Mobile App Bar */}
-        {isAuthenticated && (
+      <Box component="main" sx={{ 
+        flexGrow: 1, 
+        p: isFieldAgent ? 0 : { xs: 2, sm: 3 }  // No padding for field agent (header handles it)
+      }}>
+        {/* Field Agent gets a custom header, regular users get mobile app bar */}
+        {isAuthenticated && isFieldAgent ? (
+          <FieldAgentHeader />
+        ) : isAuthenticated && (
           <AppBar 
             position="sticky" 
             sx={{ 
@@ -513,7 +698,7 @@ function AppContent() {
                 <AnchorIcon sx={{ color: oceanTheme.navy, fontSize: 24 }} />
               </Box>
               <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontSize: '0.9rem', fontWeight: 'bold' }}>
-                {isFieldAgent ? 'Field Capture' : 'KPA Health Week'}
+                KPA Health Week
               </Typography>
               <button
                 onClick={() => setShowGlobalAI(!showGlobalAI)}
@@ -537,53 +722,50 @@ function AppContent() {
           </AppBar>
         )}
 
-        {/* Routes */}
-        <Routes>
-          {/* Public route */}
-          <Route path="/login" element={<Login />} />
-          
-          {/* Protected routes - Regular users */}
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              {isFieldAgent ? <Navigate to="/field-capture" replace /> : <Dashboard />}
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/employees" element={
-            <ProtectedRoute>
-              {isFieldAgent ? <Navigate to="/field-capture" replace /> : <Employees />}
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/data-correction" element={
-            <ProtectedRoute>
-              {isFieldAgent ? <Navigate to="/field-capture" replace /> : <DataCorrection />}
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/analytics" element={
-            <ProtectedRoute>
-              {isFieldAgent ? <Navigate to="/field-capture" replace /> : <AdvancedAnalytics />}
-            </ProtectedRoute>
-          } />
-          
-          {/* Field Capture - Accessible to all authenticated users */}
-          <Route path="/field-capture" element={
-            <ProtectedRoute>
-              <DataCaptureDashboard 
-                userRole={isFieldAgent ? 'field_agent' : 'lab_assistant'}
-                userId={user?.Id || 0}
-                stationId={user?.StationId || 1}
-              />
-            </ProtectedRoute>
-          } />
-          
-          {/* Root route - Role-based redirect */}
-          <Route path="/" element={<RoleBasedRedirect />} />
-          
-          {/* Catch-all route */}
-          <Route path="*" element={<RoleBasedRedirect />} />
-        </Routes>
+        {/* Content wrapper for field agent (adds padding) */}
+        <Box sx={{ p: isFieldAgent ? { xs: 2, sm: 3 } : 0 }}>
+          {/* Routes */}
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                {isFieldAgent ? <Navigate to="/field-capture" replace /> : <Dashboard />}
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/employees" element={
+              <ProtectedRoute>
+                {isFieldAgent ? <Navigate to="/field-capture" replace /> : <Employees />}
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/data-correction" element={
+              <ProtectedRoute>
+                {isFieldAgent ? <Navigate to="/field-capture" replace /> : <DataCorrection />}
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                {isFieldAgent ? <Navigate to="/field-capture" replace /> : <AdvancedAnalytics />}
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/field-capture" element={
+              <ProtectedRoute>
+                <DataCaptureDashboard 
+                  userRole={isFieldAgent ? 'field_agent' : 'lab_assistant'}
+                  userId={user?.Id || 0}
+                  stationId={user?.StationId || 1}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/" element={<RoleBasedRedirect />} />
+            <Route path="*" element={<RoleBasedRedirect />} />
+          </Routes>
+        </Box>
       </Box>
 
       {/* Global AI Assistant */}
