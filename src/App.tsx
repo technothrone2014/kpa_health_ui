@@ -25,7 +25,6 @@ import aiService from './api/aiService';
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import LoadingSpinner from "./components/LoadingSpinner";
 import Login from "./pages/Login";
-import FieldDataCapture from "./pages/FieldDataCapture";
 import DataCaptureDashboard from './components/DataCaptureDashboard';
 
 const queryClient = new QueryClient();
@@ -53,10 +52,35 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   
   if (!isAuthenticated) {
-    return <Login />;
+    return <Navigate to="/login" replace />;
   }
   
   return <>{children}</>;
+}
+
+// Role-based redirect component
+function RoleBasedRedirect() {
+  const { user, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  // Check if user is a field agent
+  const roles = user.roles || [];
+  const normalizedRoles = roles.map(r => r.toLowerCase());
+  const isFieldAgent = normalizedRoles.includes('fieldagent') || 
+                       normalizedRoles.includes('field_agent');
+  
+  if (isFieldAgent) {
+    return <Navigate to="/field-capture" replace />;
+  }
+  
+  return <Navigate to="/dashboard" replace />;
 }
 
 // Main App Content (requires auth context)
@@ -91,7 +115,7 @@ function AppContent() {
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/', nauticalIcon: '🧭' },
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', nauticalIcon: '🧭' },
     { text: 'Clients', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨‍✈️' },
     { text: 'Data Correction', icon: <DataUsageIcon />, path: '/data-correction', nauticalIcon: '⚓' },
     { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics', nauticalIcon: '📊' },
@@ -487,56 +511,52 @@ function AppContent() {
           </AppBar>
         )}
 
-        {/* Routes */}
+        {/* FIXED ROUTES - No duplicates, proper structure */}
         <Routes>
-          <Route path="/" element={
+          {/* Public route */}
+          <Route path="/login" element={<Login />} />
+          
+          {/* Protected routes */}
+          <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
           } />
+          
           <Route path="/employees" element={
             <ProtectedRoute>
               <Employees />
             </ProtectedRoute>
           } />
+          
           <Route path="/data-correction" element={
             <ProtectedRoute>
               <DataCorrection />
             </ProtectedRoute>
           } />
+          
           <Route path="/analytics" element={
             <ProtectedRoute>
               <AdvancedAnalytics />
             </ProtectedRoute>
           } />
+          
+          {/* Field Capture Route - Single definition */}
           <Route path="/field-capture" element={
             <ProtectedRoute>
-              <FieldDataCapture />
+              <DataCaptureDashboard 
+                userRole="field_agent"
+                userId={user?.Id || 0}
+                stationId={user?.StationId || 1}
+              />
             </ProtectedRoute>
           } />
-          <Route 
-            path="/field-capture" 
-            element={
-              <ProtectedRoute>
-                <DataCaptureDashboard 
-                  userRole="field_agent"  // or determine from user context
-                  userId={user?.Id || 0}
-                  stationId={user?.StationId || 1}  // You'll need to get this from user data
-                />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <Dashboard />  // Your main dashboard component
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Add a redirect from root */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          
+          {/* Root route - Role-based redirect */}
+          <Route path="/" element={<RoleBasedRedirect />} />
+          
+          {/* Catch-all route for 404s - Redirect to role-based home */}
+          <Route path="*" element={<RoleBasedRedirect />} />
         </Routes>
       </Box>
 

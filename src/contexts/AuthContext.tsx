@@ -213,15 +213,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           saveUserData(response.data.user);
         }
         
-        // ✅ ROLE-BASED REDIRECTION - ADD THIS HERE!
-        const roles = response.data.roles || [];
-        const isFieldAgent = roles.includes('FieldAgent') || roles.includes('FIELDAGENT');
-        
-        if (isFieldAgent) {
-          window.location.href = '/field-capture';
-        } else {
-          window.location.href = '/';
-        }
+        // Don't redirect here - let the RoleBasedRedirect component handle it
+        // The token is set, user is saved, and the app will naturally redirect
+        return response.data;
       }
       return response.data;
     } catch (error: any) {
