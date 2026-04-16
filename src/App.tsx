@@ -97,19 +97,33 @@ function AppContent() {
 
   // Determine if user is a field agent - FIXED role checking
   const isFieldAgent = React.useMemo(() => {
-    if (!user?.roles) return false;
+    if (!user) {
+      console.log('🔍 No user object');
+      return false;
+    }
+    
     const roles = user.roles || [];
-    console.log('🔍 User roles:', roles); // Debug log
+    console.log('🔍 User object:', user);
+    console.log('🔍 User roles:', roles);
+    console.log('🔍 Roles type:', typeof roles, Array.isArray(roles));
     
-    // Check for all possible field agent role formats
-    const normalizedRoles = roles.map((r: string) => r.toLowerCase());
-    const result = normalizedRoles.includes('fieldagent') || 
-                   normalizedRoles.includes('field_agent') ||
-                   normalizedRoles.includes('FieldAgent') ||
-                   roles.includes('FieldAgent');
+    // If roles is a string (sometimes happens), convert to array
+    const rolesArray = Array.isArray(roles) ? roles : [roles];
     
-    console.log('🔍 Is field agent?', result); // Debug log
-    return result;
+    // Check for all possible field agent role formats (case insensitive)
+    const isFieldAgentRole = rolesArray.some((role: string) => {
+      if (!role) return false;
+      const lowerRole = role.toLowerCase();
+      return lowerRole === 'fieldagent' || 
+             lowerRole === 'field_agent' ||
+             lowerRole === 'field-agent' ||
+             (lowerRole.includes('field') && lowerRole.includes('agent'));
+    });
+    
+    console.log('🔍 Is field agent?', isFieldAgentRole);
+    console.log('🔍 Will sidebar be hidden?', isFieldAgentRole ? 'YES - No sidebar' : 'NO - Show sidebar');
+    
+    return isFieldAgentRole;
   }, [user]);
 
   // Check AI service health on mount
@@ -133,14 +147,9 @@ function AppContent() {
     await logout();
   };
 
-  // Role-based menu items
+  // Role-based menu items (only for non-field-agents)
   const getMenuItems = () => {
-    // Field agents don't get a sidebar at all
-    if (isFieldAgent) {
-      return [];
-    }
-    
-    // Regular users see full menu
+    if (isFieldAgent) return [];
     return [
       { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', nauticalIcon: '🧭' },
       { text: 'Clients', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨‍✈️' },
@@ -158,10 +167,10 @@ function AppContent() {
       color: oceanTheme.white,
       px: { xs: 2, sm: 4 },
       py: { xs: 1.5, sm: 2 },
-      mb: 3,
       borderRadius: { xs: '0 0 16px 16px', sm: '16px' },
       boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-      borderBottom: `2px solid ${oceanTheme.gold}`
+      borderBottom: `2px solid ${oceanTheme.gold}`,
+      mb: 3
     }}>
       <Box sx={{
         display: 'flex',
@@ -170,7 +179,6 @@ function AppContent() {
         flexWrap: 'wrap',
         gap: 2
       }}>
-        {/* Logo and Title */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box sx={{
             width: 48,
@@ -194,9 +202,7 @@ function AppContent() {
           </Box>
         </Box>
 
-        {/* User Info and Actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {/* User Info */}
           <Box sx={{ 
             display: { xs: 'none', sm: 'flex' }, 
             alignItems: 'center', 
@@ -240,7 +246,6 @@ function AppContent() {
             </Box>
           </Box>
 
-          {/* AI Assistant Toggle */}
           <IconButton
             onClick={() => setShowGlobalAI(!showGlobalAI)}
             sx={{
@@ -267,7 +272,6 @@ function AppContent() {
             )}
           </IconButton>
 
-          {/* Logout Button */}
           <IconButton
             onClick={handleLogout}
             sx={{
@@ -285,7 +289,6 @@ function AppContent() {
         </Box>
       </Box>
 
-      {/* Mobile User Info */}
       <Box sx={{ 
         display: { xs: 'flex', sm: 'none' }, 
         alignItems: 'center', 
@@ -333,7 +336,7 @@ function AppContent() {
     </Box>
   );
 
-  // Regular Sidebar Drawer - FIXED: Better layout for logout button
+  // Regular Sidebar Drawer (for non-field-agents)
   const drawer = (
     <Box sx={{ 
       height: '100vh', 
@@ -343,7 +346,6 @@ function AppContent() {
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {/* Background decorations */}
       <Box sx={{ 
         position: 'absolute', 
         bottom: 0, 
@@ -366,16 +368,14 @@ function AppContent() {
         zIndex: 0
       }} />
       
-      {/* Scrollable content area */}
       <Box sx={{ 
         flex: 1, 
         overflowY: 'auto', 
         overflowX: 'hidden',
         position: 'relative',
         zIndex: 1,
-        pb: 10 // Add padding at bottom to prevent content from hiding behind logout
+        pb: 10
       }}>
-        {/* Sidebar Header */}
         <Box sx={{ 
           p: 3, 
           textAlign: 'center', 
@@ -429,7 +429,6 @@ function AppContent() {
           </Box>
         </Box>
 
-        {/* User Info */}
         {isAuthenticated && user && (
           <Box sx={{ p: 2, borderBottom: `1px solid ${oceanTheme.gold}30` }}>
             <Typography sx={{ color: oceanTheme.white, fontSize: '14px', fontWeight: 'bold' }}>
@@ -451,12 +450,11 @@ function AppContent() {
               textTransform: 'uppercase',
               letterSpacing: '0.5px'
             }}>
-              {isFieldAgent ? 'Field Agent' : 'Staff'}
+              Staff
             </Box>
           </Box>
         )}
 
-        {/* Navigation Menu */}
         <List sx={{ px: 2, py: 2 }}>
           {menuItems.map((item) => (
             <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
@@ -513,7 +511,6 @@ function AppContent() {
             </ListItem>
           ))}
           
-          {/* AI Assistant Menu Item */}
           <ListItem disablePadding sx={{ mb: 1, mt: 2 }}>
             <ListItemButton 
               onClick={() => setShowGlobalAI(!showGlobalAI)}
@@ -558,7 +555,6 @@ function AppContent() {
           </ListItem>
         </List>
 
-        {/* Decorative Compass Rose */}
         <Box sx={{ 
           textAlign: 'center',
           opacity: 0.3,
@@ -571,7 +567,6 @@ function AppContent() {
         </Box>
       </Box>
 
-      {/* Logout Button - FIXED: Always visible at bottom */}
       <Box sx={{ 
         position: 'sticky',
         bottom: 0,
@@ -620,10 +615,45 @@ function AppContent() {
     return <LoadingSpinner />;
   }
 
+  // 🎯 FIELD AGENT LAYOUT - COMPLETELY SEPARATE, NO SIDEBAR AT ALL
+  if (isAuthenticated && isFieldAgent) {
+    console.log('🎯 Rendering FIELD AGENT layout - NO SIDEBAR, NO DRAWER');
+    return (
+      <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
+        <Box component="main" sx={{ flexGrow: 1, width: '100%' }}>
+          <FieldAgentHeader />
+          <Box sx={{ p: { xs: 2, sm: 3 } }}>
+            <Routes>
+              <Route path="/login" element={<Navigate to="/field-capture" replace />} />
+              <Route path="/dashboard" element={<Navigate to="/field-capture" replace />} />
+              <Route path="/employees" element={<Navigate to="/field-capture" replace />} />
+              <Route path="/data-correction" element={<Navigate to="/field-capture" replace />} />
+              <Route path="/analytics" element={<Navigate to="/field-capture" replace />} />
+              <Route path="/field-capture" element={
+                <ProtectedRoute>
+                  <DataCaptureDashboard 
+                    userRole="field_agent"
+                    userId={user?.Id || 0}
+                    stationId={user?.StationId || 1}
+                  />
+                </ProtectedRoute>
+              } />
+              <Route path="/" element={<Navigate to="/field-capture" replace />} />
+              <Route path="*" element={<Navigate to="/field-capture" replace />} />
+            </Routes>
+          </Box>
+        </Box>
+        {showGlobalAI && <AIAssistant onClose={() => setShowGlobalAI(false)} />}
+      </Box>
+    );
+  }
+
+  // 🎯 STAFF/ADMIN LAYOUT - WITH SIDEBAR
+  console.log('🎯 Rendering STAFF/ADMIN layout - WITH SIDEBAR');
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
-      {/* Desktop Sidebar - Only show for NON-field-agents */}
-      {isAuthenticated && !isFieldAgent && (
+      {/* Desktop Sidebar */}
+      {isAuthenticated && (
         <Box
           component="nav"
           sx={{
@@ -638,31 +668,24 @@ function AppContent() {
         </Box>
       )}
 
-      {/* Mobile drawer - Only for NON-field-agents */}
-      {!isFieldAgent && (
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{ keepMounted: true }}
-          sx={{ 
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { width: 280 }
-          }}
-        >
-          {drawer}
-        </Drawer>
-      )}
+      {/* Mobile drawer */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{ keepMounted: true }}
+        sx={{ 
+          display: { xs: 'block', sm: 'none' },
+          '& .MuiDrawer-paper': { width: 280 }
+        }}
+      >
+        {drawer}
+      </Drawer>
 
       {/* Main content */}
-      <Box component="main" sx={{ 
-        flexGrow: 1, 
-        p: isFieldAgent ? 0 : { xs: 2, sm: 3 }
-      }}>
-        {/* Field Agent gets a custom header, regular users get mobile app bar */}
-        {isAuthenticated && isFieldAgent ? (
-          <FieldAgentHeader />
-        ) : isAuthenticated && (
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
+        {/* Mobile App Bar */}
+        {isAuthenticated && (
           <AppBar 
             position="sticky" 
             sx={{ 
@@ -699,59 +722,40 @@ function AppContent() {
               <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontSize: '0.9rem', fontWeight: 'bold' }}>
                 KPA Health Week
               </Typography>
+              <IconButton
+                color="inherit"
+                onClick={handleLogout}
+                sx={{ ml: 1 }}
+                title="Logout"
+              >
+                <LogoutIcon />
+              </IconButton>
             </Toolbar>
           </AppBar>
         )}
 
-        {/* Content wrapper */}
-        <Box sx={{ p: isFieldAgent ? { xs: 2, sm: 3 } : 0 }}>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                {isFieldAgent ? <Navigate to="/field-capture" replace /> : <Dashboard />}
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/employees" element={
-              <ProtectedRoute>
-                {isFieldAgent ? <Navigate to="/field-capture" replace /> : <Employees />}
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/data-correction" element={
-              <ProtectedRoute>
-                {isFieldAgent ? <Navigate to="/field-capture" replace /> : <DataCorrection />}
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/analytics" element={
-              <ProtectedRoute>
-                {isFieldAgent ? <Navigate to="/field-capture" replace /> : <AdvancedAnalytics />}
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/field-capture" element={
-              <ProtectedRoute>
-                <DataCaptureDashboard 
-                  userRole={isFieldAgent ? 'field_agent' : 'lab_assistant'}
-                  userId={user?.Id || 0}
-                  stationId={user?.StationId || 1}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/" element={<RoleBasedRedirect />} />
-            <Route path="*" element={<RoleBasedRedirect />} />
-          </Routes>
-        </Box>
+        {/* Routes for Staff/Admin */}
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
+          <Route path="/data-correction" element={<ProtectedRoute><DataCorrection /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute><AdvancedAnalytics /></ProtectedRoute>} />
+          <Route path="/field-capture" element={
+            <ProtectedRoute>
+              <DataCaptureDashboard 
+                userRole="lab_assistant"
+                userId={user?.Id || 0}
+                stationId={user?.StationId || 1}
+              />
+            </ProtectedRoute>
+          } />
+          <Route path="/" element={<RoleBasedRedirect />} />
+          <Route path="*" element={<RoleBasedRedirect />} />
+        </Routes>
       </Box>
 
-      {/* Global AI Assistant */}
-      {showGlobalAI && (
-        <AIAssistant onClose={() => setShowGlobalAI(false)} />
-      )}
+      {showGlobalAI && <AIAssistant onClose={() => setShowGlobalAI(false)} />}
     </Box>
   );
 }
