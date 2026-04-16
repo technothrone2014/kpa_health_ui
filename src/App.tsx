@@ -26,6 +26,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import LoadingSpinner from "./components/LoadingSpinner";
 import Login from "./pages/Login";
 import DataCaptureDashboard from './components/DataCaptureDashboard';
+import React from "react";
 
 const queryClient = new QueryClient();
 
@@ -93,6 +94,15 @@ function AppContent() {
   const [aiStatus, setAiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const { user, logout, isAuthenticated, isLoading } = useAuth();
 
+  // Determine if user is a field agent
+  const isFieldAgent = React.useMemo(() => {
+    if (!user?.roles) return false;
+    const roles = user.roles || [];
+    const normalizedRoles = roles.map((r: string) => r.toLowerCase());
+    return normalizedRoles.includes('fieldagent') || 
+           normalizedRoles.includes('field_agent');
+  }, [user]);
+
   // Check AI service health on mount
   useEffect(() => {
     const checkAIHealth = async () => {
@@ -114,12 +124,25 @@ function AppContent() {
     await logout();
   };
 
-  const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', nauticalIcon: '🧭' },
-    { text: 'Clients', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨‍✈️' },
-    { text: 'Data Correction', icon: <DataUsageIcon />, path: '/data-correction', nauticalIcon: '⚓' },
-    { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics', nauticalIcon: '📊' },
-  ];
+  // Role-based menu items
+  const getMenuItems = () => {
+    if (isFieldAgent) {
+      // Field agents only see field capture
+      return [
+        { text: 'Field Capture', icon: <PeopleIcon />, path: '/field-capture', nauticalIcon: '📋' },
+      ];
+    }
+    
+    // Regular users see full menu
+    return [
+      { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', nauticalIcon: '🧭' },
+      { text: 'Clients', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨‍✈️' },
+      { text: 'Data Correction', icon: <DataUsageIcon />, path: '/data-correction', nauticalIcon: '⚓' },
+      { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics', nauticalIcon: '📊' },
+    ];
+  };
+
+  const menuItems = getMenuItems();
 
   const drawer = (
     <Box sx={{ 
@@ -158,19 +181,6 @@ function AppContent() {
         position: 'relative',
         background: `linear-gradient(135deg, ${oceanTheme.navy}80, ${oceanTheme.deep}80)`,
       }}>
-        {/* Animated Ship Wheel */}
-        <Box sx={{ 
-          position: 'absolute',
-          top: -30,
-          right: -30,
-          width: 100,
-          height: 100,
-          borderRadius: '50%',
-          border: `2px solid ${oceanTheme.gold}20`,
-          opacity: 0.3,
-          animation: 'spin 20s linear infinite',
-        }} />
-        
         <Box sx={{ 
           display: 'flex', 
           flexDirection: 'column', 
@@ -217,7 +227,7 @@ function AppContent() {
         </Box>
       </Box>
 
-      {/* User Info */}
+      {/* User Info with Role Badge */}
       {isAuthenticated && user && (
         <Box sx={{ p: 2, borderBottom: `1px solid ${oceanTheme.gold}30`, mb: 2 }}>
           <Typography sx={{ color: oceanTheme.white, fontSize: '14px', fontWeight: 'bold' }}>
@@ -226,6 +236,22 @@ function AppContent() {
           <Typography sx={{ color: oceanTheme.foam, fontSize: '12px' }}>
             {user.Email}
           </Typography>
+          {/* Role Badge */}
+          <Box sx={{ 
+            mt: 1,
+            display: 'inline-block',
+            px: 1.5,
+            py: 0.5,
+            background: isFieldAgent ? oceanTheme.surface : oceanTheme.gold,
+            borderRadius: '12px',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            color: isFieldAgent ? oceanTheme.white : oceanTheme.navy,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>
+            {isFieldAgent ? 'Field Agent' : 'Staff'}
+          </Box>
         </Box>
       )}
 
@@ -303,7 +329,7 @@ function AppContent() {
           </ListItem>
         ))}
         
-        {/* AI Assistant Menu Item */}
+        {/* AI Assistant Menu Item - Available to all roles */}
         <ListItem disablePadding sx={{ mb: 1, mt: 2 }}>
           <ListItemButton 
             onClick={() => setShowGlobalAI(!showGlobalAI)}
@@ -444,7 +470,7 @@ function AppContent() {
 
       {/* Main content */}
       <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
-        {/* Mobile App Bar - Oceanic Theme (only when authenticated) */}
+        {/* Mobile App Bar */}
         {isAuthenticated && (
           <AppBar 
             position="sticky" 
@@ -487,7 +513,7 @@ function AppContent() {
                 <AnchorIcon sx={{ color: oceanTheme.navy, fontSize: 24 }} />
               </Box>
               <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontSize: '0.9rem', fontWeight: 'bold' }}>
-                KPA Health Week
+                {isFieldAgent ? 'Field Capture' : 'KPA Health Week'}
               </Typography>
               <button
                 onClick={() => setShowGlobalAI(!showGlobalAI)}
@@ -511,41 +537,41 @@ function AppContent() {
           </AppBar>
         )}
 
-        {/* FIXED ROUTES - No duplicates, proper structure */}
+        {/* Routes */}
         <Routes>
           {/* Public route */}
           <Route path="/login" element={<Login />} />
           
-          {/* Protected routes */}
+          {/* Protected routes - Regular users */}
           <Route path="/dashboard" element={
             <ProtectedRoute>
-              <Dashboard />
+              {isFieldAgent ? <Navigate to="/field-capture" replace /> : <Dashboard />}
             </ProtectedRoute>
           } />
           
           <Route path="/employees" element={
             <ProtectedRoute>
-              <Employees />
+              {isFieldAgent ? <Navigate to="/field-capture" replace /> : <Employees />}
             </ProtectedRoute>
           } />
           
           <Route path="/data-correction" element={
             <ProtectedRoute>
-              <DataCorrection />
+              {isFieldAgent ? <Navigate to="/field-capture" replace /> : <DataCorrection />}
             </ProtectedRoute>
           } />
           
           <Route path="/analytics" element={
             <ProtectedRoute>
-              <AdvancedAnalytics />
+              {isFieldAgent ? <Navigate to="/field-capture" replace /> : <AdvancedAnalytics />}
             </ProtectedRoute>
           } />
           
-          {/* Field Capture Route - Single definition */}
+          {/* Field Capture - Accessible to all authenticated users */}
           <Route path="/field-capture" element={
             <ProtectedRoute>
               <DataCaptureDashboard 
-                userRole="field_agent"
+                userRole={isFieldAgent ? 'field_agent' : 'lab_assistant'}
                 userId={user?.Id || 0}
                 stationId={user?.StationId || 1}
               />
@@ -555,12 +581,12 @@ function AppContent() {
           {/* Root route - Role-based redirect */}
           <Route path="/" element={<RoleBasedRedirect />} />
           
-          {/* Catch-all route for 404s - Redirect to role-based home */}
+          {/* Catch-all route */}
           <Route path="*" element={<RoleBasedRedirect />} />
         </Routes>
       </Box>
 
-      {/* Global AI Assistant - appears when toggled */}
+      {/* Global AI Assistant */}
       {showGlobalAI && (
         <AIAssistant onClose={() => setShowGlobalAI(false)} />
       )}
