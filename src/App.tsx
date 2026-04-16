@@ -1,3 +1,5 @@
+// App.tsx - Fixed logout button visibility and field agent sidebar
+
 import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Employees from "./pages/Employees";
@@ -93,13 +95,21 @@ function AppContent() {
   const [aiStatus, setAiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const { user, logout, isAuthenticated, isLoading } = useAuth();
 
-  // Determine if user is a field agent
+  // Determine if user is a field agent - FIXED role checking
   const isFieldAgent = React.useMemo(() => {
     if (!user?.roles) return false;
     const roles = user.roles || [];
+    console.log('🔍 User roles:', roles); // Debug log
+    
+    // Check for all possible field agent role formats
     const normalizedRoles = roles.map((r: string) => r.toLowerCase());
-    return normalizedRoles.includes('fieldagent') || 
-           normalizedRoles.includes('field_agent');
+    const result = normalizedRoles.includes('fieldagent') || 
+                   normalizedRoles.includes('field_agent') ||
+                   normalizedRoles.includes('FieldAgent') ||
+                   roles.includes('FieldAgent');
+    
+    console.log('🔍 Is field agent?', result); // Debug log
+    return result;
   }, [user]);
 
   // Check AI service health on mount
@@ -123,7 +133,7 @@ function AppContent() {
     await logout();
   };
 
-  // Role-based menu items (only for non-field-agents)
+  // Role-based menu items
   const getMenuItems = () => {
     // Field agents don't get a sidebar at all
     if (isFieldAgent) {
@@ -275,7 +285,7 @@ function AppContent() {
         </Box>
       </Box>
 
-      {/* Mobile User Info (visible only on small screens) */}
+      {/* Mobile User Info */}
       <Box sx={{ 
         display: { xs: 'flex', sm: 'none' }, 
         alignItems: 'center', 
@@ -323,15 +333,17 @@ function AppContent() {
     </Box>
   );
 
-  // Regular Sidebar Drawer (only for non-field-agents)
-  const drawer = isFieldAgent ? null : (
+  // Regular Sidebar Drawer - FIXED: Better layout for logout button
+  const drawer = (
     <Box sx={{ 
-      height: '100%', 
+      height: '100vh', 
       background: `linear-gradient(180deg, ${oceanTheme.navy} 0%, ${oceanTheme.deep} 50%, ${oceanTheme.mid} 100%)`,
       position: 'relative',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column'
     }}>
-      {/* Ocean Wave Overlay */}
+      {/* Background decorations */}
       <Box sx={{ 
         position: 'absolute', 
         bottom: 0, 
@@ -339,10 +351,10 @@ function AppContent() {
         right: 0, 
         height: '100px',
         background: `repeating-linear-gradient(0deg, transparent, transparent 10px, ${oceanTheme.surface}10 10px, ${oceanTheme.surface}20 20px)`,
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        zIndex: 0
       }} />
       
-      {/* Animated Wave Lines */}
       <Box sx={{ 
         position: 'absolute', 
         top: 0, 
@@ -350,240 +362,232 @@ function AppContent() {
         right: 0, 
         bottom: 0,
         background: `radial-gradient(circle at 20% 50%, ${oceanTheme.foam}05 0%, transparent 50%)`,
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        zIndex: 0
       }} />
       
-      {/* Sidebar Header with Ship Wheel */}
+      {/* Scrollable content area */}
       <Box sx={{ 
-        p: 3, 
-        textAlign: 'center', 
-        borderBottom: `2px solid ${oceanTheme.gold}30`,
+        flex: 1, 
+        overflowY: 'auto', 
+        overflowX: 'hidden',
         position: 'relative',
-        background: `linear-gradient(135deg, ${oceanTheme.navy}80, ${oceanTheme.deep}80)`,
+        zIndex: 1,
+        pb: 10 // Add padding at bottom to prevent content from hiding behind logout
       }}>
+        {/* Sidebar Header */}
         <Box sx={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center',
-          gap: 1 
+          p: 3, 
+          textAlign: 'center', 
+          borderBottom: `2px solid ${oceanTheme.gold}30`,
+          position: 'relative',
+          background: `linear-gradient(135deg, ${oceanTheme.navy}80, ${oceanTheme.deep}80)`,
         }}>
           <Box sx={{ 
-            width: 70, 
-            height: 70, 
-            background: `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`,
-            borderRadius: '50%',
-            display: 'flex',
+            display: 'flex', 
+            flexDirection: 'column', 
             alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-            animation: 'float 3s ease-in-out infinite'
+            gap: 1 
           }}>
-            <AnchorIcon sx={{ fontSize: 40, color: oceanTheme.navy }} />
-          </Box>
-          <Typography 
-            variant="subtitle1" 
-            sx={{ 
-              color: oceanTheme.gold, 
-              mt: 1,
-              fontWeight: 'bold',
-              fontSize: '0.9rem',
-              letterSpacing: '1px'
-            }}
-          >
-            KPA Health Intelligence
-          </Typography>
-          <Typography 
-            variant="caption" 
-            sx={{ 
-              color: oceanTheme.foam,
-              fontSize: '0.7rem',
+            <Box sx={{ 
+              width: 70, 
+              height: 70, 
+              background: `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`,
+              borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
-              gap: 0.5
-            }}
-          >
-            <WavesIcon sx={{ fontSize: 12 }} /> EAP Health Week <WavesIcon sx={{ fontSize: 12 }} />
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* User Info with Role Badge */}
-      {isAuthenticated && user && (
-        <Box sx={{ p: 2, borderBottom: `1px solid ${oceanTheme.gold}30`, mb: 2 }}>
-          <Typography sx={{ color: oceanTheme.white, fontSize: '14px', fontWeight: 'bold' }}>
-            {user.FirstName} {user.LastName}
-          </Typography>
-          <Typography sx={{ color: oceanTheme.foam, fontSize: '12px' }}>
-            {user.Email}
-          </Typography>
-          <Box sx={{ 
-            mt: 1,
-            display: 'inline-block',
-            px: 1.5,
-            py: 0.5,
-            background: oceanTheme.gold,
-            borderRadius: '12px',
-            fontSize: '10px',
-            fontWeight: 'bold',
-            color: oceanTheme.navy,
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px'
-          }}>
-            Staff
+              justifyContent: 'center',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              animation: 'float 3s ease-in-out infinite'
+            }}>
+              <AnchorIcon sx={{ fontSize: 40, color: oceanTheme.navy }} />
+            </Box>
+            <Typography 
+              variant="subtitle1" 
+              sx={{ 
+                color: oceanTheme.gold, 
+                mt: 1,
+                fontWeight: 'bold',
+                fontSize: '0.9rem',
+                letterSpacing: '1px'
+              }}
+            >
+              KPA Health Intelligence
+            </Typography>
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                color: oceanTheme.foam,
+                fontSize: '0.7rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5
+              }}
+            >
+              <WavesIcon sx={{ fontSize: 12 }} /> EAP Health Week <WavesIcon sx={{ fontSize: 12 }} />
+            </Typography>
           </Box>
         </Box>
-      )}
 
-      {/* Navigation Menu */}
-      <List sx={{ px: 2, py: 3, position: 'relative', zIndex: 1 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+        {/* User Info */}
+        {isAuthenticated && user && (
+          <Box sx={{ p: 2, borderBottom: `1px solid ${oceanTheme.gold}30` }}>
+            <Typography sx={{ color: oceanTheme.white, fontSize: '14px', fontWeight: 'bold' }}>
+              {user.FirstName} {user.LastName}
+            </Typography>
+            <Typography sx={{ color: oceanTheme.foam, fontSize: '12px' }}>
+              {user.Email}
+            </Typography>
+            <Box sx={{ 
+              mt: 1,
+              display: 'inline-block',
+              px: 1.5,
+              py: 0.5,
+              background: oceanTheme.gold,
+              borderRadius: '12px',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              color: oceanTheme.navy,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              {isFieldAgent ? 'Field Agent' : 'Staff'}
+            </Box>
+          </Box>
+        )}
+
+        {/* Navigation Menu */}
+        <List sx={{ px: 2, py: 2 }}>
+          {menuItems.map((item) => (
+            <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+              <ListItemButton 
+                component={Link} 
+                to={item.path}
+                onClick={() => {
+                  setActivePath(item.path);
+                  setMobileOpen(false);
+                }}
+                sx={{
+                  borderRadius: '12px',
+                  py: 1.5,
+                  px: 2,
+                  transition: 'all 0.3s ease',
+                  background: activePath === item.path 
+                    ? `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`
+                    : 'transparent',
+                  '&:hover': {
+                    background: `linear-gradient(135deg, ${oceanTheme.gold}40, #FFA50040)`,
+                    transform: 'translateX(8px)',
+                  },
+                  '& .MuiListItemIcon-root': {
+                    minWidth: 40,
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  color: activePath === item.path ? oceanTheme.navy : oceanTheme.foam,
+                }}>
+                  <Box sx={{ position: 'relative' }}>
+                    {item.icon}
+                    <Box sx={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
+                      fontSize: '10px',
+                      opacity: 0.7
+                    }}>
+                      {item.nauticalIcon}
+                    </Box>
+                  </Box>
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.text} 
+                  sx={{ 
+                    '& .MuiTypography-root': { 
+                      color: activePath === item.path ? oceanTheme.navy : oceanTheme.white,
+                      fontWeight: activePath === item.path ? 'bold' : 'normal',
+                    } 
+                  }} 
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+          
+          {/* AI Assistant Menu Item */}
+          <ListItem disablePadding sx={{ mb: 1, mt: 2 }}>
             <ListItemButton 
-              component={Link} 
-              to={item.path}
-              onClick={() => {
-                setActivePath(item.path);
-                setMobileOpen(false);
-              }}
+              onClick={() => setShowGlobalAI(!showGlobalAI)}
               sx={{
                 borderRadius: '12px',
                 py: 1.5,
                 px: 2,
                 transition: 'all 0.3s ease',
-                background: activePath === item.path 
+                background: showGlobalAI 
                   ? `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`
                   : 'transparent',
                 '&:hover': {
                   background: `linear-gradient(135deg, ${oceanTheme.gold}40, #FFA50040)`,
                   transform: 'translateX(8px)',
                 },
-                '& .MuiListItemIcon-root': {
-                  minWidth: 40,
-                },
-                position: 'relative',
-                overflow: 'hidden'
               }}
             >
               <ListItemIcon sx={{ 
-                color: activePath === item.path ? oceanTheme.navy : oceanTheme.foam,
-                transition: 'all 0.3s ease'
+                color: showGlobalAI ? oceanTheme.navy : oceanTheme.foam,
               }}>
-                <Box sx={{ position: 'relative' }}>
-                  {item.icon}
-                  <Box sx={{
-                    position: 'absolute',
-                    top: -2,
-                    right: -2,
-                    fontSize: '10px',
-                    opacity: 0.7
-                  }}>
-                    {item.nauticalIcon}
-                  </Box>
-                </Box>
+                <SmartToyIcon />
               </ListItemIcon>
               <ListItemText 
-                primary={item.text} 
+                primary="Sister Unesi AI" 
                 sx={{ 
                   '& .MuiTypography-root': { 
-                    color: activePath === item.path ? oceanTheme.navy : oceanTheme.white,
-                    fontWeight: activePath === item.path ? 'bold' : 'normal',
-                    transition: 'all 0.3s ease'
+                    color: showGlobalAI ? oceanTheme.navy : oceanTheme.white,
+                    fontWeight: showGlobalAI ? 'bold' : 'normal',
                   } 
                 }} 
               />
-              
-              {activePath === item.path && (
+              {aiStatus === 'online' && (
                 <Box sx={{
-                  position: 'absolute',
-                  right: 16,
-                  width: 6,
-                  height: 6,
+                  width: 8,
+                  height: 8,
                   borderRadius: '50%',
-                  background: oceanTheme.navy,
-                  animation: 'pulse 2s infinite'
+                  background: oceanTheme.surface,
+                  ml: 1,
                 }} />
               )}
             </ListItemButton>
           </ListItem>
-        ))}
-        
-        {/* AI Assistant Menu Item */}
-        <ListItem disablePadding sx={{ mb: 1, mt: 2 }}>
-          <ListItemButton 
-            onClick={() => setShowGlobalAI(!showGlobalAI)}
-            sx={{
-              borderRadius: '12px',
-              py: 1.5,
-              px: 2,
-              transition: 'all 0.3s ease',
-              background: showGlobalAI 
-                ? `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`
-                : 'transparent',
-              '&:hover': {
-                background: `linear-gradient(135deg, ${oceanTheme.gold}40, #FFA50040)`,
-                transform: 'translateX(8px)',
-              },
-            }}
-          >
-            <ListItemIcon sx={{ 
-              color: showGlobalAI ? oceanTheme.navy : oceanTheme.foam,
-            }}>
-              <SmartToyIcon />
-            </ListItemIcon>
-            <ListItemText 
-              primary="Sister Unesi AI" 
-              sx={{ 
-                '& .MuiTypography-root': { 
-                  color: showGlobalAI ? oceanTheme.navy : oceanTheme.white,
-                  fontWeight: showGlobalAI ? 'bold' : 'normal',
-                } 
-              }} 
-            />
-            {aiStatus === 'online' && (
-              <Box sx={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: oceanTheme.surface,
-                ml: 1,
-                animation: 'pulse 2s infinite'
-              }} />
-            )}
-            {aiStatus === 'offline' && (
-              <Box sx={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: oceanTheme.danger,
-                ml: 1
-              }} />
-            )}
-          </ListItemButton>
-        </ListItem>
-      </List>
+        </List>
 
-      {/* Decorative Compass Rose */}
-      <Box sx={{ 
-        position: 'absolute', 
-        bottom: 80, 
-        left: '50%', 
-        transform: 'translateX(-50%)',
-        textAlign: 'center',
-        opacity: 0.3
-      }}>
-        <CompassCalibrationIcon sx={{ color: oceanTheme.foam, fontSize: 40, animation: 'spin 60s linear infinite' }} />
-        <Typography variant="caption" sx={{ color: oceanTheme.foam, display: 'block', mt: 1 }}>
-          Kenya Ports Authority
-        </Typography>
+        {/* Decorative Compass Rose */}
+        <Box sx={{ 
+          textAlign: 'center',
+          opacity: 0.3,
+          py: 2
+        }}>
+          <CompassCalibrationIcon sx={{ color: oceanTheme.foam, fontSize: 30 }} />
+          <Typography variant="caption" sx={{ color: oceanTheme.foam, display: 'block' }}>
+            Kenya Ports Authority
+          </Typography>
+        </Box>
       </Box>
 
-      {/* Logout Button */}
-      <Box sx={{ position: 'absolute', bottom: 20, left: 0, right: 0, px: 2 }}>
+      {/* Logout Button - FIXED: Always visible at bottom */}
+      <Box sx={{ 
+        position: 'sticky',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        p: 2,
+        background: `linear-gradient(0deg, ${oceanTheme.navy} 0%, ${oceanTheme.navy} 50%, transparent 100%)`,
+        zIndex: 2,
+        borderTop: `1px solid ${oceanTheme.gold}30`
+      }}>
         <ListItem disablePadding>
           <ListItemButton onClick={handleLogout} sx={{
             borderRadius: '12px',
             py: 1.5,
             px: 2,
+            background: 'rgba(255,255,255,0.05)',
             '&:hover': {
               background: `linear-gradient(135deg, ${oceanTheme.danger}40, ${oceanTheme.danger}20)`,
             }
@@ -591,7 +595,10 @@ function AppContent() {
             <ListItemIcon sx={{ color: oceanTheme.foam }}>
               <LogoutIcon />
             </ListItemIcon>
-            <ListItemText primary="Logout" sx={{ '& .MuiTypography-root': { color: oceanTheme.white } }} />
+            <ListItemText 
+              primary="Logout" 
+              sx={{ '& .MuiTypography-root': { color: oceanTheme.white, fontWeight: 'bold' } }} 
+            />
           </ListItemButton>
         </ListItem>
       </Box>
@@ -605,10 +612,6 @@ function AppContent() {
           from { transform: translateX(-50%) rotate(0deg); }
           to { transform: translateX(-50%) rotate(360deg); }
         }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.2); }
-        }
       `}</style>
     </Box>
   );
@@ -619,7 +622,7 @@ function AppContent() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
-      {/* Desktop Sidebar - Only show for non-field-agents */}
+      {/* Desktop Sidebar - Only show for NON-field-agents */}
       {isAuthenticated && !isFieldAgent && (
         <Box
           component="nav"
@@ -635,14 +638,17 @@ function AppContent() {
         </Box>
       )}
 
-      {/* Mobile drawer - Only for non-field-agents */}
+      {/* Mobile drawer - Only for NON-field-agents */}
       {!isFieldAgent && (
         <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{ keepMounted: true }}
-          sx={{ display: { xs: 'block', sm: 'none' } }}
+          sx={{ 
+            display: { xs: 'block', sm: 'none' },
+            '& .MuiDrawer-paper': { width: 280 }
+          }}
         >
           {drawer}
         </Drawer>
@@ -651,7 +657,7 @@ function AppContent() {
       {/* Main content */}
       <Box component="main" sx={{ 
         flexGrow: 1, 
-        p: isFieldAgent ? 0 : { xs: 2, sm: 3 }  // No padding for field agent (header handles it)
+        p: isFieldAgent ? 0 : { xs: 2, sm: 3 }
       }}>
         {/* Field Agent gets a custom header, regular users get mobile app bar */}
         {isAuthenticated && isFieldAgent ? (
@@ -674,14 +680,7 @@ function AppContent() {
                 aria-label="open drawer"
                 edge="start"
                 onClick={handleDrawerToggle}
-                sx={{ 
-                  mr: 2,
-                  '&:hover': {
-                    background: 'rgba(255,255,255,0.2)',
-                    transform: 'rotate(90deg)',
-                    transition: 'transform 0.3s ease'
-                  }
-                }}
+                sx={{ mr: 2 }}
               >
                 <MenuIcon />
               </IconButton>
@@ -700,31 +699,12 @@ function AppContent() {
               <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontSize: '0.9rem', fontWeight: 'bold' }}>
                 KPA Health Week
               </Typography>
-              <button
-                onClick={() => setShowGlobalAI(!showGlobalAI)}
-                style={{
-                  background: 'rgba(255,255,255,0.2)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: 'white'
-                }}
-              >
-                <SmartToyIcon sx={{ fontSize: 18 }} />
-              </button>
-              <WavesIcon sx={{ color: oceanTheme.foam, fontSize: 20, ml: 1 }} />
             </Toolbar>
           </AppBar>
         )}
 
-        {/* Content wrapper for field agent (adds padding) */}
+        {/* Content wrapper */}
         <Box sx={{ p: isFieldAgent ? { xs: 2, sm: 3 } : 0 }}>
-          {/* Routes */}
           <Routes>
             <Route path="/login" element={<Login />} />
             
