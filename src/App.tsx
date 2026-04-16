@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Employees from "./pages/Employees";
 import DataCorrection from "./pages/DataCorrection";
@@ -26,6 +26,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import LoadingSpinner from "./components/LoadingSpinner";
 import Login from "./pages/Login";
 import FieldDataCapture from "./pages/FieldDataCapture";
+import DataCaptureDashboard from './components/DataCaptureDashboard';
 
 const queryClient = new QueryClient();
 
@@ -66,7 +67,7 @@ function AppContent() {
   const [activePath, setActivePath] = useState("/");
   const [showGlobalAI, setShowGlobalAI] = useState(false);
   const [aiStatus, setAiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isLoading } = useAuth();
 
   // Check AI service health on mount
   useEffect(() => {
@@ -384,6 +385,10 @@ function AppContent() {
     </Box>
   );
 
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
       {/* Desktop Sidebar - Only show when authenticated */}
@@ -509,6 +514,29 @@ function AppContent() {
               <FieldDataCapture />
             </ProtectedRoute>
           } />
+          <Route 
+            path="/field-capture" 
+            element={
+              <ProtectedRoute>
+                <DataCaptureDashboard 
+                  userRole="field_agent"  // or determine from user context
+                  userId={user?.Id || 0}
+                  stationId={user?.StationId || 1}  // You'll need to get this from user data
+                />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />  // Your main dashboard component
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Add a redirect from root */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Box>
 

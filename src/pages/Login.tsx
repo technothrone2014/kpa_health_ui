@@ -71,14 +71,17 @@ export default function Login() {
       const result = await verifyOTP(identifier, otp);
       if (result.success && result.token) {
         // The redirection is now handled inside verifyOTP in AuthContext
-        // This navigate is just a fallback
-        const roles = result.roles || [];
-        const isFieldAgent = roles.includes('FieldAgent') || roles.includes('FIELDAGENT');
-        
+        // This is just a fallback in case the context redirect doesn't fire
+        const roles = result.roles || [];  // ✅ Use result.roles, not response.data.roles
+        const normalizedRoles = roles.map((r: string) => r.toLowerCase());
+        const isFieldAgent = normalizedRoles.includes('fieldagent') || 
+                            normalizedRoles.includes('field_agent');
+
         if (isFieldAgent) {
-          window.location.href = '/field-capture';
+          // Use navigate instead of window.location for better React Router integration
+          navigate('/field-capture');
         } else {
-          window.location.href = '/';
+          navigate('/dashboard');  // Be explicit about dashboard route
         }
       } else {
         setError(result.message || 'Invalid verification code');

@@ -11,6 +11,8 @@ import FieldFindings from './FieldFindings';
 import LabFindings from './LabFindings';
 import OncologyForm from './OncologyForm';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
+
 
 const oceanColors = {
   deep: '#0B2F9E',
@@ -39,6 +41,7 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showRegistration, setShowRegistration] = useState(false);
+  const { user } = useAuth();
 
   // Search for client
   const searchClient = async () => {
@@ -307,7 +310,7 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
 
   const steps = getStepProgress();
   const currentStepIndex = steps.findIndex(s => s.key === step);
-
+  
   return (
     <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
       {/* Progress Steps */}

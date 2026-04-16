@@ -11,6 +11,7 @@ interface User {
   PhoneNumber?: string;
   UserName?: string;
   roles?: string[];
+  StationId?: number;
 }
 
 interface AuthContextType {
