@@ -70,8 +70,16 @@ export default function Login() {
     try {
       const result = await verifyOTP(identifier, otp);
       if (result.success && result.token) {
-        // Store token and navigate on success
-        navigate('/');
+        // The redirection is now handled inside verifyOTP in AuthContext
+        // This navigate is just a fallback
+        const roles = result.roles || [];
+        const isFieldAgent = roles.includes('FieldAgent') || roles.includes('FIELDAGENT');
+        
+        if (isFieldAgent) {
+          window.location.href = '/field-capture';
+        } else {
+          window.location.href = '/';
+        }
       } else {
         setError(result.message || 'Invalid verification code');
       }

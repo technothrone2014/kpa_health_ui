@@ -169,27 +169,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return checkPromise;
   }, []);
 
+  // AuthContext.tsx - FIXED loginWithPassword function
   const loginWithPassword = async (identifier: string, password: string) => {
     try {
       const response = await api.post('/auth/login/password', { identifier, password });
       
-      if (response.data.success && response.data.token) {
-        setToken(response.data.token);
-        if (response.data.user) {
-          saveUserData(response.data.user);
-        }
-        
-        // Role-based redirection
-        const roles = response.data.roles || [];
-        const isFieldAgent = roles.includes('FieldAgent') || roles.includes('FIELDAGENT');
-        
-        if (isFieldAgent) {
-          window.location.href = '/field-capture'; // Use window.location for full redirect
-        } else {
-          window.location.href = '/';
-        }
-        return response.data;
-      }
+      // ❌ REMOVE REDIRECTION FROM HERE - token isn't available yet!
+      // The redirection should happen after OTP verification
+      
       return response.data;
     } catch (error: any) {
       console.error('Login error:', error);
@@ -200,9 +187,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // AuthContext.tsx - FIXED loginWithOTP function
   const loginWithOTP = async (identifier: string) => {
     try {
       const response = await api.post('/auth/login/otp', { identifier });
+      // No redirection here - wait for OTP verification
       return response.data;
     } catch (error: any) {
       console.error('OTP login error:', error);
@@ -221,6 +210,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setToken(response.data.token);
         if (response.data.user) {
           saveUserData(response.data.user);
+        }
+        
+        // ✅ ROLE-BASED REDIRECTION - ADD THIS HERE!
+        const roles = response.data.roles || [];
+        const isFieldAgent = roles.includes('FieldAgent') || roles.includes('FIELDAGENT');
+        
+        if (isFieldAgent) {
+          window.location.href = '/field-capture';
+        } else {
+          window.location.href = '/';
         }
       }
       return response.data;
