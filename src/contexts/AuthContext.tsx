@@ -134,15 +134,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         if (response.data.success && response.data.user) {
           const userData = response.data.user;
+          
+          // ✅ DEBUG: Log the user data from /me endpoint
+          console.log('🔍 /auth/me response:', userData);
+          console.log('🔍 /auth/me roles:', userData.roles);
+          
           saveUserData(userData);
           localStorage.setItem(AUTH_INITIALIZED_KEY, 'true');
           return true;
         } else {
-          // Invalid response structure
           clearAuthData();
           return false;
         }
       } catch (error: any) {
+
         console.warn('Auth check failed:', error.response?.status, error.response?.data?.message);
         
         // Only clear auth data if it's a 401 (unauthorized)
