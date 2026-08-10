@@ -1,4 +1,4 @@
-// App.tsx - Fixed Field Agent Route Restrictions
+// App.tsx - Fixed Field Agent Detection with Proper Role Loading
 
 import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -47,6 +47,29 @@ const oceanTheme = {
 };
 
 // ============================================
+// Helper: Check if user is a field agent
+// ============================================
+const isUserFieldAgent = (user: any): boolean => {
+  if (!user) return false;
+  
+  const roles = user.roles || [];
+  console.log('🔍 isUserFieldAgent - User:', user.Email, 'Roles:', roles);
+  
+  // If roles is a string, convert to array
+  const rolesArray = Array.isArray(roles) ? roles : [roles];
+  
+  // Check for all possible field agent role formats (case insensitive)
+  return rolesArray.some((role: string) => {
+    if (!role) return false;
+    const lowerRole = role.toLowerCase();
+    return lowerRole === 'fieldagent' || 
+           lowerRole === 'field_agent' ||
+           lowerRole === 'field-agent' ||
+           (lowerRole.includes('field') && lowerRole.includes('agent'));
+  });
+};
+
+// ============================================
 // FIXED: Protected Route with Role-Based Access
 // ============================================
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
@@ -69,11 +92,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
     
     if (!hasRequiredRole) {
       // Redirect to appropriate page based on role
-      const isFieldAgent = userRoles.some(r => 
-        r === 'fieldagent' || r === 'field_agent' || r === 'field-agent'
-      );
-      
-      if (isFieldAgent) {
+      if (isUserFieldAgent(user)) {
         return <Navigate to="/field-capture" replace />;
       }
       
@@ -99,21 +118,14 @@ function RoleBasedRedirect() {
     return <Navigate to="/login" replace />;
   }
   
-  // Check if user is a field agent
-  const roles = user.roles || [];
-  const normalizedRoles = roles.map(r => r.toLowerCase());
-  const isFieldAgent = normalizedRoles.includes('fieldagent') || 
-                       normalizedRoles.includes('field_agent') ||
-                       normalizedRoles.includes('field-agent');
-  
-  if (isFieldAgent) {
+  if (isUserFieldAgent(user)) {
+    console.log('🔍 RoleBasedRedirect: Field Agent -> /field-capture');
     return <Navigate to="/field-capture" replace />;
   }
   
-  // Default to dashboard for staff/admin
+  console.log('🔍 RoleBasedRedirect: Staff/Admin -> /dashboard');
   return <Navigate to="/dashboard" replace />;
 }
-
 
 function AppContent() {
   const theme = useTheme();
@@ -124,33 +136,11 @@ function AppContent() {
   const [aiStatus, setAiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const { user, logout, isAuthenticated, isLoading } = useAuth();
 
-  // Determine if user is a field agent
+  // Determine if user is a field agent - using the helper function
   const isFieldAgent = React.useMemo(() => {
-    if (!user) {
-      console.log('🔍 No user object');
-      return false;
-    }
-    
-    const roles = user.roles || [];
-    console.log('🔍 User object:', user);
-    console.log('🔍 User roles:', roles);
-    
-    // If roles is a string (sometimes happens), convert to array
-    const rolesArray = Array.isArray(roles) ? roles : [roles];
-    
-    // Check for all possible field agent role formats (case insensitive)
-    const isFieldAgentRole = rolesArray.some((role: string) => {
-      if (!role) return false;
-      const lowerRole = role.toLowerCase();
-      return lowerRole === 'fieldagent' || 
-             lowerRole === 'field_agent' ||
-             lowerRole === 'field-agent' ||
-             (lowerRole.includes('field') && lowerRole.includes('agent'));
-    });
-    
-    console.log('🔍 Is field agent?', isFieldAgentRole);
-    
-    return isFieldAgentRole;
+    const result = isUserFieldAgent(user);
+    console.log('🔍 AppContent - isFieldAgent:', result);
+    return result;
   }, [user]);
 
   // Check AI service health on mount
@@ -179,7 +169,10 @@ function AppContent() {
   // ============================================
   const getMenuItems = () => {
     // Field agents should have NO menu items
-    if (isFieldAgent) return [];
+    if (isFieldAgent) {
+      console.log('🔍 getMenuItems: Field Agent - returning empty array');
+      return [];
+    }
     
     // Staff/Admin menu items
     return [
@@ -193,7 +186,7 @@ function AppContent() {
   const menuItems = getMenuItems();
 
   // ============================================
-  // FIXED: Field Agent Header (No Sidebar, No Links)
+  // Field Agent Header (No Sidebar, No Links)
   // ============================================
   const FieldAgentHeader = () => (
     <Box sx={{
@@ -662,7 +655,6 @@ function AppContent() {
           <FieldAgentHeader />
           <Box sx={{ p: { xs: 2, sm: 3 } }}>
             <Routes>
-              {/* All routes redirect to field-capture for field agents */}
               <Route path="/login" element={<Navigate to="/field-capture" replace />} />
               <Route path="/dashboard" element={<Navigate to="/field-capture" replace />} />
               <Route path="/employees" element={<Navigate to="/field-capture" replace />} />
@@ -707,7 +699,6 @@ function AppContent() {
         </Box>
       )}
 
-      {/* Mobile drawer - Only for Staff/Admin */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -721,9 +712,7 @@ function AppContent() {
         {drawer}
       </Drawer>
 
-      {/* Main content for Staff/Admin */}
       <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
-        {/* Mobile App Bar */}
         {isAuthenticated && (
           <AppBar 
             position="sticky" 
@@ -773,7 +762,6 @@ function AppContent() {
           </AppBar>
         )}
 
-        {/* Routes for Staff/Admin */}
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={
