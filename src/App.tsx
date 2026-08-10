@@ -50,27 +50,78 @@ const oceanTheme = {
 // Helper: Check if user is a field agent
 // ============================================
 const isUserFieldAgent = (user: any): boolean => {
-  if (!user) return false;
+  console.log('🔍 isUserFieldAgent - START');
   
-  const roles = user.roles || [];
-  console.log('🔍 isUserFieldAgent - User:', user.Email, 'Roles:', roles);
-  console.log('🔍 Roles type:', typeof roles, Array.isArray(roles));
+  if (!user) {
+    console.log('🔍 isUserFieldAgent - No user object, returning false');
+    return false;
+  }
+  
+  console.log('🔍 isUserFieldAgent - User Email:', user.Email);
+  console.log('🔍 isUserFieldAgent - User keys:', Object.keys(user));
+  
+  let roles = user.roles || [];
+  console.log('🔍 isUserFieldAgent - roles from user:', roles);
+  console.log('🔍 isUserFieldAgent - roles type:', typeof roles);
+  console.log('🔍 isUserFieldAgent - is roles array?', Array.isArray(roles));
   
   // If roles is a string, convert to array
-  const rolesArray = Array.isArray(roles) ? roles : [roles];
+  if (typeof roles === 'string') {
+    console.log('🔍 isUserFieldAgent - roles is a string, converting to array');
+    roles = [roles];
+  }
   
-  // Check for all possible field agent role formats (case sensitive and insensitive)
-  return rolesArray.some((role: string) => {
-    if (!role) return false;
-    const lowerRole = role.toLowerCase();
-    // Check exact matches and variations
-    return lowerRole === 'fieldagent' || 
+  // If roles is not an array, try to get it from user.role
+  if (!Array.isArray(roles) && user.role) {
+    console.log('🔍 isUserFieldAgent - trying user.role:', user.role);
+    roles = [user.role];
+  }
+  
+  // If still not an array, try user.Roles
+  if (!Array.isArray(roles) && user.Roles) {
+    console.log('🔍 isUserFieldAgent - trying user.Roles:', user.Roles);
+    roles = Array.isArray(user.Roles) ? user.Roles : [user.Roles];
+  }
+  
+  // If roles is still not an array, return false
+  if (!Array.isArray(roles)) {
+    console.log('🔍 isUserFieldAgent - Could not find roles array, returning false');
+    return false;
+  }
+  
+  console.log('🔍 isUserFieldAgent - Normalized roles array:', roles);
+  console.log('🔍 isUserFieldAgent - Roles array length:', roles.length);
+  
+  // Check each role
+  roles.forEach((role: any, index: number) => {
+    console.log(`🔍 isUserFieldAgent - Role ${index}:`, role, 'Type:', typeof role);
+  });
+  
+  // Check for all possible field agent role formats
+  const isFieldAgent = roles.some((role: any) => {
+    if (!role) {
+      console.log('🔍 isUserFieldAgent - Role is null/undefined, skipping');
+      return false;
+    }
+    const roleStr = String(role);
+    const lowerRole = roleStr.toLowerCase();
+    
+    const matches = lowerRole === 'fieldagent' || 
            lowerRole === 'field_agent' ||
            lowerRole === 'field-agent' ||
-           role === 'FieldAgent' ||           // Exact case match
-           role === 'FIELDAGENT' ||           // Uppercase
+           roleStr === 'FieldAgent' ||
+           roleStr === 'FIELDAGENT' ||
            (lowerRole.includes('field') && lowerRole.includes('agent'));
+    
+    if (matches) {
+      console.log(`✅ isUserFieldAgent - Found field agent role: "${roleStr}"`);
+    }
+    return matches;
   });
+  
+  console.log('🔍 isUserFieldAgent - Final result:', isFieldAgent);
+  console.log('🔍 isUserFieldAgent - END');
+  return isFieldAgent;
 };
 
 // ============================================
@@ -150,10 +201,18 @@ function AppContent() {
   // Debug: Log user and roles when they change
   useEffect(() => {
     if (user) {
-      console.log('🔍 AppContent - User loaded:', user);
-      console.log('🔍 AppContent - User Email:', user.Email);
-      console.log('🔍 AppContent - User roles:', user.roles);
+      console.log('🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍');
+      console.log('🔍 AppContent - User loaded:');
+      console.log('🔍   - Full user object:', JSON.stringify(user, null, 2));
+      console.log('🔍   - User Email:', user.Email);
+      console.log('🔍   - User roles:', user.roles);
+      console.log('🔍   - User roles type:', typeof user.roles);
+      console.log('🔍   - Is roles an array?', Array.isArray(user.roles));
+      console.log('🔍   - roles length:', user.roles?.length);
       console.log('🔍 AppContent - Is field agent?', isUserFieldAgent(user));
+      console.log('🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍');
+    } else {
+      console.log('🔍 AppContent - User is null or undefined');
     }
   }, [user]);
 

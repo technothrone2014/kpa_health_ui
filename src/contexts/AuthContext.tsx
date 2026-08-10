@@ -86,6 +86,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Save user data
   const saveUserData = (userData: User) => {
+    console.log('💾 saveUserData - Saving user:', userData);
+    console.log('💾 saveUserData - Roles being saved:', userData.roles);
     localStorage.setItem(USER_KEY, JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
@@ -96,7 +98,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const userStr = localStorage.getItem(USER_KEY);
       if (userStr) {
-        return JSON.parse(userStr);
+        const parsed = JSON.parse(userStr);
+        console.log('📂 loadUserFromStorage - Loaded user from storage:', parsed);
+        console.log('📂 loadUserFromStorage - Roles from storage:', parsed.roles);
+        return parsed;
       }
     } catch (e) {
       console.error('Failed to parse stored user:', e);
@@ -130,7 +135,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
       try {
+        console.log('🔍 checkAuth - Calling /auth/me endpoint...');
         const response = await api.get('/auth/me');
+        
+        console.log('🔍 checkAuth - Full response:', response);
+        console.log('🔍 checkAuth - response.data:', response.data);
+        console.log('🔍 checkAuth - response.data.success:', response.data.success);
+        console.log('🔍 checkAuth - response.data.user:', response.data.user);
         
         if (response.data.success && response.data.user) {
           const userData = response.data.user;
@@ -138,17 +149,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // ✅ DEBUG: Log the user data from /me endpoint
           console.log('🔍 /auth/me response:', userData);
           console.log('🔍 /auth/me roles:', userData.roles);
+          console.log('🔍 /auth/me roles type:', typeof userData.roles);
+          console.log('🔍 /auth/me is roles an array?', Array.isArray(userData.roles));
+          
+          // Make sure roles is an array
+          if (userData.roles && !Array.isArray(userData.roles)) {
+            console.log('🔍 /auth/me roles is not an array, converting...');
+            userData.roles = [userData.roles];
+          }
           
           saveUserData(userData);
           localStorage.setItem(AUTH_INITIALIZED_KEY, 'true');
           return true;
         } else {
+          console.warn('🔍 checkAuth - No user in response or success false');
           clearAuthData();
           return false;
         }
       } catch (error: any) {
-
-        console.warn('Auth check failed:', error.response?.status, error.response?.data?.message);
+        console.warn('🔍 checkAuth - Auth check failed:', error.response?.status, error.response?.data?.message);
+        console.warn('🔍 checkAuth - Full error:', error);
         
         // Only clear auth data if it's a 401 (unauthorized)
         // Network errors or 5xx errors shouldn't log the user out
@@ -212,9 +232,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await api.post('/auth/verify-otp', { identifier, otp });
       
+      console.log('🔍 verifyOTP - Response:', response.data);
+      
       if (response.data.success && response.data.token) {
         setToken(response.data.token);
         if (response.data.user) {
+          console.log('🔍 verifyOTP - User data from verify:', response.data.user);
+          console.log('🔍 verifyOTP - Roles from verify:', response.data.user.roles);
           saveUserData(response.data.user);
         }
         
@@ -249,11 +273,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Initialize auth on mount
   useEffect(() => {
     const initAuth = async () => {
+      console.log('🔄 initAuth - Starting auth initialization...');
       // First, try to load user from storage for immediate UI
       const storedUser = loadUserFromStorage();
       const storedToken = localStorage.getItem(TOKEN_KEY);
       
       if (storedUser && storedToken) {
+        console.log('🔄 initAuth - Found stored user and token, setting initial state...');
         setUser(storedUser);
         setIsAuthenticated(true);
         api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
@@ -262,6 +288,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Then validate with server
       setIsLoading(true);
       await checkAuth();
+      console.log('🔄 initAuth - Auth initialization complete');
     };
     
     initAuth();
