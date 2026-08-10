@@ -1,4 +1,4 @@
-// App.tsx - Fixed logout button visibility and field agent sidebar
+// App.tsx - Fixed Field Agent Route Restrictions
 
 import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -46,9 +46,11 @@ const oceanTheme = {
   danger: '#EF4444',
 };
 
-// Protected Route wrapper
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+// ============================================
+// FIXED: Protected Route with Role-Based Access
+// ============================================
+function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
   
   if (isLoading) {
     return <LoadingSpinner />;
@@ -57,11 +59,35 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+
+  // If allowedRoles is specified, check if user has the required role
+  if (allowedRoles && allowedRoles.length > 0) {
+    const userRoles = (user?.roles || []).map(r => r.toLowerCase());
+    const hasRequiredRole = allowedRoles.some(role => 
+      userRoles.includes(role.toLowerCase())
+    );
+    
+    if (!hasRequiredRole) {
+      // Redirect to appropriate page based on role
+      const isFieldAgent = userRoles.some(r => 
+        r === 'fieldagent' || r === 'field_agent' || r === 'field-agent'
+      );
+      
+      if (isFieldAgent) {
+        return <Navigate to="/field-capture" replace />;
+      }
+      
+      // Default redirect for other roles
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
   
   return <>{children}</>;
 }
 
-// Role-based redirect component
+// ============================================
+// FIXED: Role-Based Redirect
+// ============================================
 function RoleBasedRedirect() {
   const { user, isLoading } = useAuth();
   
@@ -77,14 +103,17 @@ function RoleBasedRedirect() {
   const roles = user.roles || [];
   const normalizedRoles = roles.map(r => r.toLowerCase());
   const isFieldAgent = normalizedRoles.includes('fieldagent') || 
-                       normalizedRoles.includes('field_agent');
+                       normalizedRoles.includes('field_agent') ||
+                       normalizedRoles.includes('field-agent');
   
   if (isFieldAgent) {
     return <Navigate to="/field-capture" replace />;
   }
   
+  // Default to dashboard for staff/admin
   return <Navigate to="/dashboard" replace />;
 }
+
 
 function AppContent() {
   const theme = useTheme();
@@ -95,7 +124,7 @@ function AppContent() {
   const [aiStatus, setAiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const { user, logout, isAuthenticated, isLoading } = useAuth();
 
-  // Determine if user is a field agent - FIXED role checking
+  // Determine if user is a field agent
   const isFieldAgent = React.useMemo(() => {
     if (!user) {
       console.log('🔍 No user object');
@@ -105,7 +134,6 @@ function AppContent() {
     const roles = user.roles || [];
     console.log('🔍 User object:', user);
     console.log('🔍 User roles:', roles);
-    console.log('🔍 Roles type:', typeof roles, Array.isArray(roles));
     
     // If roles is a string (sometimes happens), convert to array
     const rolesArray = Array.isArray(roles) ? roles : [roles];
@@ -121,7 +149,6 @@ function AppContent() {
     });
     
     console.log('🔍 Is field agent?', isFieldAgentRole);
-    console.log('🔍 Will sidebar be hidden?', isFieldAgentRole ? 'YES - No sidebar' : 'NO - Show sidebar');
     
     return isFieldAgentRole;
   }, [user]);
@@ -147,9 +174,14 @@ function AppContent() {
     await logout();
   };
 
-  // Role-based menu items (only for non-field-agents)
+  // ============================================
+  // FIXED: Menu items - Field agents see NONE
+  // ============================================
   const getMenuItems = () => {
+    // Field agents should have NO menu items
     if (isFieldAgent) return [];
+    
+    // Staff/Admin menu items
     return [
       { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', nauticalIcon: '🧭' },
       { text: 'Clients', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨‍✈️' },
@@ -160,7 +192,9 @@ function AppContent() {
 
   const menuItems = getMenuItems();
 
-  // Field Agent Header Component
+  // ============================================
+  // FIXED: Field Agent Header (No Sidebar, No Links)
+  // ============================================
   const FieldAgentHeader = () => (
     <Box sx={{
       background: `linear-gradient(135deg, ${oceanTheme.deep}, ${oceanTheme.mid})`,
@@ -336,7 +370,9 @@ function AppContent() {
     </Box>
   );
 
-  // Regular Sidebar Drawer (for non-field-agents)
+  // ============================================
+  // SIDEBAR DRAWER (Only for Staff/Admin)
+  // ============================================
   const drawer = (
     <Box sx={{ 
       height: '100vh', 
@@ -615,28 +651,29 @@ function AppContent() {
     return <LoadingSpinner />;
   }
 
-  // 🎯 FIELD AGENT LAYOUT - COMPLETELY SEPARATE, NO SIDEBAR AT ALL
+  // ============================================
+  // FIXED: FIELD AGENT LAYOUT - COMPLETELY SEPARATE
+  // ============================================
   if (isAuthenticated && isFieldAgent) {
-    console.log('🎯 Rendering FIELD AGENT layout - NO SIDEBAR, NO DRAWER');
+    console.log('🎯 Rendering FIELD AGENT layout - ONLY field-capture access');
     return (
       <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
         <Box component="main" sx={{ flexGrow: 1, width: '100%' }}>
           <FieldAgentHeader />
           <Box sx={{ p: { xs: 2, sm: 3 } }}>
             <Routes>
+              {/* All routes redirect to field-capture for field agents */}
               <Route path="/login" element={<Navigate to="/field-capture" replace />} />
               <Route path="/dashboard" element={<Navigate to="/field-capture" replace />} />
               <Route path="/employees" element={<Navigate to="/field-capture" replace />} />
               <Route path="/data-correction" element={<Navigate to="/field-capture" replace />} />
               <Route path="/analytics" element={<Navigate to="/field-capture" replace />} />
               <Route path="/field-capture" element={
-                <ProtectedRoute>
-                  <DataCaptureDashboard 
-                    userRole="field_agent"
-                    userId={user?.Id || 0}
-                    stationId={user?.StationId || 1}
-                  />
-                </ProtectedRoute>
+                <DataCaptureDashboard 
+                  userRole="field_agent"
+                  userId={user?.Id || 0}
+                  stationId={user?.StationId || 1}
+                />
               } />
               <Route path="/" element={<Navigate to="/field-capture" replace />} />
               <Route path="*" element={<Navigate to="/field-capture" replace />} />
@@ -648,11 +685,13 @@ function AppContent() {
     );
   }
 
-  // 🎯 STAFF/ADMIN LAYOUT - WITH SIDEBAR
+  // ============================================
+  // STAFF/ADMIN LAYOUT - WITH SIDEBAR
+  // ============================================
   console.log('🎯 Rendering STAFF/ADMIN layout - WITH SIDEBAR');
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - Only for Staff/Admin */}
       {isAuthenticated && (
         <Box
           component="nav"
@@ -668,7 +707,7 @@ function AppContent() {
         </Box>
       )}
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer - Only for Staff/Admin */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -682,7 +721,7 @@ function AppContent() {
         {drawer}
       </Drawer>
 
-      {/* Main content */}
+      {/* Main content for Staff/Admin */}
       <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
         {/* Mobile App Bar */}
         {isAuthenticated && (
@@ -737,10 +776,26 @@ function AppContent() {
         {/* Routes for Staff/Admin */}
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
-          <Route path="/data-correction" element={<ProtectedRoute><DataCorrection /></ProtectedRoute>} />
-          <Route path="/analytics" element={<ProtectedRoute><AdvancedAnalytics /></ProtectedRoute>} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/employees" element={
+            <ProtectedRoute>
+              <Employees />
+            </ProtectedRoute>
+          } />
+          <Route path="/data-correction" element={
+            <ProtectedRoute>
+              <DataCorrection />
+            </ProtectedRoute>
+          } />
+          <Route path="/analytics" element={
+            <ProtectedRoute>
+              <AdvancedAnalytics />
+            </ProtectedRoute>
+          } />
           <Route path="/field-capture" element={
             <ProtectedRoute>
               <DataCaptureDashboard 
