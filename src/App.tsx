@@ -201,7 +201,6 @@ function AppContent() {
 
   // ============================================
   // Field Agent Header (No Sidebar, No Links)
-  // MOVED HERE - Defined before it's used
   // ============================================
   const FieldAgentHeader = () => (
     <Box sx={{
@@ -314,6 +313,7 @@ function AppContent() {
             )}
           </IconButton>
 
+          {/* ✅ FIXED: Logout button for Field Agent */}
           <IconButton
             onClick={handleLogout}
             sx={{
@@ -371,9 +371,27 @@ function AppContent() {
             </Box>
           </Box>
         </Box>
-        <Typography sx={{ color: oceanTheme.foam, fontSize: '11px' }}>
-          {user?.Email}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography sx={{ color: oceanTheme.foam, fontSize: '11px' }}>
+            {user?.Email}
+          </Typography>
+          {/* Mobile logout button */}
+          <IconButton
+            onClick={handleLogout}
+            sx={{
+              background: 'rgba(255,255,255,0.1)',
+              color: oceanTheme.white,
+              '&:hover': {
+                background: oceanTheme.danger,
+                color: oceanTheme.white
+              },
+              p: 0.5
+            }}
+            title="Logout"
+          >
+            <LogoutIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Box>
       </Box>
     </Box>
   );
@@ -418,11 +436,10 @@ function AppContent() {
   // ============================================
   // STAFF/ADMIN LAYOUT - WITH SIDEBAR
   // ============================================
-  // Only Staff/Admin reach this point
   console.log('🎯 Rendering STAFF/ADMIN layout - WITH SIDEBAR');
 
   // ============================================
-  // SIDEBAR DRAWER (Only for Staff/Admin)
+  // SIDEBAR DRAWER (Full content for Staff/Admin)
   // ============================================
   const drawer = (
     <Box sx={{ 
@@ -433,8 +450,257 @@ function AppContent() {
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {/* ... drawer content (same as before) ... */}
-      {/* I'm omitting the full drawer for brevity - keep your existing drawer code here */}
+      <Box sx={{ 
+        position: 'absolute', 
+        bottom: 0, 
+        left: 0, 
+        right: 0, 
+        height: '100px',
+        background: `repeating-linear-gradient(0deg, transparent, transparent 10px, ${oceanTheme.surface}10 10px, ${oceanTheme.surface}20 20px)`,
+        pointerEvents: 'none',
+        zIndex: 0
+      }} />
+      
+      <Box sx={{ 
+        position: 'absolute', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0,
+        background: `radial-gradient(circle at 20% 50%, ${oceanTheme.foam}05 0%, transparent 50%)`,
+        pointerEvents: 'none',
+        zIndex: 0
+      }} />
+      
+      <Box sx={{ 
+        flex: 1, 
+        overflowY: 'auto', 
+        overflowX: 'hidden',
+        position: 'relative',
+        zIndex: 1,
+        pb: 10
+      }}>
+        <Box sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderBottom: `2px solid ${oceanTheme.gold}30`,
+          position: 'relative',
+          background: `linear-gradient(135deg, ${oceanTheme.navy}80, ${oceanTheme.deep}80)`,
+        }}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            gap: 1 
+          }}>
+            <Box sx={{ 
+              width: 70, 
+              height: 70, 
+              background: `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              animation: 'float 3s ease-in-out infinite'
+            }}>
+              <AnchorIcon sx={{ fontSize: 40, color: oceanTheme.navy }} />
+            </Box>
+            <Typography 
+              variant="subtitle1" 
+              sx={{ 
+                color: oceanTheme.gold, 
+                mt: 1,
+                fontWeight: 'bold',
+                fontSize: '0.9rem',
+                letterSpacing: '1px'
+              }}
+            >
+              KPA Health Intelligence
+            </Typography>
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                color: oceanTheme.foam,
+                fontSize: '0.7rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5
+              }}
+            >
+              <WavesIcon sx={{ fontSize: 12 }} /> EAP Health Week <WavesIcon sx={{ fontSize: 12 }} />
+            </Typography>
+          </Box>
+        </Box>
+
+        {isAuthenticated && user && (
+          <Box sx={{ p: 2, borderBottom: `1px solid ${oceanTheme.gold}30` }}>
+            <Typography sx={{ color: oceanTheme.white, fontSize: '14px', fontWeight: 'bold' }}>
+              {user.FirstName} {user.LastName}
+            </Typography>
+            <Typography sx={{ color: oceanTheme.foam, fontSize: '12px' }}>
+              {user.Email}
+            </Typography>
+            <Box sx={{ 
+              mt: 1,
+              display: 'inline-block',
+              px: 1.5,
+              py: 0.5,
+              background: oceanTheme.gold,
+              borderRadius: '12px',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              color: oceanTheme.navy,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Staff
+            </Box>
+          </Box>
+        )}
+
+        <List sx={{ px: 2, py: 2 }}>
+          {menuItems.map((item) => (
+            <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+              <ListItemButton 
+                component={Link} 
+                to={item.path}
+                onClick={() => {
+                  setActivePath(item.path);
+                  setMobileOpen(false);
+                }}
+                sx={{
+                  borderRadius: '12px',
+                  py: 1.5,
+                  px: 2,
+                  transition: 'all 0.3s ease',
+                  background: activePath === item.path 
+                    ? `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`
+                    : 'transparent',
+                  '&:hover': {
+                    background: `linear-gradient(135deg, ${oceanTheme.gold}40, #FFA50040)`,
+                    transform: 'translateX(8px)',
+                  },
+                  '& .MuiListItemIcon-root': {
+                    minWidth: 40,
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  color: activePath === item.path ? oceanTheme.navy : oceanTheme.foam,
+                }}>
+                  <Box sx={{ position: 'relative' }}>
+                    {item.icon}
+                    <Box sx={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
+                      fontSize: '10px',
+                      opacity: 0.7
+                    }}>
+                      {item.nauticalIcon}
+                    </Box>
+                  </Box>
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.text} 
+                  sx={{ 
+                    '& .MuiTypography-root': { 
+                      color: activePath === item.path ? oceanTheme.navy : oceanTheme.white,
+                      fontWeight: activePath === item.path ? 'bold' : 'normal',
+                    } 
+                  }} 
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+          
+          <ListItem disablePadding sx={{ mb: 1, mt: 2 }}>
+            <ListItemButton 
+              onClick={() => setShowGlobalAI(!showGlobalAI)}
+              sx={{
+                borderRadius: '12px',
+                py: 1.5,
+                px: 2,
+                transition: 'all 0.3s ease',
+                background: showGlobalAI 
+                  ? `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`
+                  : 'transparent',
+                '&:hover': {
+                  background: `linear-gradient(135deg, ${oceanTheme.gold}40, #FFA50040)`,
+                  transform: 'translateX(8px)',
+                },
+              }}
+            >
+              <ListItemIcon sx={{ 
+                color: showGlobalAI ? oceanTheme.navy : oceanTheme.foam,
+              }}>
+                <SmartToyIcon />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Sister Unesi AI" 
+                sx={{ 
+                  '& .MuiTypography-root': { 
+                    color: showGlobalAI ? oceanTheme.navy : oceanTheme.white,
+                    fontWeight: showGlobalAI ? 'bold' : 'normal',
+                  } 
+                }} 
+              />
+              {aiStatus === 'online' && (
+                <Box sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: oceanTheme.surface,
+                  ml: 1,
+                }} />
+              )}
+            </ListItemButton>
+          </ListItem>
+        </List>
+
+        <Box sx={{ 
+          textAlign: 'center',
+          opacity: 0.3,
+          py: 2
+        }}>
+          <CompassCalibrationIcon sx={{ color: oceanTheme.foam, fontSize: 30 }} />
+          <Typography variant="caption" sx={{ color: oceanTheme.foam, display: 'block' }}>
+            Kenya Ports Authority
+          </Typography>
+        </Box>
+      </Box>
+
+      <Box sx={{ 
+        position: 'sticky',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        p: 2,
+        background: `linear-gradient(0deg, ${oceanTheme.navy} 0%, ${oceanTheme.navy} 50%, transparent 100%)`,
+        zIndex: 2,
+        borderTop: `1px solid ${oceanTheme.gold}30`
+      }}>
+        <ListItem disablePadding>
+          <ListItemButton onClick={handleLogout} sx={{
+            borderRadius: '12px',
+            py: 1.5,
+            px: 2,
+            background: 'rgba(255,255,255,0.05)',
+            '&:hover': {
+              background: `linear-gradient(135deg, ${oceanTheme.danger}40, ${oceanTheme.danger}20)`,
+            }
+          }}>
+            <ListItemIcon sx={{ color: oceanTheme.foam }}>
+              <LogoutIcon />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Logout" 
+              sx={{ '& .MuiTypography-root': { color: oceanTheme.white, fontWeight: 'bold' } }} 
+            />
+          </ListItemButton>
+        </ListItem>
+      </Box>
     </Box>
   );
 
