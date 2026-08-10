@@ -143,8 +143,18 @@ function AppContent() {
   // Determine if user is a field agent - using the helper function
   const isFieldAgent = React.useMemo(() => {
     const result = isUserFieldAgent(user);
-    console.log('🔍 AppContent - isFieldAgent:', result);
+    console.log('🔍 AppContent - isFieldAgent memoized:', result);
     return result;
+  }, [user]);
+
+  // Debug: Log user and roles when they change
+  useEffect(() => {
+    if (user) {
+      console.log('🔍 AppContent - User loaded:', user);
+      console.log('🔍 AppContent - User Email:', user.Email);
+      console.log('🔍 AppContent - User roles:', user.roles);
+      console.log('🔍 AppContent - Is field agent?', isUserFieldAgent(user));
+    }
   }, [user]);
 
   // Check AI service health on mount
@@ -169,7 +179,7 @@ function AppContent() {
   };
 
   // ============================================
-  // FIXED: Menu items - Field agents see NONE
+  // Menu items - Field agents see NONE
   // ============================================
   const getMenuItems = () => {
     // Field agents should have NO menu items
@@ -189,183 +199,48 @@ function AppContent() {
 
   const menuItems = getMenuItems();
 
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
   // ============================================
-  // Field Agent Header (No Sidebar, No Links)
+  // FIELD AGENT LAYOUT - COMPLETELY SEPARATE
   // ============================================
-  const FieldAgentHeader = () => (
-    <Box sx={{
-      background: `linear-gradient(135deg, ${oceanTheme.deep}, ${oceanTheme.mid})`,
-      color: oceanTheme.white,
-      px: { xs: 2, sm: 4 },
-      py: { xs: 1.5, sm: 2 },
-      borderRadius: { xs: '0 0 16px 16px', sm: '16px' },
-      boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-      borderBottom: `2px solid ${oceanTheme.gold}`,
-      mb: 3
-    }}>
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 2
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{
-            width: 48,
-            height: 48,
-            background: `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`,
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-          }}>
-            <AnchorIcon sx={{ color: oceanTheme.navy, fontSize: 28 }} />
-          </Box>
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: oceanTheme.white, lineHeight: 1.2 }}>
-              KPA Field Capture
-            </Typography>
-            <Typography variant="caption" sx={{ color: oceanTheme.foam }}>
-              EAP Health Week • Field Agent Portal
-            </Typography>
+  if (isAuthenticated && isFieldAgent) {
+    console.log('🎯 Rendering FIELD AGENT layout - NO SIDEBAR');
+    return (
+      <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
+        <Box component="main" sx={{ flexGrow: 1, width: '100%' }}>
+          <FieldAgentHeader />
+          <Box sx={{ p: { xs: 2, sm: 3 } }}>
+            <Routes>
+              <Route path="/login" element={<Navigate to="/field-capture" replace />} />
+              <Route path="/dashboard" element={<Navigate to="/field-capture" replace />} />
+              <Route path="/employees" element={<Navigate to="/field-capture" replace />} />
+              <Route path="/data-correction" element={<Navigate to="/field-capture" replace />} />
+              <Route path="/analytics" element={<Navigate to="/field-capture" replace />} />
+              <Route path="/field-capture" element={
+                <DataCaptureDashboard 
+                  userRole="field_agent"
+                  userId={user?.Id || 0}
+                  stationId={user?.StationId || 1}
+                />
+              } />
+              <Route path="/" element={<Navigate to="/field-capture" replace />} />
+              <Route path="*" element={<Navigate to="/field-capture" replace />} />
+            </Routes>
           </Box>
         </Box>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{ 
-            display: { xs: 'none', sm: 'flex' }, 
-            alignItems: 'center', 
-            gap: 1.5,
-            background: 'rgba(255,255,255,0.1)',
-            borderRadius: '30px',
-            px: 2,
-            py: 1
-          }}>
-            <Box sx={{
-              width: 36,
-              height: 36,
-              background: oceanTheme.surface,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Typography sx={{ color: oceanTheme.white, fontWeight: 'bold', fontSize: '14px' }}>
-                {user?.FirstName?.charAt(0) || 'F'}
-                {user?.LastName?.charAt(0) || 'A'}
-              </Typography>
-            </Box>
-            <Box>
-              <Typography sx={{ color: oceanTheme.white, fontSize: '14px', fontWeight: 'bold' }}>
-                {user?.FirstName} {user?.LastName}
-              </Typography>
-              <Box sx={{ 
-                display: 'inline-block',
-                px: 1,
-                py: 0.25,
-                background: oceanTheme.gold,
-                borderRadius: '10px',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                color: oceanTheme.navy,
-                textTransform: 'uppercase'
-              }}>
-                Field Agent
-              </Box>
-            </Box>
-          </Box>
-
-          <IconButton
-            onClick={() => setShowGlobalAI(!showGlobalAI)}
-            sx={{
-              background: showGlobalAI ? oceanTheme.gold : 'rgba(255,255,255,0.15)',
-              color: showGlobalAI ? oceanTheme.navy : oceanTheme.white,
-              '&:hover': {
-                background: oceanTheme.gold,
-                color: oceanTheme.navy
-              }
-            }}
-          >
-            <SmartToyIcon />
-            {aiStatus === 'online' && (
-              <Box sx={{
-                position: 'absolute',
-                top: 4,
-                right: 4,
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: oceanTheme.surface,
-                border: '1px solid white'
-              }} />
-            )}
-          </IconButton>
-
-          <IconButton
-            onClick={handleLogout}
-            sx={{
-              background: 'rgba(255,255,255,0.15)',
-              color: oceanTheme.white,
-              '&:hover': {
-                background: oceanTheme.danger,
-                color: oceanTheme.white
-              }
-            }}
-            title="Logout"
-          >
-            <LogoutIcon />
-          </IconButton>
-        </Box>
+        {showGlobalAI && <AIAssistant onClose={() => setShowGlobalAI(false)} />}
       </Box>
+    );
+  }
 
-      <Box sx={{ 
-        display: { xs: 'flex', sm: 'none' }, 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        mt: 1.5,
-        pt: 1.5,
-        borderTop: `1px solid ${oceanTheme.gold}30`
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{
-            width: 32,
-            height: 32,
-            background: oceanTheme.surface,
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Typography sx={{ color: oceanTheme.white, fontWeight: 'bold', fontSize: '12px' }}>
-              {user?.FirstName?.charAt(0) || 'F'}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography sx={{ color: oceanTheme.white, fontSize: '13px', fontWeight: 'bold' }}>
-              {user?.FirstName} {user?.LastName}
-            </Typography>
-            <Box sx={{ 
-              display: 'inline-block',
-              px: 1,
-              py: 0.25,
-              background: oceanTheme.gold,
-              borderRadius: '10px',
-              fontSize: '9px',
-              fontWeight: 'bold',
-              color: oceanTheme.navy
-            }}>
-              Field Agent
-            </Box>
-          </Box>
-        </Box>
-        <Typography sx={{ color: oceanTheme.foam, fontSize: '11px' }}>
-          {user?.Email}
-        </Typography>
-      </Box>
-    </Box>
-  );
+  // ============================================
+  // STAFF/ADMIN LAYOUT - WITH SIDEBAR
+  // ============================================
+  // Only Staff/Admin reach this point
+  console.log('🎯 Rendering STAFF/ADMIN layout - WITH SIDEBAR');
 
   // ============================================
   // SIDEBAR DRAWER (Only for Staff/Admin)
@@ -630,61 +505,9 @@ function AppContent() {
           </ListItemButton>
         </ListItem>
       </Box>
-
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
-        }
-        @keyframes spin {
-          from { transform: translateX(-50%) rotate(0deg); }
-          to { transform: translateX(-50%) rotate(360deg); }
-        }
-      `}</style>
     </Box>
   );
 
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-
-  // ============================================
-  // FIXED: FIELD AGENT LAYOUT - COMPLETELY SEPARATE
-  // ============================================
-  if (isAuthenticated && isFieldAgent) {
-    console.log('🎯 Rendering FIELD AGENT layout - ONLY field-capture access');
-    return (
-      <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
-        <Box component="main" sx={{ flexGrow: 1, width: '100%' }}>
-          <FieldAgentHeader />
-          <Box sx={{ p: { xs: 2, sm: 3 } }}>
-            <Routes>
-              <Route path="/login" element={<Navigate to="/field-capture" replace />} />
-              <Route path="/dashboard" element={<Navigate to="/field-capture" replace />} />
-              <Route path="/employees" element={<Navigate to="/field-capture" replace />} />
-              <Route path="/data-correction" element={<Navigate to="/field-capture" replace />} />
-              <Route path="/analytics" element={<Navigate to="/field-capture" replace />} />
-              <Route path="/field-capture" element={
-                <DataCaptureDashboard 
-                  userRole="field_agent"
-                  userId={user?.Id || 0}
-                  stationId={user?.StationId || 1}
-                />
-              } />
-              <Route path="/" element={<Navigate to="/field-capture" replace />} />
-              <Route path="*" element={<Navigate to="/field-capture" replace />} />
-            </Routes>
-          </Box>
-        </Box>
-        {showGlobalAI && <AIAssistant onClose={() => setShowGlobalAI(false)} />}
-      </Box>
-    );
-  }
-
-  // ============================================
-  // STAFF/ADMIN LAYOUT - WITH SIDEBAR
-  // ============================================
-  console.log('🎯 Rendering STAFF/ADMIN layout - WITH SIDEBAR');
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
       {/* Desktop Sidebar - Only for Staff/Admin */}
@@ -703,6 +526,7 @@ function AppContent() {
         </Box>
       )}
 
+      {/* Mobile drawer - Only for Staff/Admin */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -716,7 +540,9 @@ function AppContent() {
         {drawer}
       </Drawer>
 
+      {/* Main content for Staff/Admin */}
       <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
+        {/* Mobile App Bar */}
         {isAuthenticated && (
           <AppBar 
             position="sticky" 
@@ -766,6 +592,7 @@ function AppContent() {
           </AppBar>
         )}
 
+        {/* Routes for Staff/Admin */}
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={
