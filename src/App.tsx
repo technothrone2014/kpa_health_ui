@@ -54,17 +54,21 @@ const isUserFieldAgent = (user: any): boolean => {
   
   const roles = user.roles || [];
   console.log('🔍 isUserFieldAgent - User:', user.Email, 'Roles:', roles);
+  console.log('🔍 Roles type:', typeof roles, Array.isArray(roles));
   
   // If roles is a string, convert to array
   const rolesArray = Array.isArray(roles) ? roles : [roles];
   
-  // Check for all possible field agent role formats (case insensitive)
+  // Check for all possible field agent role formats (case sensitive and insensitive)
   return rolesArray.some((role: string) => {
     if (!role) return false;
     const lowerRole = role.toLowerCase();
+    // Check exact matches and variations
     return lowerRole === 'fieldagent' || 
            lowerRole === 'field_agent' ||
            lowerRole === 'field-agent' ||
+           role === 'FieldAgent' ||           // Exact case match
+           role === 'FIELDAGENT' ||           // Uppercase
            (lowerRole.includes('field') && lowerRole.includes('agent'));
   });
 };
