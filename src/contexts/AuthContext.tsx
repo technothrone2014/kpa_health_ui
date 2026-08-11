@@ -84,29 +84,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsAuthenticated(false);
   };
 
-  // Save user data
-  const saveUserData = (userData: User) => {
-    console.log('💾 saveUserData - Saving user:', userData);
-    console.log('💾 saveUserData - Roles being saved:', userData.roles);
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
-    setUser(userData);
-    setIsAuthenticated(true);
-  };
-
-  // Load user from storage (synchronous, for initial state)
+  // Update loadUserFromStorage
   const loadUserFromStorage = (): User | null => {
     try {
       const userStr = localStorage.getItem(USER_KEY);
       if (userStr) {
         const parsed = JSON.parse(userStr);
-        console.log('📂 loadUserFromStorage - Loaded user from storage:', parsed);
-        console.log('📂 loadUserFromStorage - Roles from storage:', parsed.roles);
+        // Ensure roles is always an array
+        if (!parsed.roles) {
+          parsed.roles = [];
+        }
         return parsed;
       }
     } catch (e) {
       console.error('Failed to parse stored user:', e);
     }
     return null;
+  };
+
+  // Update saveUserData
+  const saveUserData = (userData: User) => {
+    // Ensure roles is always an array
+    if (!userData.roles) {
+      userData.roles = [];
+    }
+    
+    const userToSave = {
+      ...userData,
+      roles: Array.isArray(userData.roles) ? [...userData.roles] : []
+    };
+    
+    console.log('💾 saveUserData - Saving user with roles:', userToSave.roles);
+    localStorage.setItem(USER_KEY, JSON.stringify(userToSave));
+    setUser(userToSave);
+    setIsAuthenticated(true);
   };
 
   const checkAuth = useCallback(async (): Promise<boolean> => {
@@ -194,6 +205,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     authCheckPromiseRef.current = checkPromise;
     return checkPromise;
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      // This ensures any component using useAuth() gets updated
+      // when user is updated with roles
+      setIsAuthenticated(true);
+    }
+  }, [user]);
 
   // AuthContext.tsx - FIXED loginWithPassword function
   const loginWithPassword = async (identifier: string, password: string) => {

@@ -229,6 +229,13 @@ function AppContent() {
     checkAIHealth();
   }, []);
 
+  useEffect(() => {
+    if (user && user.roles && user.roles.length > 0) {
+      console.log('🔍 AppContent - User roles detected:', user.roles);
+      // The isFieldAgent memo will automatically recalculate
+    }
+  }, [user]);
+
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
