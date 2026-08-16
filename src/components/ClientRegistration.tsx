@@ -1,3 +1,5 @@
+// ClientRegistration.tsx - UPDATED (removes FullName)
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -23,7 +25,6 @@ interface ClientData {
   Id?: number;
   UserId: number;
   IDNumber: string;
-  FullName: string;
   FirstName: string;
   LastName: string;
   GenderId: number;
@@ -31,7 +32,8 @@ interface ClientData {
   CategoryId: number;
   StationId: number;
   DateOfBirth: string;
-  Age?: number;  // Added Age as optional property
+  Age?: number;
+  FullName?: string;  // For display only, not submitted
 }
 
 interface ClientRegistrationProps {
@@ -43,9 +45,8 @@ interface ClientRegistrationProps {
 export default function ClientRegistration({ onSuccess, onCancel, initialData }: ClientRegistrationProps) {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<Partial<ClientData>>({
-    UserId: 1, // TODO: Get from logged-in user
+    UserId: 1,
     IDNumber: '',
-    FullName: '',
     FirstName: '',
     LastName: '',
     GenderId: 1,
@@ -97,7 +98,9 @@ export default function ClientRegistration({ onSuccess, onCancel, initialData }:
   // Register client mutation
   const registerClient = useMutation({
     mutationFn: async (data: Partial<ClientData>) => {
-      const response = await api.post('/clients/register', data);
+      // ✅ Remove FullName from payload (it's auto-generated)
+      const { FullName, ...cleanData } = data;
+      const response = await api.post('/clients/register', cleanData);
       return response.data;
     },
     onSuccess: (data) => {
@@ -144,10 +147,13 @@ export default function ClientRegistration({ onSuccess, onCancel, initialData }:
     e.preventDefault();
     if (!validateForm()) return;
     
-    // Calculate age from DOB and add to form data
+    // Calculate age from DOB
     const age = calculateAge(formData.DateOfBirth!);
-    // Create a new object with the age property
-    const submitData = { ...formData, Age: age };
+    // ✅ FullName is NOT sent - database auto-generates it
+    const submitData = { 
+      ...formData, 
+      Age: age 
+    };
     registerClient.mutate(submitData);
   };
 
@@ -165,6 +171,11 @@ export default function ClientRegistration({ onSuccess, onCancel, initialData }:
     setSearchTerm('');
     if (onSuccess) onSuccess(client.Id);
   };
+
+  // Auto-generate FullName for display
+  const displayFullName = formData.FirstName && formData.LastName 
+    ? `${formData.FirstName} ${formData.LastName}` 
+    : '';
 
   return (
     <div style={{
@@ -305,23 +316,24 @@ export default function ClientRegistration({ onSuccess, onCancel, initialData }:
             {errors.IDNumber && <span style={{ fontSize: '11px', color: oceanColors.danger }}>{errors.IDNumber}</span>}
           </div>
 
-          {/* Full Name */}
+          {/* ✅ REMOVED Full Name field - replaced with auto-generated display */}
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: oceanColors.textDark, display: 'block', marginBottom: '6px' }}>
-              Full Name *
+              Full Name <span style={{ fontSize: '11px', color: oceanColors.textLight }}>(auto-generated)</span>
             </label>
-            <input
-              type="text"
-              value={formData.FullName}
-              onChange={(e) => setFormData({ ...formData, FullName: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: `1px solid ${oceanColors.mid}30`,
-                borderRadius: '8px',
-                outline: 'none'
-              }}
-            />
+            <div style={{
+              width: '100%',
+              padding: '10px 12px',
+              background: '#f3f4f6',
+              borderRadius: '8px',
+              border: `1px solid ${oceanColors.mid}20`,
+              color: oceanColors.textDark,
+              minHeight: '40px',
+              display: 'flex',
+              alignItems: 'center'
+            }}>
+              {displayFullName || 'Enter First Name and Last Name'}
+            </div>
           </div>
 
           {/* First Name */}
