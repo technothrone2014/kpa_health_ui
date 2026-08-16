@@ -251,19 +251,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await api.post('/auth/verify-otp', { identifier, otp });
       
-      console.log('🔍 verifyOTP - Response:', response.data);
+      console.log('🔍 verifyOTP - Full response:', response.data);
+      console.log('🔍 verifyOTP - Response roles:', response.data.roles);
       
       if (response.data.success && response.data.token) {
         setToken(response.data.token);
+        
+        // ✅ CRITICAL FIX: Extract roles from the response
+        const roles = response.data.roles || [];
+        
         if (response.data.user) {
-          console.log('🔍 verifyOTP - User data from verify:', response.data.user);
-          console.log('🔍 verifyOTP - Roles from verify:', response.data.user.roles);
-          saveUserData(response.data.user);
+          // ✅ Merge roles into user data
+          const userData = {
+            ...response.data.user,
+            roles: roles
+          };
+          console.log('🔍 verifyOTP - User data with roles being saved:', userData);
+          saveUserData(userData);
+        } else {
+          // Fallback: If no user object, try to fetch it
+          console.warn('🔍 verifyOTP - No user object in response, fetching from /me');
+          await checkAuth();
         }
         
-        // Don't redirect here - let the RoleBasedRedirect component handle it
-        // The token is set, user is saved, and the app will naturally redirect
-        return response.data;
+        return {
+          ...response.data,
+          roles: roles
+        };
       }
       return response.data;
     } catch (error: any) {
