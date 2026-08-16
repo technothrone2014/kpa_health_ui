@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Activity, Heart, Scale, Droplets, Save, Loader2 } from 'lucide-react';
+import { Activity, Heart, Scale, Droplets, Save, Loader2, Calendar } from 'lucide-react';
 import api from '../api/client';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 
 const oceanColors = {
   deep: '#0B2F9E',
@@ -24,7 +25,6 @@ interface FieldFindingsProps {
 
 export default function FieldFindings({ clientId, clientName, stationId, onSuccess }: FieldFindingsProps) {
   const [formData, setFormData] = useState({
-    Age: '',
     Weight: '',
     Height: '',
     Waist: '',
@@ -46,6 +46,45 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     NutritionCounselling: false,
     PSA: false,
   });
+
+  // ✅ Fetch client details including DateOfBirth
+  const { data: clientData, isLoading: clientLoading } = useQuery({
+    queryKey: ['client', clientId],
+    queryFn: async () => {
+      const response = await api.get(`/clients/${clientId}`);
+      return response.data;
+    },
+    enabled: !!clientId,
+  });
+
+  // ✅ Calculate age from client's DateOfBirth
+  const [calculatedAge, setCalculatedAge] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (clientData?.DateOfBirth) {
+      const age = calculateAgeFromDOB(clientData.DateOfBirth);
+      setCalculatedAge(age);
+    }
+  }, [clientData]);
+
+  // Calculate age from date of birth
+  const calculateAgeFromDOB = (dob: string): number | null => {
+    if (!dob) return null;
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  // Format date of birth for display
+  const formatDOB = (dob: string): string => {
+    if (!dob) return 'Not set';
+    return format(new Date(dob), 'dd MMM yyyy');
+  };
 
   // Fetch BMI interpretation values
   const { data: bmiValues } = useQuery({
@@ -119,10 +158,13 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
       const bmi = calculateBMI(parseFloat(data.Weight), parseFloat(data.Height));
       const whr = calculateWHR(parseFloat(data.Waist), parseFloat(data.Hip));
       
+      // ✅ Use calculated age from client's DOB
+      const age = calculatedAge || 0;
+      
       const payload = {
         ClientId: clientId,
         StationId: stationId,
-        Age: parseInt(data.Age),
+        Age: age,
         Weight: parseFloat(data.Weight),
         Height: parseFloat(data.Height),
         BMIValue: bmi,
@@ -134,7 +176,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
         Diastolic: parseInt(data.Diastolic),
         BPINTValueId: getBPInterpretation(parseInt(data.Systolic), parseInt(data.Diastolic)),
         RBSValue: parseFloat(data.RBSValue),
-        RBSINTValueId: 1, // Calculate based on value
+        RBSINTValueId: 1,
         BMD: data.BMD,
         CancerSCN: data.CancerSCN,
         DentalSCN: data.DentalSCN,
@@ -166,6 +208,15 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     saveFindings.mutate(formData);
   };
 
+  if (clientLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px' }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: oceanColors.deep }} />
+        <p style={{ marginTop: '16px', color: oceanColors.textLight }}>Loading client data...</p>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       background: 'white',
@@ -178,9 +229,17 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
         <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: oceanColors.textDark, margin: 0 }}>
           Field Findings
         </h2>
-        <p style={{ fontSize: '13px', color: oceanColors.textLight, marginTop: '4px' }}>
-          Patient: {clientName} | Station ID: {stationId}
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
+          <p style={{ fontSize: '13px', color: oceanColors.textLight }}>
+            Patient: {clientName} | Station ID: {stationId}
+          </p>
+          {clientData?.DateOfBirth && (
+            <p style={{ fontSize: '12px', color: oceanColors.deep, background: '#f0f7ff', padding: '4px 12px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={14} />
+              DOB: {formatDOB(clientData.DateOfBirth)} • Age: <strong>{calculatedAge !== null ? calculatedAge : '...'}</strong>
+            </p>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -190,18 +249,28 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
             <Scale size={18} /> Anthropometric Measurements
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+            {/* ✅ Age is now a read-only field */}
             <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Age (years)</label>
-              <input
-                type="number"
-                value={formData.Age}
-                onChange={(e) => setFormData({ ...formData, Age: e.target.value })}
-                style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-                required
-              />
+              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>
+                Age (years) <span style={{ color: oceanColors.success, fontSize: '11px' }}>● Auto</span>
+              </label>
+              <div style={{
+                width: '100%',
+                padding: '8px 12px',
+                background: '#f3f4f6',
+                borderRadius: '8px',
+                border: `1px solid ${oceanColors.mid}20`,
+                color: oceanColors.textDark,
+                minHeight: '38px',
+                display: 'flex',
+                alignItems: 'center',
+                fontWeight: 'bold'
+              }}>
+                {calculatedAge !== null ? calculatedAge : 'Calculating...'}
+              </div>
             </div>
             <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Weight (kg)</label>
+              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Weight (kg) *</label>
               <input
                 type="number"
                 step="0.1"
@@ -212,7 +281,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               />
             </div>
             <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Height (cm)</label>
+              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Height (cm) *</label>
               <input
                 type="number"
                 step="0.1"
@@ -223,7 +292,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               />
             </div>
             <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Waist (cm)</label>
+              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Waist (cm) *</label>
               <input
                 type="number"
                 step="0.1"
@@ -234,7 +303,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               />
             </div>
             <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Hip (cm)</label>
+              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Hip (cm) *</label>
               <input
                 type="number"
                 step="0.1"
@@ -254,7 +323,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
             <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Systolic (mmHg)</label>
+              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Systolic (mmHg) *</label>
               <input
                 type="number"
                 value={formData.Systolic}
@@ -264,7 +333,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               />
             </div>
             <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Diastolic (mmHg)</label>
+              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Diastolic (mmHg) *</label>
               <input
                 type="number"
                 value={formData.Diastolic}
@@ -282,7 +351,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
             <Droplets size={18} /> Random Blood Sugar
           </h3>
           <div>
-            <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>RBS Value (mg/dL)</label>
+            <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>RBS Value (mg/dL) *</label>
             <input
               type="number"
               step="0.1"
