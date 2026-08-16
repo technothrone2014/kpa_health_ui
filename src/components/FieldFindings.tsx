@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { 
   Activity, Heart, Scale, Droplets, Save, Loader2, Calendar, 
@@ -35,7 +35,6 @@ interface InterpretationValue {
   StopIndex: number;
 }
 
-// Interpretation result interface
 interface InterpretationResult {
   id: number;
   label: string;
@@ -43,6 +42,135 @@ interface InterpretationResult {
   color: string;
   icon: React.ReactNode;
 }
+
+// ✅ Stable StatusBadge component (memoized)
+const StatusBadge = React.memo(({ result }: { result: InterpretationResult | null }) => {
+  if (!result || result.status === 'info') {
+    return (
+      <span style={{
+        fontSize: '11px',
+        color: oceanColors.textLight,
+        background: '#f3f4f6',
+        padding: '2px 10px',
+        borderRadius: '12px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px'
+      }}>
+        {result?.icon || <Minus size={14} />} {result?.label || 'N/A'}
+      </span>
+    );
+  }
+  
+  const bgColors = {
+    normal: `${oceanColors.success}15`,
+    warning: `${oceanColors.warning}15`,
+    danger: `${oceanColors.danger}15`,
+    info: `${oceanColors.info}15`,
+  };
+  
+  const textColors = {
+    normal: oceanColors.success,
+    warning: oceanColors.warning,
+    danger: oceanColors.danger,
+    info: oceanColors.info,
+  };
+  
+  return (
+    <span style={{
+      fontSize: '11px',
+      fontWeight: 'bold',
+      color: textColors[result.status],
+      background: bgColors[result.status],
+      padding: '2px 10px',
+      borderRadius: '12px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+      border: `1px solid ${textColors[result.status]}30`
+    }}>
+      {result.icon} {result.label}
+    </span>
+  );
+});
+
+// ✅ Stable InputWithInterpretation component (memoized)
+const InputWithInterpretation = React.memo(({ 
+  label, 
+  value, 
+  onChange, 
+  unit, 
+  result,
+  required = true,
+  step = '1',
+  type = 'number',
+  readOnly = false,
+  id
+}: any) => {
+  const inputId = id || `input-${label.replace(/\s+/g, '-').toLowerCase()}`;
+  
+  return (
+    <div style={{ marginBottom: '0' }}>
+      <label htmlFor={inputId} style={{ 
+        fontSize: '12px', 
+        fontWeight: '500', 
+        color: oceanColors.textDark, 
+        display: 'block', 
+        marginBottom: '4px' 
+      }}>
+        {label} {unit && <span style={{ color: oceanColors.textLight, fontSize: '10px' }}>({unit})</span>}
+        {required && !readOnly && <span style={{ color: oceanColors.danger, marginLeft: '2px' }}>*</span>}
+        {readOnly && <span style={{ color: oceanColors.success, fontSize: '10px', marginLeft: '4px' }}>● Auto</span>}
+      </label>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        {readOnly ? (
+          <div style={{
+            flex: 1,
+            padding: '10px 12px',
+            background: '#f3f4f6',
+            borderRadius: '8px',
+            border: `1px solid ${oceanColors.mid}20`,
+            fontSize: '14px',
+            fontWeight: 'bold',
+            color: oceanColors.textDark,
+            minHeight: '42px',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            {value || '—'}
+          </div>
+        ) : (
+          <input
+            id={inputId}
+            type={type}
+            step={step}
+            value={value}
+            onChange={onChange}
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: `1px solid ${oceanColors.mid}30`,
+              fontSize: '14px',
+              outline: 'none',
+              minWidth: '0',
+              width: '100%',
+              background: 'white'
+            }}
+            onFocus={(e) => e.currentTarget.style.borderColor = oceanColors.gold}
+            onBlur={(e) => e.currentTarget.style.borderColor = `${oceanColors.mid}30`}
+            required={required}
+          />
+        )}
+        {result && (
+          <div style={{ flexShrink: 0, minWidth: '80px', textAlign: 'right' }}>
+            <StatusBadge result={result} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
 
 export default function FieldFindings({ clientId, clientName, stationId, onSuccess }: FieldFindingsProps) {
   const [formData, setFormData] = useState({
@@ -53,7 +181,6 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     Systolic: '',
     Diastolic: '',
     RBSValue: '',
-    // Referrals
     BMD: false,
     CancerSCN: false,
     DentalSCN: false,
@@ -68,7 +195,16 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     PSA: false,
   });
 
-  // ✅ Fetch client details including DateOfBirth
+  // ✅ Use useCallback for stable onChange handlers
+  const handleInputChange = useCallback((field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+  }, []);
+
+  const handleCheckboxChange = useCallback((field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, [field]: e.target.checked }));
+  }, []);
+
+  // ✅ Fetch client details
   const { data: clientData, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
     queryFn: async () => {
@@ -78,7 +214,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     enabled: !!clientId,
   });
 
-  // ✅ Fetch BMI interpretation values from database
+  // ✅ Fetch interpretation values
   const { data: bmiValues } = useQuery({
     queryKey: ['bmi-int-values'],
     queryFn: async () => {
@@ -87,7 +223,6 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     },
   });
 
-  // ✅ Fetch BP interpretation values from database
   const { data: bpValues } = useQuery({
     queryKey: ['bp-int-values'],
     queryFn: async () => {
@@ -96,7 +231,6 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     },
   });
 
-  // ✅ Fetch RBS interpretation values from database
   const { data: rbsValues } = useQuery({
     queryKey: ['rbs-int-values'],
     queryFn: async () => {
@@ -105,7 +239,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     },
   });
 
-  // ✅ Calculate age from client's DateOfBirth
+  // ✅ Calculate age
   const [calculatedAge, setCalculatedAge] = useState<number | null>(null);
 
   useEffect(() => {
@@ -133,23 +267,21 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
   };
 
   // ============================================
-  // INTERPRETATION FUNCTIONS (Using Database Values)
+  // INTERPRETATION FUNCTIONS
   // ============================================
 
-  // Find interpretation from database values
-  const findInterpretation = (values: InterpretationValue[], numericValue: number): InterpretationResult | null => {
+  // ✅ Memoized findInterpretation
+  const findInterpretation = useCallback((values: InterpretationValue[], numericValue: number): InterpretationResult | null => {
     if (!values || values.length === 0 || !numericValue || numericValue <= 0) {
       return null;
     }
 
-    // Find the matching range
     const matched = values.find(v => 
       numericValue >= v.StartIndex && numericValue < v.StopIndex
     );
 
     if (!matched) return null;
 
-    // Determine status based on title
     const title = matched.Title.toUpperCase();
     let status: 'normal' | 'warning' | 'danger' | 'info' = 'info';
     let color = oceanColors.info;
@@ -179,67 +311,10 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
       color,
       icon: icons[status],
     };
-  };
-
-  // Get BMI interpretation from database
-  const getBMIInterpretation = (bmi: number): InterpretationResult | null => {
-    return findInterpretation(bmiValues || [], bmi);
-  };
-
-  // Get BP interpretation from database
-  const getBPInterpretation = (systolic: number, diastolic: number): InterpretationResult | null => {
-    // Use systolic for BP interpretation (as per database ranges)
-    return findInterpretation(bpValues || [], systolic);
-  };
-
-  // Get RBS interpretation from database
-  const getRBSInterpretation = (rbs: number): InterpretationResult | null => {
-    return findInterpretation(rbsValues || [], rbs);
-  };
-
-  // Calculate Waist-Hip Ratio (straightforward calculation)
-  const calculateWHR = (waist: number, hip: number): number => {
-    if (waist && hip && hip > 0) {
-      return waist / hip;
-    }
-    return 0;
-  };
-
-  // Interpret WHR (simple calculation)
-  const interpretWHR = (whr: number, gender: string): InterpretationResult => {
-    if (whr <= 0) {
-      return { 
-        id: 0, 
-        label: 'N/A', 
-        status: 'info', 
-        color: oceanColors.info, 
-        icon: <Minus size={14} /> 
-      };
-    }
-    
-    const isFemale = gender?.toLowerCase() === 'female';
-    const threshold = isFemale ? 0.80 : 0.90;
-    
-    if (whr < threshold) {
-      return { 
-        id: 1, 
-        label: 'Normal', 
-        status: 'normal', 
-        color: oceanColors.success, 
-        icon: <CheckCircle size={14} /> 
-      };
-    }
-    return { 
-      id: 2, 
-      label: 'Increased Risk', 
-      status: 'danger', 
-      color: oceanColors.danger, 
-      icon: <AlertCircle size={14} /> 
-    };
-  };
+  }, []);
 
   // ============================================
-  // COMPUTED VALUES
+  // COMPUTED VALUES - Memoized
   // ============================================
 
   const weight = parseFloat(formData.Weight) || 0;
@@ -250,13 +325,38 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
   const diastolic = parseInt(formData.Diastolic) || 0;
   const rbs = parseFloat(formData.RBSValue) || 0;
 
-  const bmi = weight && height ? (weight / ((height / 100) * (height / 100))) : 0;
-  const whr = calculateWHR(waist, hip);
-  
-  const bmiInterpretation = getBMIInterpretation(bmi);
-  const bpInterpretation = getBPInterpretation(systolic, diastolic);
-  const rbsInterpretation = getRBSInterpretation(rbs);
-  const whrInterpretation = interpretWHR(whr, clientData?.GenderTitle || '');
+  const bmi = useMemo(() => {
+    return weight && height ? (weight / ((height / 100) * (height / 100))) : 0;
+  }, [weight, height]);
+
+  const whr = useMemo(() => {
+    return (waist && hip && hip > 0) ? (waist / hip) : 0;
+  }, [waist, hip]);
+
+  // ✅ Memoized interpretations
+  const bmiInterpretation = useMemo(() => {
+    return findInterpretation(bmiValues || [], bmi);
+  }, [bmiValues, bmi, findInterpretation]);
+
+  const bpInterpretation = useMemo(() => {
+    return findInterpretation(bpValues || [], systolic);
+  }, [bpValues, systolic, findInterpretation]);
+
+  const rbsInterpretation = useMemo(() => {
+    return findInterpretation(rbsValues || [], rbs);
+  }, [rbsValues, rbs, findInterpretation]);
+
+  const whrInterpretation = useMemo(() => {
+    if (whr <= 0) {
+      return { id: 0, label: 'N/A', status: 'info' as const, color: oceanColors.info, icon: <Minus size={14} /> };
+    }
+    const isFemale = clientData?.GenderTitle?.toLowerCase() === 'female';
+    const threshold = isFemale ? 0.80 : 0.90;
+    if (whr < threshold) {
+      return { id: 1, label: 'Normal', status: 'normal' as const, color: oceanColors.success, icon: <CheckCircle size={14} /> };
+    }
+    return { id: 2, label: 'Increased Risk', status: 'danger' as const, color: oceanColors.danger, icon: <AlertCircle size={14} /> };
+  }, [whr, clientData?.GenderTitle]);
 
   // ============================================
   // SAVE MUTATION
@@ -312,127 +412,6 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
   };
 
   // ============================================
-  // UI COMPONENTS
-  // ============================================
-
-  // Status Badge Component
-  const StatusBadge = ({ result }: { result: InterpretationResult | null }) => {
-    if (!result || result.status === 'info') {
-      return (
-        <span style={{
-          fontSize: '11px',
-          color: oceanColors.textLight,
-          background: '#f3f4f6',
-          padding: '2px 10px',
-          borderRadius: '12px',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '4px'
-        }}>
-          {result?.icon || <Minus size={14} />} {result?.label || 'N/A'}
-        </span>
-      );
-    }
-    
-    const bgColors = {
-      normal: `${oceanColors.success}15`,
-      warning: `${oceanColors.warning}15`,
-      danger: `${oceanColors.danger}15`,
-      info: `${oceanColors.info}15`,
-    };
-    
-    const textColors = {
-      normal: oceanColors.success,
-      warning: oceanColors.warning,
-      danger: oceanColors.danger,
-      info: oceanColors.info,
-    };
-    
-    return (
-      <span style={{
-        fontSize: '11px',
-        fontWeight: 'bold',
-        color: textColors[result.status],
-        background: bgColors[result.status],
-        padding: '2px 10px',
-        borderRadius: '12px',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '4px',
-        border: `1px solid ${textColors[result.status]}30`
-      }}>
-        {result.icon} {result.label}
-      </span>
-    );
-  };
-
-  // Input with interpretation
-  const InputWithInterpretation = ({ 
-    label, 
-    value, 
-    onChange, 
-    unit, 
-    result,
-    required = true,
-    step = '1',
-    type = 'number',
-    readOnly = false
-  }: any) => (
-    <div style={{ marginBottom: '0' }}>
-      <label style={{ fontSize: '12px', fontWeight: '500', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>
-        {label} {unit && <span style={{ color: oceanColors.textLight, fontSize: '10px' }}>({unit})</span>}
-        {required && !readOnly && <span style={{ color: oceanColors.danger, marginLeft: '2px' }}>*</span>}
-        {readOnly && <span style={{ color: oceanColors.success, fontSize: '10px', marginLeft: '4px' }}>● Auto</span>}
-      </label>
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        {readOnly ? (
-          <div style={{
-            flex: 1,
-            padding: '10px 12px',
-            background: '#f3f4f6',
-            borderRadius: '8px',
-            border: `1px solid ${oceanColors.mid}20`,
-            fontSize: '14px',
-            fontWeight: 'bold',
-            color: oceanColors.textDark,
-            minHeight: '42px',
-            display: 'flex',
-            alignItems: 'center'
-          }}>
-            {value || '—'}
-          </div>
-        ) : (
-          <input
-            type={type}
-            step={step}
-            value={value}
-            onChange={onChange}
-            style={{
-              flex: 1,
-              padding: '10px 12px',
-              borderRadius: '8px',
-              border: `1px solid ${oceanColors.mid}30`,
-              fontSize: '14px',
-              outline: 'none',
-              minWidth: '0',
-              width: '100%',
-              background: 'white'
-            }}
-            onFocus={(e) => e.currentTarget.style.borderColor = oceanColors.gold}
-            onBlur={(e) => e.currentTarget.style.borderColor = `${oceanColors.mid}30`}
-            required={required}
-          />
-        )}
-        {result && (
-          <div style={{ flexShrink: 0, minWidth: '80px', textAlign: 'right' }}>
-            <StatusBadge result={result} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // ============================================
   // RENDER
   // ============================================
 
@@ -483,8 +462,8 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
             gridTemplateColumns: 'repeat(2, 1fr)', 
             gap: '12px'
           }}>
-            {/* Age - Read-only */}
             <InputWithInterpretation
+              id="age"
               label="Age"
               unit="years"
               value={calculatedAge !== null ? calculatedAge : 'Calculating...'}
@@ -492,26 +471,26 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               required={false}
             />
 
-            {/* Weight */}
             <InputWithInterpretation
+              id="weight"
               label="Weight"
               unit="kg"
               value={formData.Weight}
-              onChange={(e: any) => setFormData({ ...formData, Weight: e.target.value })}
+              onChange={handleInputChange('Weight')}
               step="0.1"
             />
 
-            {/* Height */}
             <InputWithInterpretation
+              id="height"
               label="Height"
               unit="cm"
               value={formData.Height}
-              onChange={(e: any) => setFormData({ ...formData, Height: e.target.value })}
+              onChange={handleInputChange('Height')}
               step="0.1"
             />
 
-            {/* BMI - Read-only with interpretation */}
             <InputWithInterpretation
+              id="bmi"
               label="BMI"
               unit=""
               value={bmi > 0 ? bmi.toFixed(1) : '—'}
@@ -533,24 +512,26 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
             gap: '12px'
           }}>
             <InputWithInterpretation
+              id="waist"
               label="Waist"
               unit="cm"
               value={formData.Waist}
-              onChange={(e: any) => setFormData({ ...formData, Waist: e.target.value })}
+              onChange={handleInputChange('Waist')}
               step="0.1"
             />
 
             <InputWithInterpretation
+              id="hip"
               label="Hip"
               unit="cm"
               value={formData.Hip}
-              onChange={(e: any) => setFormData({ ...formData, Hip: e.target.value })}
+              onChange={handleInputChange('Hip')}
               step="0.1"
             />
 
-            {/* WHR - Read-only with interpretation */}
             <div style={{ gridColumn: 'span 2' }}>
               <InputWithInterpretation
+                id="whr"
                 label="Waist-Hip Ratio"
                 unit=""
                 value={whr > 0 ? whr.toFixed(2) : '—'}
@@ -573,22 +554,24 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
             gap: '12px'
           }}>
             <InputWithInterpretation
+              id="systolic"
               label="Systolic"
               unit="mmHg"
               value={formData.Systolic}
-              onChange={(e: any) => setFormData({ ...formData, Systolic: e.target.value })}
+              onChange={handleInputChange('Systolic')}
             />
 
             <InputWithInterpretation
+              id="diastolic"
               label="Diastolic"
               unit="mmHg"
               value={formData.Diastolic}
-              onChange={(e: any) => setFormData({ ...formData, Diastolic: e.target.value })}
+              onChange={handleInputChange('Diastolic')}
             />
 
-            {/* BP Interpretation - Full width */}
             <div style={{ gridColumn: 'span 2' }}>
               <InputWithInterpretation
+                id="bp-interpretation"
                 label="BP Interpretation"
                 unit=""
                 value={systolic > 0 && diastolic > 0 ? `${systolic}/${diastolic} mmHg` : '—'}
@@ -611,10 +594,11 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
             gap: '12px'
           }}>
             <InputWithInterpretation
+              id="rbs"
               label="RBS Value"
               unit="mg/dL"
               value={formData.RBSValue}
-              onChange={(e: any) => setFormData({ ...formData, RBSValue: e.target.value })}
+              onChange={handleInputChange('RBSValue')}
               step="0.1"
               result={rbsInterpretation}
             />
@@ -634,54 +618,29 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
             padding: '12px',
             borderRadius: '12px'
           }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.BMD} onChange={(e) => setFormData({ ...formData, BMD: e.target.checked })} />
-              BMD
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.CancerSCN} onChange={(e) => setFormData({ ...formData, CancerSCN: e.target.checked })} />
-              Cancer Screen
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.DentalSCN} onChange={(e) => setFormData({ ...formData, DentalSCN: e.target.checked })} />
-              Dental Screen
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.ECG} onChange={(e) => setFormData({ ...formData, ECG: e.target.checked })} />
-              ECG
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.EyeSCN} onChange={(e) => setFormData({ ...formData, EyeSCN: e.target.checked })} />
-              Eye Screen
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.FBS} onChange={(e) => setFormData({ ...formData, FBS: e.target.checked })} />
-              FBS
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.HBA1C} onChange={(e) => setFormData({ ...formData, HBA1C: e.target.checked })} />
-              HbA1c
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.HepatitisBC} onChange={(e) => setFormData({ ...formData, HepatitisBC: e.target.checked })} />
-              Hep B/C
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.Lipid} onChange={(e) => setFormData({ ...formData, Lipid: e.target.checked })} />
-              Lipid Profile
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.Microalbumin} onChange={(e) => setFormData({ ...formData, Microalbumin: e.target.checked })} />
-              Microalbumin
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.NutritionCounselling} onChange={(e) => setFormData({ ...formData, NutritionCounselling: e.target.checked })} />
-              Nutrition
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-              <input type="checkbox" checked={formData.PSA} onChange={(e) => setFormData({ ...formData, PSA: e.target.checked })} />
-              PSA
-            </label>
+            {[
+              { key: 'BMD', label: 'BMD' },
+              { key: 'CancerSCN', label: 'Cancer Screen' },
+              { key: 'DentalSCN', label: 'Dental Screen' },
+              { key: 'ECG', label: 'ECG' },
+              { key: 'EyeSCN', label: 'Eye Screen' },
+              { key: 'FBS', label: 'FBS' },
+              { key: 'HBA1C', label: 'HbA1c' },
+              { key: 'HepatitisBC', label: 'Hep B/C' },
+              { key: 'Lipid', label: 'Lipid Profile' },
+              { key: 'Microalbumin', label: 'Microalbumin' },
+              { key: 'NutritionCounselling', label: 'Nutrition' },
+              { key: 'PSA', label: 'PSA' },
+            ].map(({ key, label }) => (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                <input 
+                  type="checkbox" 
+                  checked={formData[key as keyof typeof formData] as boolean} 
+                  onChange={handleCheckboxChange(key)} 
+                />
+                {label}
+              </label>
+            ))}
           </div>
         </div>
 
