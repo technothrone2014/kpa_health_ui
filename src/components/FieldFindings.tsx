@@ -94,6 +94,70 @@ const StatusBadge = React.memo(({ result }: { result: InterpretationResult | nul
   );
 });
 
+// Map backend status → icon (colour is applied in StatusBadge via `status`)
+const STATUS_ICONS: Record<InterpretationResult['status'], React.ReactNode> = {
+  normal: <CheckCircle size={14} />,
+  warning: <AlertTriangle size={14} />,
+  danger: <AlertCircle size={14} />,
+  info: <Minus size={14} />,
+};
+
+const STATUS_COLORS: Record<InterpretationResult['status'], string> = {
+  normal: oceanColors.success,
+  warning: oceanColors.warning,
+  danger: oceanColors.danger,
+  info: oceanColors.info,
+};
+
+function mapHitToResult(hit: {
+  Id: number;
+  Title: string;
+  status: InterpretationResult['status'];
+} | null): InterpretationResult | null {
+  if (!hit) return null;
+  return {
+    id: hit.Id,
+    label: hit.Title,
+    status: hit.status,
+    color: STATUS_COLORS[hit.status],
+    icon: STATUS_ICONS[hit.status],
+  };
+}
+
+// Debounced server-side interpretation hook
+function useInterpretation(type: 'bmi' | 'bp' | 'rbs', value: number) {
+  const [result, setResult] = useState<InterpretationResult | null>(null);
+
+  useEffect(() => {
+    if (!value || value <= 0) {
+      setResult(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get(`/lookups/interpret/${type}`, {
+          params: { value },
+          signal: controller.signal,
+        });
+        setResult(mapHitToResult(res.data?.interpretation ?? null));
+      } catch (err: any) {
+        if (err?.name !== 'CanceledError' && err?.name !== 'AbortError') {
+          console.error(`Interpretation fetch failed for ${type}:`, err);
+        }
+      }
+    }, 300); // debounce
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [type, value]);
+
+  return result;
+}
+
 // ✅ Stable InputWithInterpretation component (memoized)
 const InputWithInterpretation = React.memo(({ 
   label, 
@@ -214,31 +278,6 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     enabled: !!clientId,
   });
 
-  // ✅ Fetch interpretation values
-  const { data: bmiValues } = useQuery({
-    queryKey: ['bmi-int-values'],
-    queryFn: async () => {
-      const response = await api.get('/lookups/bmi-values');
-      return response.data || [];
-    },
-  });
-
-  const { data: bpValues } = useQuery({
-    queryKey: ['bp-int-values'],
-    queryFn: async () => {
-      const response = await api.get('/lookups/bp-values');
-      return response.data || [];
-    },
-  });
-
-  const { data: rbsValues } = useQuery({
-    queryKey: ['rbs-int-values'],
-    queryFn: async () => {
-      const response = await api.get('/lookups/rbs-values');
-      return response.data || [];
-    },
-  });
-
   // ✅ Calculate age
   const [calculatedAge, setCalculatedAge] = useState<number | null>(null);
 
@@ -266,52 +305,6 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     return format(new Date(dob), 'dd MMM yyyy');
   };
 
-  // ============================================
-  // INTERPRETATION FUNCTIONS
-  // ============================================
-
-  // ✅ Memoized findInterpretation
-  const findInterpretation = useCallback((values: InterpretationValue[], numericValue: number): InterpretationResult | null => {
-    if (!values || values.length === 0 || !numericValue || numericValue <= 0) {
-      return null;
-    }
-
-    const matched = values.find(v => 
-      numericValue >= v.StartIndex && numericValue < v.StopIndex
-    );
-
-    if (!matched) return null;
-
-    const title = matched.Title.toUpperCase();
-    let status: 'normal' | 'warning' | 'danger' | 'info' = 'info';
-    let color = oceanColors.info;
-
-    if (title.includes('NORMAL') || title.includes('HEALTHY')) {
-      status = 'normal';
-      color = oceanColors.success;
-    } else if (title.includes('PRE') || title.includes('ELEVATED') || title.includes('OVERWEIGHT') || title.includes('STAGE I')) {
-      status = 'warning';
-      color = oceanColors.warning;
-    } else if (title.includes('HYPERTENSION') || title.includes('OBESE') || title.includes('DIABETIC') || title.includes('CRISIS')) {
-      status = 'danger';
-      color = oceanColors.danger;
-    }
-
-    const icons = {
-      normal: <CheckCircle size={14} />,
-      warning: <AlertTriangle size={14} />,
-      danger: <AlertCircle size={14} />,
-      info: <Minus size={14} />,
-    };
-
-    return {
-      id: matched.Id,
-      label: matched.Title,
-      status,
-      color,
-      icon: icons[status],
-    };
-  }, []);
 
   // ============================================
   // COMPUTED VALUES - Memoized
@@ -337,17 +330,10 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
   }, [waist, hip]);
 
   // ✅ Memoized interpretations
-  const bmiInterpretation = useMemo(() => {
-    return findInterpretation(bmiValues || [], bmi);
-  }, [bmiValues, bmi, findInterpretation]);
+  const bmiInterpretation = useInterpretation('bmi', bmi);
+  const bpInterpretation  = useInterpretation('bp',  systolic);
+  const rbsInterpretation = useInterpretation('rbs', rbs);
 
-  const bpInterpretation = useMemo(() => {
-    return findInterpretation(bpValues || [], systolic);
-  }, [bpValues, systolic, findInterpretation]);
-
-  const rbsInterpretation = useMemo(() => {
-    return findInterpretation(rbsValues || [], rbs);
-  }, [rbsValues, rbs, findInterpretation]);
 
   // ============================================
   // SAVE MUTATION
@@ -362,15 +348,12 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
         Weight: weight,
         Height: height,
         BMIValue: bmi,
-        BMIINTValueId: bmiInterpretation?.id || 6,
         Waist: waist,
         Hip: hip,
         WHRatio: whr,
         Systolic: systolic,
         Diastolic: diastolic,
-        BPINTValueId: bpInterpretation?.id || 6,
         RBSValue: rbs,
-        RBSINTValueId: rbsInterpretation?.id || 5,
         BMD: data.BMD,
         CancerSCN: data.CancerSCN,
         DentalSCN: data.DentalSCN,
