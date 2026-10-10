@@ -326,7 +326,10 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
   const rbs = parseFloat(formData.RBSValue) || 0;
 
   const bmi = useMemo(() => {
-    return weight && height ? (weight / ((height / 100) * (height / 100))) : 0;
+    if (!weight || !height) return 0;
+    if (height < 50 || height > 250) return 0; // sanity: reject absurd heights
+    if (weight < 1 || weight > 400) return 0;  // sanity: reject absurd weights
+    return weight / ((height / 100) * (height / 100));
   }, [weight, height]);
 
   const whr = useMemo(() => {
@@ -371,15 +374,15 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
         Weight: weight,
         Height: height,
         BMIValue: bmi,
-        BMIINTValueId: bmiInterpretation?.id || 1,
+        BMIINTValueId: bmiInterpretation?.id || 6,
         Waist: waist,
         Hip: hip,
         WHRatio: whr,
         Systolic: systolic,
         Diastolic: diastolic,
-        BPINTValueId: bpInterpretation?.id || 1,
+        BPINTValueId: bpInterpretation?.id || 6,
         RBSValue: rbs,
-        RBSINTValueId: rbsInterpretation?.id || 1,
+        RBSINTValueId: rbsInterpretation?.id || 5,
         BMD: data.BMD,
         CancerSCN: data.CancerSCN,
         DentalSCN: data.DentalSCN,
@@ -452,10 +455,10 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
       </div>
 
       <form onSubmit={handleSubmit}>
-        {/* Anthropometric Measurements */}
+        {/* Age */}
         <div style={{ marginBottom: '20px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: oceanColors.deep, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Scale size={16} /> Anthropometric
+            <Calendar size={16} /> Age
           </h3>
           <div style={{ 
             display: 'grid', 
@@ -470,7 +473,19 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               readOnly={true}
               required={false}
             />
+          </div>
+        </div>
 
+        {/* BMI */}
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: oceanColors.deep, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Scale size={16} /> BMI
+          </h3>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(2, 1fr)', 
+            gap: '12px'
+          }}>
             <InputWithInterpretation
               id="weight"
               label="Weight"
@@ -489,15 +504,17 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               step="0.1"
             />
 
-            <InputWithInterpretation
-              id="bmi"
-              label="BMI"
-              unit=""
-              value={bmi > 0 ? bmi.toFixed(1) : '—'}
-              readOnly={true}
-              required={false}
-              result={bmiInterpretation}
-            />
+            <div style={{ gridColumn: 'span 2' }}>
+              <InputWithInterpretation
+                id="bmi"
+                label="BMI"
+                unit="kg/m²"
+                value={bmi > 0 ? bmi.toFixed(1) : '—'}
+                readOnly={true}
+                required={false}
+                result={bmiInterpretation}
+              />
+            </div>
           </div>
         </div>
 
