@@ -349,18 +349,6 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     return findInterpretation(rbsValues || [], rbs);
   }, [rbsValues, rbs, findInterpretation]);
 
-  const whrInterpretation = useMemo(() => {
-    if (whr <= 0) {
-      return { id: 0, label: 'N/A', status: 'info' as const, color: oceanColors.info, icon: <Minus size={14} /> };
-    }
-    const isFemale = clientData?.GenderTitle?.toLowerCase() === 'female';
-    const threshold = isFemale ? 0.80 : 0.90;
-    if (whr < threshold) {
-      return { id: 1, label: 'Normal', status: 'normal' as const, color: oceanColors.success, icon: <CheckCircle size={14} /> };
-    }
-    return { id: 2, label: 'Increased Risk', status: 'danger' as const, color: oceanColors.danger, icon: <AlertCircle size={14} /> };
-  }, [whr, clientData?.GenderTitle]);
-
   // ============================================
   // SAVE MUTATION
   // ============================================
@@ -554,7 +542,6 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
                 value={whr > 0 ? whr.toFixed(2) : '—'}
                 readOnly={true}
                 required={false}
-                result={whrInterpretation}
               />
             </div>
           </div>
