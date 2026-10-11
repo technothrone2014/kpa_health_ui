@@ -331,7 +331,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
 
   // ✅ Memoized interpretations
   const bmiInterpretation = useInterpretation('bmi', bmi);
-  const bpInterpretation  = useInterpretation('bp',  systolic);
+  const bpInterpretation  = useInterpretation('bp',  diastolic);
   const rbsInterpretation = useInterpretation('rbs', rbs);
 
 
