@@ -21,6 +21,31 @@ const oceanColors = {
   white: '#FFFFFF',
 };
 
+// ============================================
+// VALIDATION RULES
+// ============================================
+const FIELD_LIMITS = {
+  Weight:   { min: 5,  max: 300, unit: 'kg' },
+  Height:   { min: 30, max: 250, unit: 'cm' },
+  Waist:    { min: 30, max: 200, unit: 'cm' },
+  Hip:      { min: 30, max: 200, unit: 'cm' },
+  Systolic: { min: 60, max: 250, unit: 'mmHg' },
+  Diastolic:{ min: 30, max: 150, unit: 'mmHg' },
+  RBSValue: { min: 20, max: 800, unit: 'mg/dL' },
+} as const;
+
+type FieldKey = keyof typeof FIELD_LIMITS;
+
+function validateField(field: FieldKey, value: string): string | null {
+  if (!value || value.trim() === '') return null; // empty is allowed (handled by `required`)
+  const num = parseFloat(value);
+  if (Number.isNaN(num)) return 'Must be a valid number';
+  const limit = FIELD_LIMITS[field];
+  if (num < limit.min) return `Minimum is ${limit.min} ${limit.unit}`;
+  if (num > limit.max) return `Maximum is ${limit.max} ${limit.unit}`;
+  return null;
+}
+
 interface FieldFindingsProps {
   clientId: number;
   clientName: string;
@@ -169,10 +194,14 @@ const InputWithInterpretation = React.memo(({
   step = '1',
   type = 'number',
   readOnly = false,
-  id
+  id,
+  min,
+  max,
+  error,
 }: any) => {
   const inputId = id || `input-${label.replace(/\s+/g, '-').toLowerCase()}`;
-  
+  const hasError = !!error;
+
   return (
     <div style={{ marginBottom: '0' }}>
       <label htmlFor={inputId} style={{ 
@@ -208,21 +237,24 @@ const InputWithInterpretation = React.memo(({
             id={inputId}
             type={type}
             step={step}
+            min={min}
+            max={max}
             value={value}
             onChange={onChange}
+            aria-invalid={hasError}
             style={{
               flex: 1,
               padding: '10px 12px',
               borderRadius: '8px',
-              border: `1px solid ${oceanColors.mid}30`,
+              border: `1px solid ${hasError ? oceanColors.danger : `${oceanColors.mid}30`}`,
               fontSize: '14px',
               outline: 'none',
               minWidth: '0',
               width: '100%',
-              background: 'white'
+              background: hasError ? `${oceanColors.danger}08` : 'white'
             }}
-            onFocus={(e) => e.currentTarget.style.borderColor = oceanColors.gold}
-            onBlur={(e) => e.currentTarget.style.borderColor = `${oceanColors.mid}30`}
+            onFocus={(e) => e.currentTarget.style.borderColor = hasError ? oceanColors.danger : oceanColors.gold}
+            onBlur={(e) => e.currentTarget.style.borderColor = hasError ? oceanColors.danger : `${oceanColors.mid}30`}
             required={required}
           />
         )}
@@ -232,6 +264,18 @@ const InputWithInterpretation = React.memo(({
           </div>
         )}
       </div>
+      {hasError && (
+        <p style={{
+          fontSize: '11px',
+          color: oceanColors.danger,
+          margin: '4px 0 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px'
+        }}>
+          <AlertCircle size={12} /> {error}
+        </p>
+      )}
     </div>
   );
 });
@@ -329,6 +373,34 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     return (waist && hip && hip > 0) ? (waist / hip) : 0;
   }, [waist, hip]);
 
+  // ============================================
+  // VALIDATION
+  // ============================================
+  const errors = useMemo(() => {
+    const e: Record<string, string | null> = {
+      Weight:    validateField('Weight',    formData.Weight),
+      Height:    validateField('Height',    formData.Height),
+      Waist:     validateField('Waist',     formData.Waist),
+      Hip:       validateField('Hip',       formData.Hip),
+      Systolic:  validateField('Systolic',  formData.Systolic),
+      Diastolic: validateField('Diastolic', formData.Diastolic),
+      RBSValue:  validateField('RBSValue',  formData.RBSValue),
+    };
+
+    // Cross-field: systolic must be strictly greater than diastolic
+    if (systolic > 0 && diastolic > 0 && systolic <= diastolic) {
+      e.Systolic  = 'Systolic must be greater than Diastolic';
+      e.Diastolic = 'Diastolic must be less than Systolic';
+    }
+
+    return e;
+  }, [formData, systolic, diastolic]);
+
+  const hasErrors = useMemo(
+    () => Object.values(errors).some((msg) => !!msg),
+    [errors]
+  );
+
   // ✅ Memoized interpretations
   const bmiInterpretation = useInterpretation('bmi', bmi);
   const bpInterpretation  = useInterpretation('bp',  diastolic);
@@ -382,6 +454,10 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasErrors) {
+      toast.error('Please fix the highlighted errors before saving.');
+      return;
+    }
     saveFindings.mutate(formData);
   };
 
@@ -464,6 +540,9 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               value={formData.Weight}
               onChange={handleInputChange('Weight')}
               step="0.1"
+              min={FIELD_LIMITS.Weight.min}
+              max={FIELD_LIMITS.Weight.max}
+              error={errors.Weight}
             />
 
             <InputWithInterpretation
@@ -473,6 +552,9 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               value={formData.Height}
               onChange={handleInputChange('Height')}
               step="0.1"
+              min={FIELD_LIMITS.Height.min}
+              max={FIELD_LIMITS.Height.max}
+              error={errors.Height}
             />
 
             <div style={{ gridColumn: 'span 2' }}>
@@ -506,6 +588,9 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               value={formData.Waist}
               onChange={handleInputChange('Waist')}
               step="0.1"
+              min={FIELD_LIMITS.Waist.min}
+              max={FIELD_LIMITS.Waist.max}
+              error={errors.Waist}
             />
 
             <InputWithInterpretation
@@ -515,6 +600,9 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               value={formData.Hip}
               onChange={handleInputChange('Hip')}
               step="0.1"
+              min={FIELD_LIMITS.Hip.min}
+              max={FIELD_LIMITS.Hip.max}
+              error={errors.Hip}
             />
 
             <div style={{ gridColumn: 'span 2' }}>
@@ -546,6 +634,9 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               unit="mmHg"
               value={formData.Systolic}
               onChange={handleInputChange('Systolic')}
+              min={FIELD_LIMITS.Systolic.min}
+              max={FIELD_LIMITS.Systolic.max}
+              error={errors.Systolic}
             />
 
             <InputWithInterpretation
@@ -554,6 +645,9 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               unit="mmHg"
               value={formData.Diastolic}
               onChange={handleInputChange('Diastolic')}
+              min={FIELD_LIMITS.Diastolic.min}
+              max={FIELD_LIMITS.Diastolic.max}
+              error={errors.Diastolic}
             />
 
             <div style={{ gridColumn: 'span 2' }}>
@@ -587,6 +681,9 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
               value={formData.RBSValue}
               onChange={handleInputChange('RBSValue')}
               step="0.1"
+              min={FIELD_LIMITS.RBSValue.min}
+              max={FIELD_LIMITS.RBSValue.max}
+              error={errors.RBSValue}
               result={rbsInterpretation}
             />
           </div>
@@ -634,7 +731,7 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={saveFindings.isPending}
+          disabled={saveFindings.isPending || hasErrors}
           style={{
             width: '100%',
             padding: '14px',
@@ -644,12 +741,12 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
             color: oceanColors.deep,
             fontWeight: 'bold',
             fontSize: '16px',
-            cursor: saveFindings.isPending ? 'not-allowed' : 'pointer',
+            cursor: (saveFindings.isPending || hasErrors) ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '10px',
-            opacity: saveFindings.isPending ? 0.7 : 1,
+            opacity: (saveFindings.isPending || hasErrors) ? 0.6 : 1,
             transition: 'all 0.2s'
           }}
         >
