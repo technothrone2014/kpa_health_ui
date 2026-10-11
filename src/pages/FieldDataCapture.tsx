@@ -732,6 +732,13 @@ export default function FieldDataCapture() {
               clientId={selectedClient.Id}
               clientName={selectedClient.FullName}
               stationId={sessionStation}
+              onStationChange={(newId) => {
+                setSessionStation(newId);
+                toast.success(
+                  `Station changed to "${stations?.find((s: Station) => s.Id === newId)?.Title ?? newId}" for this session`,
+                  { icon: '📍' }
+                );
+              }}
               onSuccess={handleFindingsSuccess}
             />
           </div>

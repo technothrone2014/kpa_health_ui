@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { 
   Activity, Heart, Scale, Droplets, Save, Loader2, Calendar, 
-  Ruler, AlertCircle, CheckCircle, AlertTriangle, Minus
+  Ruler, AlertCircle, CheckCircle, AlertTriangle, Minus, MapPin
 } from 'lucide-react';
 import api from '../api/client';
 import toast from 'react-hot-toast';
@@ -51,6 +51,13 @@ interface FieldFindingsProps {
   clientName: string;
   stationId: number;
   onSuccess?: () => void;
+  /** Optional: when provided, renders an editable station dropdown */
+  onStationChange?: (newStationId: number) => void;
+}
+
+interface StationOption {
+  Id: number;
+  Title: string;
 }
 
 interface InterpretationValue {
@@ -280,7 +287,13 @@ const InputWithInterpretation = React.memo(({
   );
 });
 
-export default function FieldFindings({ clientId, clientName, stationId, onSuccess }: FieldFindingsProps) {
+export default function FieldFindings({
+  clientId,
+  clientName,
+  stationId,
+  onSuccess,
+  onStationChange,
+}: FieldFindingsProps) {
   const [formData, setFormData] = useState({
     Weight: '',
     Height: '',
@@ -321,6 +334,20 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
     },
     enabled: !!clientId,
   });
+
+  // ✅ Fetch stations for the dropdown (shared cache key with parent)
+  const { data: stations } = useQuery<StationOption[]>({
+    queryKey: ['stations'],
+    queryFn: async () => {
+      const response = await api.get('/analytics/stations');
+      return response.data.data || [];
+    },
+    staleTime: 5 * 60 * 1000, // 5 min — stations rarely change
+  });
+
+  const currentStationName = useMemo(() => {
+    return stations?.find((s) => s.Id === stationId)?.Title ?? `Station ${stationId}`;
+  }, [stations, stationId]);
 
   // ✅ Calculate age
   const [calculatedAge, setCalculatedAge] = useState<number | null>(null);
@@ -488,10 +515,44 @@ export default function FieldFindings({ clientId, clientName, stationId, onSucce
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: oceanColors.textDark, margin: 0 }}>
           Field Findings
         </h2>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px', gap: '8px' }}>
-          <p style={{ fontSize: '12px', color: oceanColors.textLight, margin: 0 }}>
-            {clientName} • Station: {stationId}
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginTop: '6px', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: oceanColors.textLight, flexWrap: 'wrap' }}>
+            <span>{clientName}</span>
+            <span style={{ color: oceanColors.mid }}>•</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <MapPin size={12} style={{ color: oceanColors.deep }} />
+              Station:
+              {onStationChange && stations && stations.length > 0 ? (
+                <select
+                  value={stationId}
+                  onChange={(e) => onStationChange(Number(e.target.value))}
+                  title="Change station for this session — applies to all subsequent clients"
+                  style={{
+                    fontSize: '12px',
+                    padding: '4px 8px',
+                    borderRadius: '8px',
+                    border: `1px solid ${oceanColors.mid}40`,
+                    background: '#f8fafc',
+                    color: oceanColors.textDark,
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    maxWidth: '220px',
+                  }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = oceanColors.gold)}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = `${oceanColors.mid}40`)}
+                >
+                  {stations.map((s) => (
+                    <option key={s.Id} value={s.Id}>
+                      {s.Title}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <strong style={{ color: oceanColors.textDark }}>{currentStationName}</strong>
+              )}
+            </span>
+          </div>
           {clientData?.DateOfBirth && (
             <p style={{ fontSize: '11px', color: oceanColors.deep, background: '#f0f7ff', padding: '2px 10px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
               <Calendar size={12} />
