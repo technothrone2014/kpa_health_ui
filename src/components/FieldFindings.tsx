@@ -635,25 +635,13 @@ export default function FieldFindings({
         {/* Waist & Hip */}
         <div style={{ marginBottom: '20px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: oceanColors.deep, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Ruler size={16} /> Waist & Hip
+            <Ruler size={16} /> Hip & Waist
           </h3>
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(2, 1fr)', 
             gap: '12px'
           }}>
-            <InputWithInterpretation
-              id="waist"
-              label="Waist"
-              unit="cm"
-              value={formData.Waist}
-              onChange={handleInputChange('Waist')}
-              step="0.1"
-              min={FIELD_LIMITS.Waist.min}
-              max={FIELD_LIMITS.Waist.max}
-              error={errors.Waist}
-            />
-
             <InputWithInterpretation
               id="hip"
               label="Hip"
@@ -664,6 +652,18 @@ export default function FieldFindings({
               min={FIELD_LIMITS.Hip.min}
               max={FIELD_LIMITS.Hip.max}
               error={errors.Hip}
+            />
+
+            <InputWithInterpretation
+              id="waist"
+              label="Waist"
+              unit="cm"
+              value={formData.Waist}
+              onChange={handleInputChange('Waist')}
+              step="0.1"
+              min={FIELD_LIMITS.Waist.min}
+              max={FIELD_LIMITS.Waist.max}
+              error={errors.Waist}
             />
 
             <div style={{ gridColumn: 'span 2' }}>
