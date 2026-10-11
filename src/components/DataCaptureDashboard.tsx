@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Search, UserPlus, Activity, FlaskConical, Shield, 
@@ -42,6 +42,23 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
   const [isSearching, setIsSearching] = useState(false);
   const [showRegistration, setShowRegistration] = useState(false);
   const { user } = useAuth();
+
+  // ✅ Session-editable station — starts from the prop, adjustable per session
+  const [localStationId, setLocalStationId] = useState<number>(stationId);
+
+  useEffect(() => {
+    setLocalStationId(stationId);
+  }, [stationId]);
+
+  // Fetch stations for the dropdown (shared cache with FieldFindings)
+  const { data: stations } = useQuery({
+    queryKey: ['stations'],
+    queryFn: async () => {
+      const response = await api.get('/analytics/stations');
+      return response.data.data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Search for client
   const searchClient = async () => {
@@ -257,7 +274,14 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
           <FieldFindings
             clientId={selectedClient.Id}
             clientName={selectedClient.FullName}
-            stationId={stationId}
+            stationId={localStationId}
+            onStationChange={(newId) => {
+              setLocalStationId(newId);
+              toast.success(
+                `Station changed to "${stations?.find((s: any) => s.Id === newId)?.Title ?? newId}" for this session`,
+                { icon: '📍' }
+              );
+            }}
             onSuccess={handleFieldSuccess}
           />
         );
@@ -269,7 +293,7 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
             clientId={selectedClient.Id}
             clientName={selectedClient.FullName}
             clientIdNumber={selectedClient.IDNumber}
-            stationId={stationId}
+            stationId={localStationId}   // ← changed
             onSuccess={handleLabSuccess}
           />
         );
@@ -282,11 +306,11 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
             clientName={selectedClient.FullName}
             clientIdNumber={selectedClient.IDNumber}
             genderId={selectedClient.GenderId}
-            stationId={stationId}
+            stationId={localStationId}   // ← changed
             onSuccess={handleOncologySuccess}
           />
         );
-
+        
       default:
         return null;
     }
