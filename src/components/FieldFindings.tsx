@@ -302,6 +302,8 @@ export default function FieldFindings({
     Systolic: '',
     Diastolic: '',
     RBSValue: '',
+    BPRemarkId: '' as string | number,
+    RBSRemarkId: '' as string | number,
     BMD: false,
     CancerSCN: false,
     DentalSCN: false,
@@ -343,6 +345,24 @@ export default function FieldFindings({
       return response.data.data || [];
     },
     staleTime: 5 * 60 * 1000, // 5 min — stations rarely change
+  });
+
+  const { data: bpRemarks } = useQuery<StationOption[]>({
+    queryKey: ['bp-remark-values'],
+    queryFn: async () => {
+      const response = await api.get('/lookups/bp-remark-values');
+      return response.data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: rbsRemarks } = useQuery<StationOption[]>({
+    queryKey: ['rbs-remark-values'],
+    queryFn: async () => {
+      const response = await api.get('/lookups/rbs-remark-values');
+      return response.data || [];
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   const currentStationName = useMemo(() => {
@@ -420,9 +440,12 @@ export default function FieldFindings({
       e.Diastolic = 'Diastolic must be less than Systolic';
     }
 
+    // Required remarks (medication status must be recorded)
+    if (!formData.BPRemarkId) e.BPRemarkId = 'Please select a remark';
+    if (!formData.RBSRemarkId) e.RBSRemarkId = 'Please select a remark';
+
     return e;
   }, [formData, systolic, diastolic]);
-
   const hasErrors = useMemo(
     () => Object.values(errors).some((msg) => !!msg),
     [errors]
@@ -453,6 +476,8 @@ export default function FieldFindings({
         Systolic: systolic,
         Diastolic: diastolic,
         RBSValue: rbs,
+        BPRemarkId: formData.BPRemarkId || null,
+        RBSRemarkId: formData.RBSRemarkId || null,
         BMD: data.BMD,
         CancerSCN: data.CancerSCN,
         DentalSCN: data.DentalSCN,
@@ -712,15 +737,44 @@ export default function FieldFindings({
             />
 
             <div style={{ gridColumn: 'span 2' }}>
-              <InputWithInterpretation
-                id="bp-interpretation"
-                label="BP Interpretation"
-                unit=""
-                value={systolic > 0 && diastolic > 0 ? `${systolic}/${diastolic} mmHg` : '—'}
-                readOnly={true}
-                required={false}
-                result={bpInterpretation}
-              />
+              <label htmlFor="bp-remark" style={{
+                fontSize: '12px',
+                fontWeight: '500',
+                color: oceanColors.textDark,
+                display: 'block',
+                marginBottom: '4px'
+              }}>
+                Remark <span style={{ color: oceanColors.textLight, fontSize: '10px' }}>(medication status)</span>
+                <span style={{ color: oceanColors.danger, marginLeft: '2px' }}>*</span>
+              </label>
+              <select
+                id="bp-remark"
+                value={formData.BPRemarkId}
+                onChange={(e) => setFormData(prev => ({ ...prev, BPRemarkId: e.target.value ? Number(e.target.value) : '' }))}
+                aria-invalid={!!errors.BPRemarkId}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${errors.BPRemarkId ? oceanColors.danger : `${oceanColors.mid}30`}`,
+                  fontSize: '14px',
+                  outline: 'none',
+                  background: errors.BPRemarkId ? `${oceanColors.danger}08` : 'white',
+                  cursor: 'pointer'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = errors.BPRemarkId ? oceanColors.danger : oceanColors.gold}
+                onBlur={(e) => e.currentTarget.style.borderColor = errors.BPRemarkId ? oceanColors.danger : `${oceanColors.mid}30`}
+              >
+                <option value="">Select remark…</option>
+                {bpRemarks?.map((r) => (
+                  <option key={r.Id} value={r.Id}>{r.Title}</option>
+                ))}
+              </select>
+              {errors.BPRemarkId && (
+                <p style={{ fontSize: '11px', color: oceanColors.danger, margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <AlertCircle size={12} /> {errors.BPRemarkId}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -732,7 +786,7 @@ export default function FieldFindings({
           </h3>
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: '1fr', 
+            gridTemplateColumns: 'repeat(2, 1fr)', 
             gap: '12px'
           }}>
             <InputWithInterpretation
@@ -747,6 +801,47 @@ export default function FieldFindings({
               error={errors.RBSValue}
               result={rbsInterpretation}
             />
+
+            <div>
+              <label htmlFor="rbs-remark" style={{
+                fontSize: '12px',
+                fontWeight: '500',
+                color: oceanColors.textDark,
+                display: 'block',
+                marginBottom: '4px'
+              }}>
+                Remark <span style={{ color: oceanColors.textLight, fontSize: '10px' }}>(medication status)</span>
+                <span style={{ color: oceanColors.danger, marginLeft: '2px' }}>*</span>
+              </label>
+              <select
+                id="rbs-remark"
+                value={formData.RBSRemarkId}
+                onChange={(e) => setFormData(prev => ({ ...prev, RBSRemarkId: e.target.value ? Number(e.target.value) : '' }))}
+                aria-invalid={!!errors.RBSRemarkId}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${errors.RBSRemarkId ? oceanColors.danger : `${oceanColors.mid}30`}`,
+                  fontSize: '14px',
+                  outline: 'none',
+                  background: errors.RBSRemarkId ? `${oceanColors.danger}08` : 'white',
+                  cursor: 'pointer'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = errors.RBSRemarkId ? oceanColors.danger : oceanColors.gold}
+                onBlur={(e) => e.currentTarget.style.borderColor = errors.RBSRemarkId ? oceanColors.danger : `${oceanColors.mid}30`}
+              >
+                <option value="">Select remark…</option>
+                {rbsRemarks?.map((r) => (
+                  <option key={r.Id} value={r.Id}>{r.Title}</option>
+                ))}
+              </select>
+              {errors.RBSRemarkId && (
+                <p style={{ fontSize: '11px', color: oceanColors.danger, margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <AlertCircle size={12} /> {errors.RBSRemarkId}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
