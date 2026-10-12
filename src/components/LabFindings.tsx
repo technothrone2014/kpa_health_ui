@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { FlaskConical, Microscope, Beaker, Save, Loader2, AlertTriangle, Activity } from 'lucide-react';
+import { FlaskConical, Microscope, Beaker, Save, Loader2, AlertTriangle, CheckCircle, AlertCircle, Minus, Activity } from 'lucide-react';
 import api from '../api/client';
 import toast from 'react-hot-toast';
 
@@ -11,9 +11,110 @@ const oceanColors = {
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
+  info: '#3B82F6',
   textDark: '#1F2937',
   textLight: '#6B7280',
 };
+
+// ============================================
+// INTERPRETATION — matches FieldFindings pattern
+// ============================================
+interface InterpretationResult {
+  id: number;
+  label: string;
+  status: 'normal' | 'warning' | 'danger' | 'info';
+  color: string;
+  icon: React.ReactNode;
+}
+
+const STATUS_ICONS: Record<InterpretationResult['status'], React.ReactNode> = {
+  normal: <CheckCircle size={14} />,
+  warning: <AlertTriangle size={14} />,
+  danger: <AlertCircle size={14} />,
+  info: <Minus size={14} />,
+};
+
+const STATUS_COLORS: Record<InterpretationResult['status'], string> = {
+  normal: oceanColors.success,
+  warning: oceanColors.warning,
+  danger: oceanColors.danger,
+  info: oceanColors.info,
+};
+
+function classifyTitle(title: string): InterpretationResult['status'] {
+  const t = (title || '').toUpperCase();
+  if (t.includes('N/A')) return 'info';
+  if (t.includes('NORMAL') || t.includes('HEALTHY')) return 'normal';
+  if (
+    t.includes('PRE') || t.includes('ELEVATED') || t.includes('OVERWEIGHT') ||
+    t.includes('STAGE I') || t.includes('BORDERLINE') ||
+    t.includes('IMPAIRED') || t.includes('OSTEOPENIA')
+  ) return 'warning';
+  if (
+    t.includes('HYPERTENSION') || t.includes('HYPOTENSION') ||
+    t.includes('HYPOGLYCEMIA') || t.includes('DIABETES') ||
+    t.includes('DIABETIC') || t.includes('OBESE') || t.includes('CRISIS') ||
+    t.includes('MICROALBUMINURIA') || t.includes('MACROALBUMINURIA') ||
+    t.includes('OSTEOPOROSIS')
+  ) return 'danger';
+  return 'info';
+}
+
+function mapHitToResult(hit: any | null): InterpretationResult | null {
+  if (!hit) return null;
+  const status = classifyTitle(hit.Title);
+  return {
+    id: hit.Id,
+    label: hit.Title,
+    status,
+    color: STATUS_COLORS[status],
+    icon: STATUS_ICONS[status],
+  };
+}
+
+/** Client-side interpretation using cached ranges (mirrors FieldFindings). */
+function interpretLocally(
+  ranges: any[] | undefined,
+  value: number,
+  allowNegative = false
+): InterpretationResult | null {
+  if (!ranges || ranges.length === 0) return null;
+  if (Number.isNaN(value)) return null;
+  if (!allowNegative && value <= 0) return null;
+
+  const hit = ranges.find((r: any) =>
+    Number(r.StartIndex) <= value && Number(r.StopIndex) > value
+  );
+  return mapHitToResult(hit);
+}
+
+// Small badge component
+const StatusBadge = React.memo(({ result }: { result: InterpretationResult | null }) => {
+  if (!result || result.status === 'info') {
+    return (
+      <span style={{
+        fontSize: '11px', color: oceanColors.textLight,
+        background: '#f3f4f6', padding: '2px 10px', borderRadius: '12px',
+        display: 'inline-flex', alignItems: 'center', gap: '4px',
+      }}>
+        {result?.icon || <Minus size={14} />} {result?.label || 'N/A'}
+      </span>
+    );
+  }
+
+  return (
+    <span style={{
+      fontSize: '11px', fontWeight: 'bold',
+      color: STATUS_COLORS[result.status],
+      background: `${STATUS_COLORS[result.status]}15`,
+      padding: '2px 10px', borderRadius: '12px',
+      display: 'inline-flex', alignItems: 'center', gap: '4px',
+      border: `1px solid ${STATUS_COLORS[result.status]}30`,
+    }}>
+      {result.icon} {result.label}
+    </span>
+  );
+});
 
 interface LabFindingsProps {
   clientId: number;
@@ -28,21 +129,16 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
   const [formData, setFormData] = useState({
     // FBS (Fasting Blood Sugar)
     FBSValue: '',
-    FBSINTValueId: 0,
     // HbA1c
     HBA1CValue: '',
-    HBA1CINTValueId: 0,
     // Lipid Profile
     LipidId: 0,
     // Microalbumin
     MicroalbuminValue: '',
-    MicroalbuminINTValueId: 0,
     // BMD (Bone Mineral Density)
     BMDValue: '',
-    BMDINTValueId: 0,
     // PSA (Prostate Specific Antigen)
     PSAValue: '',
-    PSAINTValueId: 0,
     // Hepatitis B
     HepatitisBValueId: 0,
     // Hepatitis C
@@ -66,6 +162,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       const response = await api.get('/lookups/fbs-values');
       return response.data;
     },
+    staleTime: 30 * 60 * 1000,
   });
 
   const { data: hba1cValues } = useQuery({
@@ -74,6 +171,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       const response = await api.get('/lookups/hba1c-values');
       return response.data;
     },
+    staleTime: 30 * 60 * 1000,
   });
 
   const { data: lipidValues } = useQuery({
@@ -82,6 +180,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       const response = await api.get('/lookups/lipid-values');
       return response.data;
     },
+    staleTime: 30 * 60 * 1000,
   });
 
   const { data: microalbuminValues } = useQuery({
@@ -90,6 +189,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       const response = await api.get('/lookups/microalbumin-values');
       return response.data;
     },
+    staleTime: 30 * 60 * 1000,
   });
 
   const { data: bmdValues } = useQuery({
@@ -98,6 +198,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       const response = await api.get('/lookups/bmd-values');
       return response.data;
     },
+    staleTime: 30 * 60 * 1000,
   });
 
   const { data: psaValues } = useQuery({
@@ -106,6 +207,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       const response = await api.get('/lookups/psa-values');
       return response.data;
     },
+    staleTime: 30 * 60 * 1000,
   });
 
   const { data: hepatitisBValues } = useQuery({
@@ -114,6 +216,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       const response = await api.get('/lookups/hepatitis-b-values');
       return response.data;
     },
+    staleTime: 30 * 60 * 1000,
   });
 
   const { data: hepatitisCValues } = useQuery({
@@ -122,53 +225,8 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       const response = await api.get('/lookups/hepatitis-c-values');
       return response.data;
     },
+    staleTime: 30 * 60 * 1000,
   });
-
-  // Get interpretation ID based on value and reference ranges
-  const getInterpretationId = (value: number, referenceRanges: any[]): number => {
-    for (const range of referenceRanges) {
-      if (range.MinValue !== undefined && range.MaxValue !== undefined) {
-        if (value >= range.MinValue && value <= range.MaxValue) {
-          return range.Id;
-        }
-      } else if (range.MinValue !== undefined && value >= range.MinValue) {
-        return range.Id;
-      } else if (range.MaxValue !== undefined && value <= range.MaxValue) {
-        return range.Id;
-      }
-    }
-    return referenceRanges[0]?.Id || 1;
-  };
-
-  // Get FBS interpretation
-  const getFBSInterpretation = (value: number): number => {
-    if (fbsValues) {
-      if (value < 100) return fbsValues.find((v: any) => v.Title === 'NORMAL')?.Id || 1;
-      if (value < 126) return fbsValues.find((v: any) => v.Title === 'IMPAIRED FASTING GLUCOSE')?.Id || 2;
-      return fbsValues.find((v: any) => v.Title === 'DIABETES')?.Id || 3;
-    }
-    return 1;
-  };
-
-  // Get HbA1c interpretation
-  const getHBA1CInterpretation = (value: number): number => {
-    if (hba1cValues) {
-      if (value < 5.7) return hba1cValues.find((v: any) => v.Title === 'NORMAL')?.Id || 1;
-      if (value < 6.5) return hba1cValues.find((v: any) => v.Title === 'PREDIABETES')?.Id || 2;
-      return hba1cValues.find((v: any) => v.Title === 'DIABETES')?.Id || 3;
-    }
-    return 1;
-  };
-
-  // Get PSA interpretation (gender-specific)
-  const getPSAInterpretation = (value: number): number => {
-    if (psaValues) {
-      if (value < 4) return psaValues.find((v: any) => v.Title === 'NORMAL')?.Id || 1;
-      if (value < 10) return psaValues.find((v: any) => v.Title === 'BORDERLINE')?.Id || 2;
-      return psaValues.find((v: any) => v.Title === 'ELEVATED')?.Id || 3;
-    }
-    return 1;
-  };
 
   // Save lab findings
   const saveFindings = useMutation({
@@ -176,17 +234,12 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       const payload = {
         ClientId: clientId,
         StationId: stationId,
-        FBSValue: parseFloat(data.FBSValue),
-        FBSINTValueId: getFBSInterpretation(parseFloat(data.FBSValue)),
-        HBA1CValue: parseFloat(data.HBA1CValue),
-        HBA1CINTValueId: getHBA1CInterpretation(parseFloat(data.HBA1CValue)),
-        LipidId: parseInt(data.LipidId),
+        FBSValue:          parseFloat(data.FBSValue),
+        HBA1CValue:        parseFloat(data.HBA1CValue),
+        LipidId:           parseInt(data.LipidId),
         MicroalbuminValue: parseFloat(data.MicroalbuminValue),
-        MicroalbuminINTValueId: parseInt(data.MicroalbuminINTValueId),
-        BMDValue: parseFloat(data.BMDValue),
-        BMDINTValueId: parseInt(data.BMDINTValueId),
-        PSAValue: parseFloat(data.PSAValue),
-        PSAINTValueId: getPSAInterpretation(parseFloat(data.PSAValue)),
+        BMDValue:          parseFloat(data.BMDValue),
+        PSAValue:          parseFloat(data.PSAValue),
         HepatitisBValueId: parseInt(data.HepatitisBValueId),
         HepatitisCValueId: parseInt(data.HepatitisCValueId),
       };
@@ -301,33 +354,26 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
                 type="number"
                 step="0.1"
                 value={formData.FBSValue}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData({ 
-                    ...formData, 
-                    FBSValue: value,
-                    FBSINTValueId: value ? getFBSInterpretation(parseFloat(value)) : 0
-                  });
-                }}
+                onChange={(e) => setFormData({ ...formData, FBSValue: e.target.value })}
                 style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
                 required
               />
             </div>
             <div>
               <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Interpretation</label>
-              <input
-                type="text"
-                value={fbsValues?.find((v: any) => v.Id === formData.FBSINTValueId)?.Title || ''}
-                readOnly
-                style={{ 
-                  width: '100%', 
-                  padding: '8px', 
-                  border: `1px solid ${oceanColors.mid}30`, 
-                  borderRadius: '8px',
-                  background: '#f8fafc',
-                  color: oceanColors.textDark
-                }}
-              />
+              <div style={{
+                minHeight: '36px', padding: '8px',
+                background: '#f8fafc',
+                border: `1px solid ${oceanColors.mid}20`,
+                borderRadius: '8px',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}>
+                {interpretLocally(fbsValues, parseFloat(formData.FBSValue) || 0) ? (
+                  <StatusBadge result={interpretLocally(fbsValues, parseFloat(formData.FBSValue) || 0)} />
+                ) : (
+                  <span style={{ fontSize: '12px', color: oceanColors.textLight }}>Enter a value to see interpretation</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -344,32 +390,26 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
                 type="number"
                 step="0.1"
                 value={formData.HBA1CValue}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData({ 
-                    ...formData, 
-                    HBA1CValue: value,
-                    HBA1CINTValueId: value ? getHBA1CInterpretation(parseFloat(value)) : 0
-                  });
-                }}
+                onChange={(e) => setFormData({ ...formData, HBA1CValue: e.target.value })}
                 style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
                 required
               />
             </div>
             <div>
               <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Interpretation</label>
-              <input
-                type="text"
-                value={hba1cValues?.find((v: any) => v.Id === formData.HBA1CINTValueId)?.Title || ''}
-                readOnly
-                style={{ 
-                  width: '100%', 
-                  padding: '8px', 
-                  border: `1px solid ${oceanColors.mid}30`, 
-                  borderRadius: '8px',
-                  background: '#f8fafc'
-                }}
-              />
+              <div style={{
+                minHeight: '36px', padding: '8px',
+                background: '#f8fafc',
+                border: `1px solid ${oceanColors.mid}20`,
+                borderRadius: '8px',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}>
+                {interpretLocally(hba1cValues, parseFloat(formData.HBA1CValue) || 0) ? (
+                  <StatusBadge result={interpretLocally(hba1cValues, parseFloat(formData.HBA1CValue) || 0)} />
+                ) : (
+                  <span style={{ fontSize: '12px', color: oceanColors.textLight }}>Enter a value to see interpretation</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -414,17 +454,19 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
             </div>
             <div>
               <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Interpretation</label>
-              <select
-                value={formData.MicroalbuminINTValueId}
-                onChange={(e) => setFormData({ ...formData, MicroalbuminINTValueId: parseInt(e.target.value) })}
-                style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-                required
-              >
-                <option value="0">Select Interpretation</option>
-                {microalbuminValues?.map((value: any) => (
-                  <option key={value.Id} value={value.Id}>{value.Title}</option>
-                ))}
-              </select>
+              <div style={{
+                minHeight: '36px', padding: '8px',
+                background: '#f8fafc',
+                border: `1px solid ${oceanColors.mid}20`,
+                borderRadius: '8px',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}>
+                {interpretLocally(microalbuminValues, parseFloat(formData.MicroalbuminValue) || 0) ? (
+                  <StatusBadge result={interpretLocally(microalbuminValues, parseFloat(formData.MicroalbuminValue) || 0)} />
+                ) : (
+                  <span style={{ fontSize: '12px', color: oceanColors.textLight }}>Enter a value to see interpretation</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -448,17 +490,19 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
             </div>
             <div>
               <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Interpretation</label>
-              <select
-                value={formData.BMDINTValueId}
-                onChange={(e) => setFormData({ ...formData, BMDINTValueId: parseInt(e.target.value) })}
-                style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-                required
-              >
-                <option value="0">Select Interpretation</option>
-                {bmdValues?.map((value: any) => (
-                  <option key={value.Id} value={value.Id}>{value.Title}</option>
-                ))}
-              </select>
+              <div style={{
+                minHeight: '36px', padding: '8px',
+                background: '#f8fafc',
+                border: `1px solid ${oceanColors.mid}20`,
+                borderRadius: '8px',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}>
+                {interpretLocally(bmdValues, parseFloat(formData.BMDValue), true) ? (
+                  <StatusBadge result={interpretLocally(bmdValues, parseFloat(formData.BMDValue), true)} />
+                ) : (
+                  <span style={{ fontSize: '12px', color: oceanColors.textLight }}>Enter a T-score to see interpretation</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -475,31 +519,25 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
                 type="number"
                 step="0.01"
                 value={formData.PSAValue}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData({ 
-                    ...formData, 
-                    PSAValue: value,
-                    PSAINTValueId: value ? getPSAInterpretation(parseFloat(value)) : 0
-                  });
-                }}
+                onChange={(e) => setFormData({ ...formData, PSAValue: e.target.value })}
                 style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
               />
             </div>
             <div>
               <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Interpretation</label>
-              <input
-                type="text"
-                value={psaValues?.find((v: any) => v.Id === formData.PSAINTValueId)?.Title || ''}
-                readOnly
-                style={{ 
-                  width: '100%', 
-                  padding: '8px', 
-                  border: `1px solid ${oceanColors.mid}30`, 
-                  borderRadius: '8px',
-                  background: '#f8fafc'
-                }}
-              />
+              <div style={{
+                minHeight: '36px', padding: '8px',
+                background: '#f8fafc',
+                border: `1px solid ${oceanColors.mid}20`,
+                borderRadius: '8px',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}>
+                {interpretLocally(psaValues, parseFloat(formData.PSAValue) || 0) ? (
+                  <StatusBadge result={interpretLocally(psaValues, parseFloat(formData.PSAValue) || 0)} />
+                ) : (
+                  <span style={{ fontSize: '12px', color: oceanColors.textLight }}>Enter a value to see interpretation</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
