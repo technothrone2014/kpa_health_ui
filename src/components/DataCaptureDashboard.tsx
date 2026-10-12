@@ -72,7 +72,12 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
       const response = await api.get(`/clients/search?q=${encodeURIComponent(searchTerm)}`);
       setSearchResults(response.data);
       if (response.data.length === 0) {
-        toast('Client not found. You can register a new client.', { icon: 'ℹ️' });
+        toast(
+          userRole === 'lab_assistant'
+            ? 'Client not found. Please verify the search term.'
+            : 'Client not found. You can register a new client.',
+          { icon: 'ℹ️' }
+        );
       }
     } catch (error) {
       console.error('Search failed:', error);
@@ -84,7 +89,7 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
 
   const handleSelectClient = (client: any) => {
     setSelectedClient(client);
-    setStep('field');
+    setStep(userRole === 'lab_assistant' ? 'lab' : 'field');
     setSearchResults([]);
     setSearchTerm('');
   };
@@ -188,25 +193,27 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
               </button>
             </div>
 
-            <button
-              onClick={() => setShowRegistration(true)}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: 'transparent',
-                border: `1px solid ${oceanColors.mid}30`,
-                borderRadius: '12px',
-                cursor: 'pointer',
-                color: oceanColors.textDark,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              <UserPlus size={18} />
-              Register New Client
-            </button>
+            {userRole !== 'lab_assistant' && (
+              <button
+                onClick={() => setShowRegistration(true)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: 'transparent',
+                  border: `1px solid ${oceanColors.mid}30`,
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  color: oceanColors.textDark,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <UserPlus size={18} />
+                Register New Client
+              </button>
+            )}
 
             {searchResults.length > 0 && (
               <div style={{ marginTop: '24px' }}>
@@ -293,8 +300,12 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
             clientId={selectedClient.Id}
             clientName={selectedClient.FullName}
             clientIdNumber={selectedClient.IDNumber}
-            stationId={localStationId}   // ← changed
+            stationId={localStationId}
             onSuccess={handleLabSuccess}
+            onCancel={() => {
+              setSelectedClient(null);
+              setStep('search');
+            }}
           />
         );
 
@@ -317,18 +328,25 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
   };
 
   const getStepProgress = () => {
+    // Lab assistant: only Search → Lab
+    if (userRole === 'lab_assistant') {
+      return [
+        { key: 'search', label: 'Find Client', icon: Search },
+        { key: 'lab', label: 'Lab Findings', icon: FlaskConical },
+      ];
+    }
+
+    // Field agent: Search → Field
     const steps = [
       { key: 'search', label: 'Find Client', icon: Search },
       { key: 'field', label: 'Field Findings', icon: Activity },
     ];
-    
-    if (userRole !== 'field_agent') {
-      steps.push({ key: 'lab', label: 'Lab Findings', icon: FlaskConical });
-    }
+
+    // Oncology technician: add oncology step
     if (userRole === 'oncology_technician') {
       steps.push({ key: 'oncology', label: 'Oncology', icon: Shield });
     }
-    
+
     return steps;
   };
 

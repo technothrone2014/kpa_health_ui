@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { FlaskConical, Microscope, Beaker, Save, Loader2, AlertTriangle, CheckCircle, Activity } from 'lucide-react';
+import { FlaskConical, Microscope, Beaker, Save, Loader2, AlertTriangle, Activity } from 'lucide-react';
 import api from '../api/client';
 import toast from 'react-hot-toast';
 
@@ -49,25 +49,14 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
     HepatitisCValueId: 0,
   });
 
-  const [validationStatus, setValidationStatus] = useState<{
-    hasFieldFindings: boolean;
-    message?: string;
-  }>({ hasFieldFindings: true });
-
-  // Check if client has field findings (required before lab findings)
-  const { data: hasFieldFindings, isLoading: checkingFindings } = useQuery({
-    queryKey: ['client-has-field-findings', clientId],
+  // Verify the client exists (lab findings can be captured with or without field findings)
+  const { data: clientCheck, isLoading: checkingClient } = useQuery({
+    queryKey: ['client-existence', clientId],
     queryFn: async () => {
-      const response = await api.get(`/clients/${clientId}/has-field-findings`);
-      const hasFindings = response.data.hasFindings;
-      if (!hasFindings) {
-        setValidationStatus({
-          hasFieldFindings: false,
-          message: 'Client must have field findings recorded before lab findings can be captured.'
-        });
-      }
-      return hasFindings;
+      const response = await api.get(`/clients/${clientId}`);
+      return response.data;
     },
+    enabled: !!clientId,
   });
 
   // Fetch interpretation values
@@ -216,25 +205,19 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!hasFieldFindings) {
-      toast.error('Client must have field findings recorded first');
-      return;
-    }
-    
     saveFindings.mutate(formData);
   };
 
-  if (checkingFindings) {
+  if (checkingClient) {
     return (
       <div style={{ textAlign: 'center', padding: '40px' }}>
         <Loader2 size={32} className="animate-spin" style={{ color: oceanColors.deep }} />
-        <p style={{ marginTop: '16px', color: oceanColors.textLight }}>Verifying client records...</p>
+        <p style={{ marginTop: '16px', color: oceanColors.textLight }}>Loading client…</p>
       </div>
     );
   }
 
-  if (!hasFieldFindings) {
+  if (!clientCheck) {
     return (
       <div style={{
         background: `${oceanColors.danger}10`,
@@ -245,24 +228,26 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       }}>
         <AlertTriangle size={48} style={{ color: oceanColors.danger, marginBottom: '16px' }} />
         <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: oceanColors.danger, marginBottom: '8px' }}>
-          Field Findings Required
+          Client Not Found
         </h3>
         <p style={{ color: oceanColors.textLight, marginBottom: '16px' }}>
-          {validationStatus.message || 'This client must complete field findings before lab results can be recorded.'}
+          This client record could not be located. Please search again.
         </p>
-        <button
-          onClick={onCancel}
-          style={{
-            padding: '10px 20px',
-            background: oceanColors.deep,
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer'
-          }}
-        >
-          Go Back
-        </button>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            style={{
+              padding: '10px 20px',
+              background: oceanColors.deep,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            Back to Search
+          </button>
+        )}
       </div>
     );
   }
@@ -289,16 +274,16 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
           </div>
           <div style={{
             padding: '4px 12px',
-            background: `${oceanColors.success}15`,
+            background: `${oceanColors.mid}15`,
             borderRadius: '20px',
             fontSize: '12px',
-            color: oceanColors.success,
+            color: oceanColors.mid,
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
           }}>
-            <CheckCircle size={14} />
-            Field Findings Complete
+            <Beaker size={14} />
+            Lab Capture
           </div>
         </div>
       </div>

@@ -80,8 +80,14 @@ export default function Login() {
                             normalizedRoles.includes('field_agent') ||
                             normalizedRoles.includes('field-agent');
 
+        const isLabAssistant = normalizedRoles.includes('labassistant') ||
+                              normalizedRoles.includes('lab_assistant') ||
+                              normalizedRoles.includes('lab-assistant');
+
         if (isFieldAgent) {
           navigate('/field-capture');
+        } else if (isLabAssistant) {
+          navigate('/lab-capture');
         } else {
           navigate('/dashboard');
         }

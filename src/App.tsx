@@ -17,6 +17,7 @@ import DataUsageIcon from '@mui/icons-material/DataUsage';
 import AnchorIcon from '@mui/icons-material/Anchor';
 import WavesIcon from '@mui/icons-material/Waves';
 import CompassCalibrationIcon from '@mui/icons-material/CompassCalibration';
+import ScienceIcon from '@mui/icons-material/Science';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -125,6 +126,24 @@ const isUserFieldAgent = (user: any): boolean => {
 };
 
 // ============================================
+// Helper: Check if user is a lab assistant
+// ============================================
+const isUserLabAssistant = (user: any): boolean => {
+  if (!user) return false;
+  let roles = user.roles || [];
+  if (typeof roles === 'string') roles = [roles];
+  if (!Array.isArray(roles)) return false;
+  return roles.some((role: any) => {
+    if (!role) return false;
+    const lower = String(role).toLowerCase();
+    return lower === 'labassistant' ||
+           lower === 'lab_assistant' ||
+           lower === 'lab-assistant' ||
+           (lower.includes('lab') && lower.includes('assistant'));
+  });
+};
+
+// ============================================
 // FIXED: Protected Route with Role-Based Access
 // ============================================
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
@@ -146,12 +165,12 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
     );
     
     if (!hasRequiredRole) {
-      // Redirect to appropriate page based on role
       if (isUserFieldAgent(user)) {
         return <Navigate to="/field-capture" replace />;
       }
-      
-      // Default redirect for other roles
+      if (isUserLabAssistant(user)) {
+        return <Navigate to="/lab-capture" replace />;
+      }
       return <Navigate to="/dashboard" replace />;
     }
   }
@@ -174,11 +193,13 @@ function RoleBasedRedirect() {
   }
   
   if (isUserFieldAgent(user)) {
-    console.log('🔍 RoleBasedRedirect: Field Agent -> /field-capture');
     return <Navigate to="/field-capture" replace />;
   }
   
-  console.log('🔍 RoleBasedRedirect: Staff/Admin -> /dashboard');
+  if (isUserLabAssistant(user)) {
+    return <Navigate to="/lab-capture" replace />;
+  }
+  
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -196,6 +217,10 @@ function AppContent() {
     const result = isUserFieldAgent(user);
     console.log('🔍 AppContent - isFieldAgent memoized:', result);
     return result;
+  }, [user]);
+
+  const isLabAssistant = React.useMemo(() => {
+    return isUserLabAssistant(user);
   }, [user]);
 
   // Debug: Log user and roles when they change
@@ -491,6 +516,114 @@ function AppContent() {
               } />
               <Route path="/" element={<Navigate to="/field-capture" replace />} />
               <Route path="*" element={<Navigate to="/field-capture" replace />} />
+            </Routes>
+          </Box>
+        </Box>
+        {showGlobalAI && <AIAssistant onClose={() => setShowGlobalAI(false)} />}
+      </Box>
+    );
+  }
+
+  // ============================================
+  // LAB ASSISTANT LAYOUT - NO SIDEBAR
+  // ============================================
+  if (isAuthenticated && isLabAssistant) {
+    return (
+      <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F5F7FA' }}>
+        <Box component="main" sx={{ flexGrow: 1, width: '100%' }}>
+          {/* Header — same visual language as field agent, different labels */}
+          <Box sx={{
+            background: `linear-gradient(135deg, ${oceanTheme.deep}, ${oceanTheme.mid})`,
+            color: oceanTheme.white,
+            px: { xs: 2, sm: 4 },
+            py: { xs: 1.5, sm: 2 },
+            borderRadius: { xs: '0 0 16px 16px', sm: '16px' },
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            borderBottom: `2px solid ${oceanTheme.gold}`,
+            mb: 3,
+            mx: { sm: 3, md: 4 },
+            mt: { sm: 3 }
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{
+                  width: 48, height: 48,
+                  background: `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`,
+                  borderRadius: '12px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                }}>
+                  <ScienceIcon sx={{ color: oceanTheme.navy, fontSize: 28 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', color: oceanTheme.white, lineHeight: 1.2 }}>
+                    KPA Lab Capture
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: oceanTheme.foam }}>
+                    EAP Health Week • Lab Assistant Portal
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{
+                  display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1.5,
+                  background: 'rgba(255,255,255,0.1)', borderRadius: '30px', px: 2, py: 1
+                }}>
+                  <Box sx={{
+                    width: 36, height: 36, background: oceanTheme.surface,
+                    borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <Typography sx={{ color: oceanTheme.white, fontWeight: 'bold', fontSize: '14px' }}>
+                      {user?.FirstName?.charAt(0) || 'L'}{user?.LastName?.charAt(0) || 'A'}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography sx={{ color: oceanTheme.white, fontSize: '14px', fontWeight: 'bold' }}>
+                      {user?.FirstName} {user?.LastName}
+                    </Typography>
+                    <Box sx={{
+                      display: 'inline-block', px: 1, py: 0.25,
+                      background: oceanTheme.gold, borderRadius: '10px',
+                      fontSize: '10px', fontWeight: 'bold',
+                      color: oceanTheme.navy, textTransform: 'uppercase'
+                    }}>
+                      Lab Assistant
+                    </Box>
+                  </Box>
+                </Box>
+
+                <IconButton
+                  onClick={handleLogout}
+                  sx={{
+                    background: 'rgba(255,255,255,0.15)', color: oceanTheme.white,
+                    '&:hover': { background: oceanTheme.danger, color: oceanTheme.white }
+                  }}
+                  title="Logout"
+                >
+                  <LogoutIcon />
+                </IconButton>
+              </Box>
+            </Box>
+          </Box>
+
+          <Box sx={{ p: { xs: 2, sm: 3 } }}>
+            <Routes>
+              <Route path="/login" element={<Navigate to="/lab-capture" replace />} />
+              <Route path="/dashboard" element={<Navigate to="/lab-capture" replace />} />
+              <Route path="/employees" element={<Navigate to="/lab-capture" replace />} />
+              <Route path="/data-correction" element={<Navigate to="/lab-capture" replace />} />
+              <Route path="/analytics" element={<Navigate to="/lab-capture" replace />} />
+              <Route path="/field-capture" element={<Navigate to="/lab-capture" replace />} />
+              <Route path="/lab-capture" element={
+                <DataCaptureDashboard
+                  userRole="lab_assistant"
+                  userId={user?.Id || 0}
+                  stationId={user?.StationId || 1}
+                />
+              } />
+              <Route path="/" element={<Navigate to="/lab-capture" replace />} />
+              <Route path="*" element={<Navigate to="/lab-capture" replace />} />
             </Routes>
           </Box>
         </Box>
