@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import api from "../api/client";
 import * as XLSX from 'xlsx';
 import PatientProfile from "../components/PatientProfile";
+import TechnicalConfigModal from '../components/TechnicalConfigModal';
 
 // Oceanic Theme Colors
 const oceanColors = {
@@ -201,6 +202,7 @@ export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [showHighRiskModal, setShowHighRiskModal] = useState(false);
+  const [showTechnicalConfig, setShowTechnicalConfig] = useState(false);
   
   const [filters, setFilters] = useState({
     startDate: '', endDate: '', category: 'all', station: 'all', gender: 'all'
@@ -484,6 +486,7 @@ export default function Dashboard() {
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button onClick={() => setShowFilters(!showFilters)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(4px)', borderRadius: '12px', color: 'white', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer' }}><Filter size={18} /> Filters</button>
+              <button onClick={() => setShowTechnicalConfig(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', background: 'rgba(255,215,0,0.15)', backdropFilter: 'blur(4px)', borderRadius: '12px', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)', cursor: 'pointer', fontWeight: '600' }}><Settings size={18} /> Technical Config</button>
               <button onClick={handleRefresh} disabled={refreshing} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 24px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(4px)', borderRadius: '12px', color: 'white', fontWeight: '600', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', opacity: refreshing ? 0.5 : 1 }}><RefreshCw size={20} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} /> Refresh</button>
             </div>
           </div>
@@ -1099,7 +1102,10 @@ export default function Dashboard() {
       </div>
 
       <HighRiskModal isOpen={showHighRiskModal} onClose={() => setShowHighRiskModal(false)} patients={highRiskClients} filters={filters} onFilterChange={setFilters} availableStations={availableStations} availableCategories={availableCategories} />
-
+      <TechnicalConfigModal
+        isOpen={showTechnicalConfig}
+        onClose={() => setShowTechnicalConfig(false)}
+      />      
       <style>{`
         @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
