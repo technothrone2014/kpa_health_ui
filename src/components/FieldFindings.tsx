@@ -304,27 +304,12 @@ export default function FieldFindings({
     RBSValue: '',
     BPRemarkId: '' as string | number,
     RBSRemarkId: '' as string | number,
-    BMD: false,
-    CancerSCN: false,
-    DentalSCN: false,
-    ECG: false,
-    EyeSCN: false,
-    FBS: false,
-    HBA1C: false,
-    HepatitisBC: false,
-    Lipid: false,
-    Microalbumin: false,
-    NutritionCounselling: false,
-    PSA: false,
+    ReferralIds: [] as number[],
   });
 
   // ✅ Use useCallback for stable onChange handlers
   const handleInputChange = useCallback((field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
-  }, []);
-
-  const handleCheckboxChange = useCallback((field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({ ...prev, [field]: e.target.checked }));
   }, []);
 
   // ✅ Fetch client details
@@ -360,6 +345,15 @@ export default function FieldFindings({
     queryKey: ['rbs-remark-values'],
     queryFn: async () => {
       const response = await api.get('/lookups/rbs-remark-values');
+      return response.data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: referrals } = useQuery<StationOption[]>({
+    queryKey: ['referral-values'],
+    queryFn: async () => {
+      const response = await api.get('/lookups/referral-values');
       return response.data || [];
     },
     staleTime: 5 * 60 * 1000,
@@ -477,18 +471,7 @@ export default function FieldFindings({
         RBSValue: rbs,
         BPRemarkId: formData.BPRemarkId || null,
         RBSRemarkId: formData.RBSRemarkId || null,
-        BMD: data.BMD,
-        CancerSCN: data.CancerSCN,
-        DentalSCN: data.DentalSCN,
-        ECG: data.ECG,
-        EyeSCN: data.EyeSCN,
-        FBS: data.FBS,
-        HBA1C: data.HBA1C,
-        HepatitisBC: data.HepatitisBC,
-        Lipid: data.Lipid,
-        Microalbumin: data.Microalbumin,
-        NutritionCounselling: data.NutritionCounselling,
-        PSA: data.PSA,
+        ReferralIds: formData.ReferralIds,
       };
       
       const response = await api.post('/tallies', payload);
@@ -869,32 +852,31 @@ export default function FieldFindings({
             padding: '12px',
             borderRadius: '12px'
           }}>
-            {[
-              { key: 'BMD', label: 'BMD' },
-              { key: 'CancerSCN', label: 'Cancer Screen' },
-              { key: 'DentalSCN', label: 'Dental Screen' },
-              { key: 'ECG', label: 'ECG' },
-              { key: 'EyeSCN', label: 'Eye Screen' },
-              { key: 'FBS', label: 'FBS' },
-              { key: 'HBA1C', label: 'HbA1c' },
-              { key: 'HepatitisBC', label: 'Hep B/C' },
-              { key: 'Lipid', label: 'Lipid Profile' },
-              { key: 'Microalbumin', label: 'Microalbumin' },
-              { key: 'NutritionCounselling', label: 'Nutrition' },
-              { key: 'PSA', label: 'PSA' },
-            ].map(({ key, label }) => (
-              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                <input 
-                  type="checkbox" 
-                  checked={formData[key as keyof typeof formData] as boolean} 
-                  onChange={handleCheckboxChange(key)} 
+            {(referrals ?? []).map((r) => (
+              <label key={r.Id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={formData.ReferralIds.includes(r.Id)}
+                  onChange={(e) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      ReferralIds: e.target.checked
+                        ? [...prev.ReferralIds, r.Id]
+                        : prev.ReferralIds.filter(id => id !== r.Id),
+                    }));
+                  }}
                 />
-                {label}
+                {r.Title}
               </label>
             ))}
+            {(!referrals || referrals.length === 0) && (
+              <p style={{ gridColumn: 'span 2', fontSize: '12px', color: oceanColors.textLight, textAlign: 'center', margin: '8px 0' }}>
+                No referrals configured yet.
+              </p>
+            )}
           </div>
         </div>
-
+        
         {/* Submit Button */}
         <button
           type="submit"
