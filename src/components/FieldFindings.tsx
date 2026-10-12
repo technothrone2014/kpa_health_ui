@@ -31,7 +31,7 @@ const FIELD_LIMITS = {
   Hip:      { min: 30, max: 200, unit: 'cm' },
   Systolic: { min: 60, max: 250, unit: 'mmHg' },
   Diastolic:{ min: 30, max: 150, unit: 'mmHg' },
-  RBSValue: { min: 20, max: 800, unit: 'mg/dL' },
+  RBSValue: { min: 1,  max: 40, unit: 'mmol/L' },
 } as const;
 
 type FieldKey = keyof typeof FIELD_LIMITS;
@@ -804,7 +804,7 @@ export default function FieldFindings({
             <InputWithInterpretation
               id="rbs"
               label="RBS Value"
-              unit="mg/dL"
+              unit="mmol/L"
               value={formData.RBSValue}
               onChange={handleInputChange('RBSValue')}
               step="0.1"
