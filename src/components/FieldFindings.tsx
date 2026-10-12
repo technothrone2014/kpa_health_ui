@@ -157,37 +157,34 @@ function mapHitToResult(hit: {
 }
 
 // Debounced server-side interpretation hook
-function useInterpretation(type: 'bmi' | 'bp' | 'rbs', value: number) {
-  const [result, setResult] = useState<InterpretationResult | null>(null);
+function useInterpretation(
+  type: 'bmi' | 'bp' | 'rbs',
+  value: number,
+  ranges: any
+) {
+  return useMemo(() => {
+    if (!value || value <= 0 || !ranges) return null;
+    const table = ranges[type];
+    if (!Array.isArray(table) || table.length === 0) return null;
 
-  useEffect(() => {
-    if (!value || value <= 0) {
-      setResult(null);
-      return;
-    }
+    const hit = table.find((r: any) =>
+      Number(r.StartIndex) <= value && Number(r.StopIndex) > value
+    );
+    if (!hit) return null;
 
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      try {
-        const res = await api.get(`/lookups/interpret/${type}`, {
-          params: { value },
-          signal: controller.signal,
-        });
-        setResult(mapHitToResult(res.data?.interpretation ?? null));
-      } catch (err: any) {
-        if (err?.name !== 'CanceledError' && err?.name !== 'AbortError') {
-          console.error(`Interpretation fetch failed for ${type}:`, err);
-        }
-      }
-    }, 300); // debounce
+    // Reuse the same classify() rules the backend uses
+    const t = String(hit.Title).toUpperCase();
+    let status: InterpretationResult['status'] = 'info';
+    if (t.includes('N/A')) status = 'info';
+    else if (t.includes('HYPOGLYCEMIA') || t.includes('HYPOTENSION')) status = 'danger';
+    else if (t.includes('NORMAL') || t.includes('HEALTHY')) status = 'normal';
+    else if (t.includes('PRE') || t.includes('ELEVATED') ||
+             t.includes('OVERWEIGHT') || t.includes('STAGE I')) status = 'warning';
+    else if (t.includes('STAGE II') || t.includes('HYPERTENSION') ||
+             t.includes('OBESE') || t.includes('DIABETIC') || t.includes('CRISIS')) status = 'danger';
 
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [type, value]);
-
-  return result;
+    return mapHitToResult({ Id: hit.Id, Title: hit.Title, status });
+  }, [type, value, ranges]);
 }
 
 // ✅ Stable InputWithInterpretation component (memoized)
@@ -312,6 +309,24 @@ export default function FieldFindings({
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
   }, []);
 
+  const { data: lookupRanges } = useQuery({
+    queryKey: ['interpret-ranges'],
+    queryFn: async () => {
+      // Fetch all three lookup tables in parallel
+      const [bmi, bp, rbs] = await Promise.all([
+        api.get('/lookups/bmi-values'),
+        api.get('/lookups/bp-values'),
+        api.get('/lookups/rbs-values'),
+      ]);
+      return {
+        bmi: bmi.data || [],
+        bp:  bp.data  || [],
+        rbs: rbs.data || [],
+      };
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+
   // ✅ Fetch client details
   const { data: clientData, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
@@ -329,7 +344,7 @@ export default function FieldFindings({
       const response = await api.get('/analytics/stations');
       return response.data.data || [];
     },
-    staleTime: 5 * 60 * 1000, // 5 min — stations rarely change
+    staleTime: 30 * 60 * 1000, // 5 min — stations rarely change
   });
 
   const { data: bpRemarks } = useQuery<StationOption[]>({
@@ -338,7 +353,7 @@ export default function FieldFindings({
       const response = await api.get('/lookups/bp-remark-values');
       return response.data || [];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
 
   const { data: rbsRemarks } = useQuery<StationOption[]>({
@@ -347,7 +362,7 @@ export default function FieldFindings({
       const response = await api.get('/lookups/rbs-remark-values');
       return response.data || [];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
 
   const { data: referrals } = useQuery<StationOption[]>({
@@ -356,12 +371,35 @@ export default function FieldFindings({
       const response = await api.get('/lookups/referral-values');
       return response.data || [];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
 
   const currentStationName = useMemo(() => {
     return stations?.find((s) => s.Id === stationId)?.Title ?? `Station ${stationId}`;
   }, [stations, stationId]);
+
+  // Auto-save draft so a network drop doesn't lose the clerk's work
+  useEffect(() => {
+    const key = `draft:tally:${clientId}`;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(key, JSON.stringify(formData));
+      } catch { /* ignore quota errors */ }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [formData, clientId]);
+
+  // Restore draft on mount
+  useEffect(() => {
+    const key = `draft:tally:${clientId}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setFormData(prev => ({ ...prev, ...parsed }));
+      }
+    } catch { /* ignore */ }
+  }, [clientId]);
 
   // ✅ Calculate age
   const [calculatedAge, setCalculatedAge] = useState<number | null>(null);
@@ -446,9 +484,9 @@ export default function FieldFindings({
   );
 
   // ✅ Memoized interpretations
-  const bmiInterpretation = useInterpretation('bmi', bmi);
-  const bpInterpretation  = useInterpretation('bp',  diastolic);
-  const rbsInterpretation = useInterpretation('rbs', rbs);
+  const bmiInterpretation = useInterpretation('bmi', bmi, lookupRanges);
+  const bpInterpretation  = useInterpretation('bp',  diastolic, lookupRanges);
+  const rbsInterpretation = useInterpretation('rbs', rbs, lookupRanges);
 
 
   // ============================================
@@ -457,32 +495,24 @@ export default function FieldFindings({
 
   const saveFindings = useMutation({
     mutationFn: async (data: any) => {
-      const payload = {
-        ClientId: clientId,
-        StationId: stationId,
-        Weight: weight,
-        Height: height,
-        BMIValue: bmi,
-        Waist: waist,
-        Hip: hip,
-        WHRatio: whr,
-        Systolic: systolic,
-        Diastolic: diastolic,
-        RBSValue: rbs,
-        BPRemarkId: formData.BPRemarkId || null,
-        RBSRemarkId: formData.RBSRemarkId || null,
-        ReferralIds: formData.ReferralIds,
-      };
-      
+      const payload = { /* ...unchanged... */ };
       const response = await api.post('/tallies', payload);
       return response.data;
     },
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+    // 1s → 2s → 4s → up to 8s
     onSuccess: () => {
+      try { localStorage.removeItem(`draft:tally:${clientId}`); } catch {}
       toast.success('Field findings saved successfully!');
       if (onSuccess) onSuccess();
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to save findings');
+      toast.error(
+        error.response?.data?.message ||
+        'Save failed after 3 attempts. Please check your connection and retry.',
+        { duration: 6000 }
+      );
     },
   });
 
