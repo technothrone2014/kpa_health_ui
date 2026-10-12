@@ -40,18 +40,15 @@ function LookupManager({
   type,
   title,
   subtitle,
-  showLegacyColumn = false,
   showUsage = false,
 }: {
   type: ConfigType;
   title: string;
   subtitle: string;
-  showLegacyColumn?: boolean;
   showUsage?: boolean;
 }) {
   const qc = useQueryClient();
   const [newTitle, setNewTitle] = useState('');
-  const [newLegacy, setNewLegacy] = useState('');
   const [pendingToggleId, setPendingToggleId] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -71,7 +68,6 @@ function LookupManager({
     onSuccess: () => {
       toast.success(`"${newTitle}" added.`);
       setNewTitle('');
-      setNewLegacy('');
       qc.invalidateQueries({ queryKey: ['admin-config', type] });
       qc.invalidateQueries({ queryKey: ['referral-values'] });
       qc.invalidateQueries({ queryKey: ['bp-remark-values'] });
@@ -105,13 +101,8 @@ function LookupManager({
       toast.error('Title must be at least 2 characters');
       return;
     }
-    createMut.mutate({
-      Title: t,
-      ...(showLegacyColumn && newLegacy.trim()
-        ? { LegacyColumn: newLegacy.trim() }
-        : {}),
-    });
-  }, [newTitle, newLegacy, createMut, showLegacyColumn]);
+    createMut.mutate({ Title: t });
+  }, [newTitle, createMut]);
 
   const items = data || [];
   const activeCount = items.filter(i => !i.Deleted).length;
@@ -165,21 +156,6 @@ function LookupManager({
               fontSize: '13px', outline: 'none',
             }}
           />
-          {showLegacyColumn && (
-            <input
-              type="text"
-              placeholder="Legacy column (optional)"
-              value={newLegacy}
-              onChange={(e) => setNewLegacy(e.target.value)}
-              maxLength={50}
-              title="Maps to a legacy Tallies boolean column — leave blank for new referrals"
-              style={{
-                width: '200px', padding: '10px 12px', borderRadius: '8px',
-                border: `1px solid ${oceanColors.mid}30`, fontSize: '13px',
-                outline: 'none',
-              }}
-            />
-          )}
           <button
             onClick={handleCreate}
             disabled={createMut.isPending || newTitle.trim().length < 2}
@@ -399,7 +375,6 @@ export default function TechnicalConfigModal({ isOpen, onClose }: Props) {
                 type="referrals"
                 title="Referrals"
                 subtitle="Shown as checkboxes on the field findings form"
-                showLegacyColumn
                 showUsage
               />
             </div>
