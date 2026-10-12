@@ -737,6 +737,18 @@ export default function FieldFindings({
             />
 
             <div style={{ gridColumn: 'span 2' }}>
+              <InputWithInterpretation
+                id="bp-interpretation"
+                label="BP Interpretation"
+                unit=""
+                value={systolic > 0 && diastolic > 0 ? `${systolic}/${diastolic} mmHg` : '—'}
+                readOnly={true}
+                required={false}
+                result={bpInterpretation}
+              />
+            </div>
+
+            <div style={{ gridColumn: 'span 2' }}>
               <label htmlFor="bp-remark" style={{
                 fontSize: '12px',
                 fontWeight: '500',
