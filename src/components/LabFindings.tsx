@@ -45,11 +45,11 @@ const STATUS_COLORS: Record<InterpretationResult['status'], string> = {
 // VALIDATION — generous bounds that tolerate table changes
 // ============================================
 const LAB_LIMITS = {
-  FBSValue:          { min: 10,  max: 1000, unit: 'mg/dL' },
-  HBA1CValue:        { min: 2,   max: 25,   unit: '%' },
-  MicroalbuminValue: { min: 0,   max: 5000, unit: 'mg/L' },
-  BMDValue:          { min: -10, max: 5,    unit: '' },
-  PSAValue:          { min: 0,   max: 500,  unit: 'ng/mL' },
+  FBSValue:          { min: 0,  max: 50,   unit: 'mmol/L' },  // Table: 0.0001–40
+  HBA1CValue:        { min: 0,  max: 25,   unit: '%' },        // Table: 4–20
+  MicroalbuminValue: { min: 0,  max: 600,  unit: 'mg/L' },     // Table: 0.0001–500
+  BMDValue:          { min: -10, max: 5,   unit: '' },         // Table: -3 to -0.9999
+  PSAValue:          { min: 0,  max: 250,  unit: 'ng/mL' },    // Table: 0.0001–200
 } as const;
 
 type LabFieldKey = keyof typeof LAB_LIMITS;
@@ -460,7 +460,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
           <InputWithBadge
             id="fbs"
             label="FBS Value"
-            unit="mg/dL"
+            unit="mmol/L"
             value={formData.FBSValue}
             onChange={(e: any) => setFormData({ ...formData, FBSValue: e.target.value })}
             step="0.1"
