@@ -466,7 +466,6 @@ export default function FieldFindings({
       const payload = {
         ClientId: clientId,
         StationId: stationId,
-        Age: calculatedAge || 0,
         Weight: weight,
         Height: height,
         BMIValue: bmi,
