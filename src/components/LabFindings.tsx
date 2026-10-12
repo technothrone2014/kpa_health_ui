@@ -41,6 +41,29 @@ const STATUS_COLORS: Record<InterpretationResult['status'], string> = {
   info: oceanColors.info,
 };
 
+// ============================================
+// VALIDATION — generous bounds that tolerate table changes
+// ============================================
+const LAB_LIMITS = {
+  FBSValue:          { min: 10,  max: 1000, unit: 'mg/dL' },
+  HBA1CValue:        { min: 2,   max: 25,   unit: '%' },
+  MicroalbuminValue: { min: 0,   max: 5000, unit: 'mg/L' },
+  BMDValue:          { min: -10, max: 5,    unit: '' },
+  PSAValue:          { min: 0,   max: 500,  unit: 'ng/mL' },
+} as const;
+
+type LabFieldKey = keyof typeof LAB_LIMITS;
+
+function validateLabField(field: LabFieldKey, value: string): string | null {
+  if (!value || value.trim() === '') return null;
+  const num = parseFloat(value);
+  if (Number.isNaN(num)) return 'Must be a valid number';
+  const limit = LAB_LIMITS[field];
+  if (num < limit.min) return `Minimum is ${limit.min}${limit.unit ? ' ' + limit.unit : ''}`;
+  if (num > limit.max) return `Maximum is ${limit.max}${limit.unit ? ' ' + limit.unit : ''}`;
+  return null;
+}
+
 function classifyTitle(title: string): InterpretationResult['status'] {
   const t = (title || '').toUpperCase();
   if (t.includes('N/A')) return 'info';
@@ -80,12 +103,20 @@ function interpretLocally(
 ): InterpretationResult | null {
   if (!ranges || ranges.length === 0) return null;
   if (Number.isNaN(value)) return null;
-  if (!allowNegative && value <= 0) return null;
+  if (!allowNegative && value < 0) return null;
 
-  const hit = ranges.find((r: any) =>
-    Number(r.StartIndex) <= value && Number(r.StopIndex) > value
-  );
-  return mapHitToResult(hit);
+  // 1) Range match — StartIndex <= v < StopIndex
+  const hit = ranges.find((r: any) => {
+    const s = Number(r.StartIndex);
+    const e = Number(r.StopIndex);
+    if (s === e) return false;                    // skip sentinel rows here
+    return s <= value && e > value;
+  });
+  if (hit) return mapHitToResult(hit);
+
+  // 2) Fallback — first row where StartIndex === StopIndex (N/A sentinel)
+  const sentinel = ranges.find((r: any) => Number(r.StartIndex) === Number(r.StopIndex));
+  return sentinel ? mapHitToResult(sentinel) : null;
 }
 
 // Small badge component
@@ -113,6 +144,65 @@ const StatusBadge = React.memo(({ result }: { result: InterpretationResult | nul
     }}>
       {result.icon} {result.label}
     </span>
+  );
+});
+
+const InputWithBadge = React.memo(({
+  label, unit, value, onChange, result, error,
+  step = '0.1', min, max, required = true, id, placeholder,
+}: any) => {
+  const inputId = id || `input-${label.replace(/\s+/g, '-').toLowerCase()}`;
+  const hasError = !!error;
+
+  return (
+    <div>
+      <label htmlFor={inputId} style={{
+        fontSize: '13px', color: oceanColors.textDark,
+        display: 'block', marginBottom: '4px',
+      }}>
+        {label} {unit && <span style={{ color: oceanColors.textLight, fontSize: '11px' }}>({unit})</span>}
+        {required && <span style={{ color: oceanColors.danger, marginLeft: '2px' }}>*</span>}
+      </label>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <input
+          id={inputId}
+          type="number"
+          step={step}
+          min={min}
+          max={max}
+          value={value}
+          onChange={onChange}
+          aria-invalid={hasError}
+          placeholder={placeholder}
+          style={{
+            flex: 1,
+            padding: '8px 10px',
+            borderRadius: '8px',
+            border: `1px solid ${hasError ? oceanColors.danger : `${oceanColors.mid}30`}`,
+            fontSize: '14px',
+            outline: 'none',
+            minWidth: '0',
+            background: hasError ? `${oceanColors.danger}08` : 'white',
+          }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = hasError ? oceanColors.danger : oceanColors.gold)}
+          onBlur={(e) => (e.currentTarget.style.borderColor = hasError ? oceanColors.danger : `${oceanColors.mid}30`)}
+          required={required}
+        />
+        {result && (
+          <div style={{ flexShrink: 0, minWidth: '80px', textAlign: 'right' }}>
+            <StatusBadge result={result} />
+          </div>
+        )}
+      </div>
+      {hasError && (
+        <p style={{
+          fontSize: '11px', color: oceanColors.danger,
+          margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: '4px',
+        }}>
+          <AlertCircle size={12} /> {error}
+        </p>
+      )}
+    </div>
   );
 });
 
@@ -228,6 +318,22 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
     staleTime: 30 * 60 * 1000,
   });
 
+  const errors = React.useMemo(() => {
+    const e: Record<string, string | null> = {
+      FBSValue:          validateLabField('FBSValue',          formData.FBSValue),
+      HBA1CValue:        validateLabField('HBA1CValue',        formData.HBA1CValue),
+      MicroalbuminValue: validateLabField('MicroalbuminValue', formData.MicroalbuminValue),
+      BMDValue:          validateLabField('BMDValue',          formData.BMDValue),
+      PSAValue:          validateLabField('PSAValue',          formData.PSAValue),
+    };
+    return e;
+  }, [formData]);
+
+  const hasErrors = React.useMemo(
+    () => Object.values(errors).some((msg) => !!msg),
+    [errors]
+  );
+
   // Save lab findings
   const saveFindings = useMutation({
     mutationFn: async (data: any) => {
@@ -258,6 +364,10 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasErrors) {
+      toast.error('Please fix the highlighted errors before saving.');
+      return;
+    }
     saveFindings.mutate(formData);
   };
 
@@ -347,35 +457,18 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
           <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: oceanColors.deep, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Beaker size={18} /> Fasting Blood Sugar (FBS)
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-            <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>FBS Value (mg/dL)</label>
-              <input
-                type="number"
-                step="0.1"
-                value={formData.FBSValue}
-                onChange={(e) => setFormData({ ...formData, FBSValue: e.target.value })}
-                style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Interpretation</label>
-              <div style={{
-                minHeight: '36px', padding: '8px',
-                background: '#f8fafc',
-                border: `1px solid ${oceanColors.mid}20`,
-                borderRadius: '8px',
-                display: 'flex', alignItems: 'center', gap: '8px',
-              }}>
-                {interpretLocally(fbsValues, parseFloat(formData.FBSValue) || 0) ? (
-                  <StatusBadge result={interpretLocally(fbsValues, parseFloat(formData.FBSValue) || 0)} />
-                ) : (
-                  <span style={{ fontSize: '12px', color: oceanColors.textLight }}>Enter a value to see interpretation</span>
-                )}
-              </div>
-            </div>
-          </div>
+          <InputWithBadge
+            id="fbs"
+            label="FBS Value"
+            unit="mg/dL"
+            value={formData.FBSValue}
+            onChange={(e: any) => setFormData({ ...formData, FBSValue: e.target.value })}
+            step="0.1"
+            min={LAB_LIMITS.FBSValue.min}
+            max={LAB_LIMITS.FBSValue.max}
+            error={errors.FBSValue}
+            result={interpretLocally(fbsValues, parseFloat(formData.FBSValue) || 0)}
+          />
         </div>
 
         {/* HbA1c Section */}
@@ -383,35 +476,18 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
           <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: oceanColors.deep, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Microscope size={18} /> HbA1c (Glycated Hemoglobin)
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-            <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>HbA1c Value (%)</label>
-              <input
-                type="number"
-                step="0.1"
-                value={formData.HBA1CValue}
-                onChange={(e) => setFormData({ ...formData, HBA1CValue: e.target.value })}
-                style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Interpretation</label>
-              <div style={{
-                minHeight: '36px', padding: '8px',
-                background: '#f8fafc',
-                border: `1px solid ${oceanColors.mid}20`,
-                borderRadius: '8px',
-                display: 'flex', alignItems: 'center', gap: '8px',
-              }}>
-                {interpretLocally(hba1cValues, parseFloat(formData.HBA1CValue) || 0) ? (
-                  <StatusBadge result={interpretLocally(hba1cValues, parseFloat(formData.HBA1CValue) || 0)} />
-                ) : (
-                  <span style={{ fontSize: '12px', color: oceanColors.textLight }}>Enter a value to see interpretation</span>
-                )}
-              </div>
-            </div>
-          </div>
+          <InputWithBadge
+            id="hba1c"
+            label="HbA1c Value"
+            unit="%"
+            value={formData.HBA1CValue}
+            onChange={(e: any) => setFormData({ ...formData, HBA1CValue: e.target.value })}
+            step="0.1"
+            min={LAB_LIMITS.HBA1CValue.min}
+            max={LAB_LIMITS.HBA1CValue.max}
+            error={errors.HBA1CValue}
+            result={interpretLocally(hba1cValues, parseFloat(formData.HBA1CValue) || 0)}
+          />
         </div>
 
         {/* Lipid Profile */}
@@ -440,106 +516,56 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
           <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: oceanColors.deep, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Beaker size={18} /> Microalbumin
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-            <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Value (mg/L)</label>
-              <input
-                type="number"
-                step="0.1"
-                value={formData.MicroalbuminValue}
-                onChange={(e) => setFormData({ ...formData, MicroalbuminValue: e.target.value })}
-                style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Interpretation</label>
-              <div style={{
-                minHeight: '36px', padding: '8px',
-                background: '#f8fafc',
-                border: `1px solid ${oceanColors.mid}20`,
-                borderRadius: '8px',
-                display: 'flex', alignItems: 'center', gap: '8px',
-              }}>
-                {interpretLocally(microalbuminValues, parseFloat(formData.MicroalbuminValue) || 0) ? (
-                  <StatusBadge result={interpretLocally(microalbuminValues, parseFloat(formData.MicroalbuminValue) || 0)} />
-                ) : (
-                  <span style={{ fontSize: '12px', color: oceanColors.textLight }}>Enter a value to see interpretation</span>
-                )}
-              </div>
-            </div>
-          </div>
+          <InputWithBadge
+            id="microalbumin"
+            label="Microalbumin Value"
+            unit="mg/L"
+            value={formData.MicroalbuminValue}
+            onChange={(e: any) => setFormData({ ...formData, MicroalbuminValue: e.target.value })}
+            step="0.1"
+            min={LAB_LIMITS.MicroalbuminValue.min}
+            max={LAB_LIMITS.MicroalbuminValue.max}
+            error={errors.MicroalbuminValue}
+            result={interpretLocally(microalbuminValues, parseFloat(formData.MicroalbuminValue) || 0)}
+          />
         </div>
 
-        {/* BMD (Bone Mineral Density) */}
+        {/* BMD */}
         <div style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: oceanColors.deep, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Activity size={18} /> Bone Mineral Density (BMD)
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-            <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>T-Score</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.BMDValue}
-                onChange={(e) => setFormData({ ...formData, BMDValue: e.target.value })}
-                style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Interpretation</label>
-              <div style={{
-                minHeight: '36px', padding: '8px',
-                background: '#f8fafc',
-                border: `1px solid ${oceanColors.mid}20`,
-                borderRadius: '8px',
-                display: 'flex', alignItems: 'center', gap: '8px',
-              }}>
-                {interpretLocally(bmdValues, parseFloat(formData.BMDValue), true) ? (
-                  <StatusBadge result={interpretLocally(bmdValues, parseFloat(formData.BMDValue), true)} />
-                ) : (
-                  <span style={{ fontSize: '12px', color: oceanColors.textLight }}>Enter a T-score to see interpretation</span>
-                )}
-              </div>
-            </div>
-          </div>
+          <InputWithBadge
+            id="bmd"
+            label="T-Score"
+            value={formData.BMDValue}
+            onChange={(e: any) => setFormData({ ...formData, BMDValue: e.target.value })}
+            step="0.01"
+            min={LAB_LIMITS.BMDValue.min}
+            max={LAB_LIMITS.BMDValue.max}
+            error={errors.BMDValue}
+            result={interpretLocally(bmdValues, parseFloat(formData.BMDValue) || 0, true)}
+          />
         </div>
 
-        {/* PSA (Prostate Specific Antigen) */}
+        {/* PSA */}
         <div style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: oceanColors.deep, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Beaker size={18} /> PSA (Prostate Specific Antigen)
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-            <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>PSA Value (ng/mL)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.PSAValue}
-                onChange={(e) => setFormData({ ...formData, PSAValue: e.target.value })}
-                style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '13px', color: oceanColors.textDark, display: 'block', marginBottom: '4px' }}>Interpretation</label>
-              <div style={{
-                minHeight: '36px', padding: '8px',
-                background: '#f8fafc',
-                border: `1px solid ${oceanColors.mid}20`,
-                borderRadius: '8px',
-                display: 'flex', alignItems: 'center', gap: '8px',
-              }}>
-                {interpretLocally(psaValues, parseFloat(formData.PSAValue) || 0) ? (
-                  <StatusBadge result={interpretLocally(psaValues, parseFloat(formData.PSAValue) || 0)} />
-                ) : (
-                  <span style={{ fontSize: '12px', color: oceanColors.textLight }}>Enter a value to see interpretation</span>
-                )}
-              </div>
-            </div>
-          </div>
+          <InputWithBadge
+            id="psa"
+            label="PSA Value"
+            unit="ng/mL"
+            value={formData.PSAValue}
+            onChange={(e: any) => setFormData({ ...formData, PSAValue: e.target.value })}
+            step="0.01"
+            min={LAB_LIMITS.PSAValue.min}
+            max={LAB_LIMITS.PSAValue.max}
+            error={errors.PSAValue}
+            required={false}
+            result={interpretLocally(psaValues, parseFloat(formData.PSAValue) || 0)}
+          />
         </div>
 
         {/* Hepatitis Section */}
@@ -600,7 +626,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
           )}
           <button
             type="submit"
-            disabled={saveFindings.isPending}
+            disabled={saveFindings.isPending || hasErrors}
             style={{
               flex: 2,
               padding: '12px',
@@ -609,12 +635,12 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
               borderRadius: '8px',
               color: oceanColors.mid,
               fontWeight: 'bold',
-              cursor: saveFindings.isPending ? 'not-allowed' : 'pointer',
+              cursor: (saveFindings.isPending || hasErrors) ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              opacity: saveFindings.isPending ? 0.7 : 1
+              opacity: (saveFindings.isPending || hasErrors) ? 0.6 : 1,
             }}
           >
             {saveFindings.isPending ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
