@@ -20,6 +20,7 @@ interface OncologyFormProps {
   clientName: string;
   clientIdNumber: string;
   genderId: number;
+  genderTitle?: string;
   stationId: number;
   onSuccess?: () => void;
   onCancel?: () => void;

@@ -74,9 +74,9 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
       setSearchResults(response.data);
       if (response.data.length === 0) {
         toast(
-          userRole === 'lab_assistant'
-            ? 'Client not found. Please verify the search term.'
-            : 'Client not found. You can register a new client.',
+          userRole === 'field_agent'
+            ? 'Client not found. You can register a new client.'
+            : 'Client not found. Please verify the search term.',
           { icon: 'ℹ️' }
         );
       }
@@ -252,7 +252,7 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
               </button>
             </div>
 
-            {userRole !== 'lab_assistant' && (
+            {userRole === 'field_agent' && (
               <button
                 onClick={() => setShowRegistration(true)}
                 style={{
@@ -376,6 +376,7 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
             clientName={selectedClient.FullName}
             clientIdNumber={selectedClient.IDNumber}
             genderId={selectedClient.GenderId}
+            genderTitle={selectedClient.GenderTitle}
             stationId={localStationId}
             onSuccess={handleOncologySuccess}
             onCancel={() => {
