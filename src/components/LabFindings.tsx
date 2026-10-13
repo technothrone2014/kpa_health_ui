@@ -245,6 +245,20 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
     enabled: !!clientId,
   });
 
+  // Fetch station name for display (shared cache key with other components)
+  const { data: stations } = useQuery<any[]>({
+    queryKey: ['stations'],
+    queryFn: async () => {
+      const response = await api.get('/analytics/stations');
+      return response.data.data || [];
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const currentStationName = React.useMemo(() => {
+    return stations?.find((s: any) => s.Id === stationId)?.Title ?? `Station ${stationId}`;
+  }, [stations, stationId]);
+
   // Fetch interpretation values
   const { data: fbsValues } = useQuery({
     queryKey: ['fbs-values'],
@@ -356,12 +370,12 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
         StationId: stationId,
         FBSValue:          parseFloat(data.FBSValue)          || 0,
         HBA1CValue:        parseFloat(data.HBA1CValue)        || 0,
-        LipidId:           parseInt(data.LipidId)             || 0,
+        LipidId:           parseInt(data.LipidId)             || null,
         MicroalbuminValue: parseFloat(data.MicroalbuminValue) || 0,
         BMDValue:          parseFloat(data.BMDValue)          || 0,
         PSAValue:          parseFloat(data.PSAValue)          || 0,
-        HepatitisBValueId: parseInt(data.HepatitisBValueId)   || 0,
-        HepatitisCValueId: parseInt(data.HepatitisCValueId)   || 0,
+        HepatitisBValueId: parseInt(data.HepatitisBValueId)   || null,
+        HepatitisCValueId: parseInt(data.HepatitisCValueId)   || null,
       };
       
       const response = await api.post('/findings', payload);
@@ -450,7 +464,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
               Lab Findings
             </h2>
             <p style={{ fontSize: '13px', color: oceanColors.textLight, marginTop: '4px' }}>
-              Patient: {clientName} (ID: {clientIdNumber}) | Station ID: {stationId}
+              Patient: {clientName} (ID: {clientIdNumber}) • Station: <strong style={{ color: oceanColors.textDark }}>{currentStationName}</strong>
             </p>
           </div>
           <div style={{
