@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { FlaskConical, Microscope, Beaker, Save, Loader2, AlertTriangle, CheckCircle, AlertCircle, Minus, Activity } from 'lucide-react';
 import api from '../api/client';
@@ -235,6 +235,29 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
     HepatitisCValueId: 0,
   });
 
+  // Auto-save draft so a network drop doesn't lose the clerk's work
+  useEffect(() => {
+    const key = `draft:findings:${clientId}`;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(key, JSON.stringify(formData));
+      } catch { /* ignore quota errors */ }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [formData, clientId]);
+
+  // Restore draft on mount
+  useEffect(() => {
+    const key = `draft:findings:${clientId}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setFormData(prev => ({ ...prev, ...parsed }));
+      }
+    } catch { /* ignore */ }
+  }, [clientId]);
+
   // Verify the client exists (lab findings can be captured with or without field findings)
   const { data: clientCheck, isLoading: checkingClient } = useQuery({
     queryKey: ['client-existence', clientId],
@@ -381,12 +404,19 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
       const response = await api.post('/findings', payload);
       return response.data;
     },
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),  // 1s → 2s → 4s → up to 8s
     onSuccess: () => {
+      try { localStorage.removeItem(`draft:findings:${clientId}`); } catch {}
       toast.success('Lab findings saved successfully!');
       if (onSuccess) onSuccess();
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to save lab findings');
+      toast.error(
+        error.response?.data?.message ||
+        'Save failed after 3 attempts. Please check your connection and retry.',
+        { duration: 6000 }
+      );
     },
   });
 
@@ -697,3 +727,4 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
     </div>
   );
 }
+
