@@ -90,7 +90,9 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
 
   const handleSelectClient = (client: any) => {
     setSelectedClient(client);
-    setStep(userRole === 'lab_assistant' ? 'lab' : 'field');
+    if (userRole === 'lab_assistant') setStep('lab');
+    else if (userRole === 'oncology_technician') setStep('oncology');
+    else setStep('field');
     setSearchResults([]);
     setSearchTerm('');
   };
@@ -374,8 +376,12 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
             clientName={selectedClient.FullName}
             clientIdNumber={selectedClient.IDNumber}
             genderId={selectedClient.GenderId}
-            stationId={localStationId}   // ← changed
+            stationId={localStationId}
             onSuccess={handleOncologySuccess}
+            onCancel={() => {
+              setSelectedClient(null);
+              setStep('search');
+            }}
           />
         );
         
@@ -385,26 +391,23 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
   };
 
   const getStepProgress = () => {
-    // Lab assistant: only Search → Lab
     if (userRole === 'lab_assistant') {
       return [
         { key: 'search', label: 'Find Client', icon: Search },
         { key: 'lab', label: 'Lab Findings', icon: FlaskConical },
       ];
     }
-
-    // Field agent: Search → Field
-    const steps = [
+    if (userRole === 'oncology_technician') {
+      return [
+        { key: 'search', label: 'Find Client', icon: Search },
+        { key: 'oncology', label: 'Oncology', icon: Shield },
+      ];
+    }
+    // Field agent
+    return [
       { key: 'search', label: 'Find Client', icon: Search },
       { key: 'field', label: 'Field Findings', icon: Activity },
     ];
-
-    // Oncology technician: add oncology step
-    if (userRole === 'oncology_technician') {
-      steps.push({ key: 'oncology', label: 'Oncology', icon: Shield });
-    }
-
-    return steps;
   };
 
   const steps = getStepProgress();

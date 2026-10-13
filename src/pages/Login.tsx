@@ -84,13 +84,21 @@ export default function Login() {
                               normalizedRoles.includes('lab_assistant') ||
                               normalizedRoles.includes('lab-assistant');
 
+        const isOncologyTechnician =
+          normalizedRoles.includes('oncologytechnician') ||
+          normalizedRoles.includes('oncology_technician') ||
+          normalizedRoles.includes('oncology-technician');
+
         if (isFieldAgent) {
           navigate('/field-capture');
         } else if (isLabAssistant) {
           navigate('/lab-capture');
+        } else if (isOncologyTechnician) {
+          navigate('/oncology-capture');
         } else {
           navigate('/dashboard');
         }
+
       } else {
         setError(result.message || 'Invalid verification code');
       }
