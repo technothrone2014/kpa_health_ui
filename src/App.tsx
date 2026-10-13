@@ -30,7 +30,7 @@ import LoadingSpinner from "./components/LoadingSpinner";
 import Login from "./pages/Login";
 import DataCaptureDashboard from './components/DataCaptureDashboard';
 import React from "react";
-import { ShieldIcon } from "lucide-react";
+import { Shield } from "lucide-react";
 
 const queryClient = new QueryClient();
 
@@ -690,7 +690,7 @@ function AppContent() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
                 }}>
-                  <ShieldIcon color={oceanTheme.navy} size={28} />
+                  <Shield color={oceanTheme.navy} size={28} />
                 </Box>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 'bold', color: oceanTheme.white, lineHeight: 1.2 }}>
