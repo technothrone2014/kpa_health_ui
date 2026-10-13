@@ -334,20 +334,34 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
     [errors]
   );
 
+  const hasAnyValue = React.useMemo(() => {
+    const num = (v: any) => parseFloat(v) || 0;
+    return (
+      num(formData.FBSValue) !== 0 ||
+      num(formData.HBA1CValue) !== 0 ||
+      num(formData.MicroalbuminValue) !== 0 ||
+      num(formData.BMDValue) !== 0 ||
+      num(formData.PSAValue) !== 0 ||
+      formData.LipidId > 0 ||
+      formData.HepatitisBValueId > 0 ||
+      formData.HepatitisCValueId > 0
+    );
+  }, [formData]);
+
   // Save lab findings
   const saveFindings = useMutation({
     mutationFn: async (data: any) => {
       const payload = {
         ClientId: clientId,
         StationId: stationId,
-        FBSValue:          parseFloat(data.FBSValue),
-        HBA1CValue:        parseFloat(data.HBA1CValue),
-        LipidId:           parseInt(data.LipidId),
-        MicroalbuminValue: parseFloat(data.MicroalbuminValue),
-        BMDValue:          parseFloat(data.BMDValue),
-        PSAValue:          parseFloat(data.PSAValue),
-        HepatitisBValueId: parseInt(data.HepatitisBValueId),
-        HepatitisCValueId: parseInt(data.HepatitisCValueId),
+        FBSValue:          parseFloat(data.FBSValue)          || 0,
+        HBA1CValue:        parseFloat(data.HBA1CValue)        || 0,
+        LipidId:           parseInt(data.LipidId)             || 0,
+        MicroalbuminValue: parseFloat(data.MicroalbuminValue) || 0,
+        BMDValue:          parseFloat(data.BMDValue)          || 0,
+        PSAValue:          parseFloat(data.PSAValue)          || 0,
+        HepatitisBValueId: parseInt(data.HepatitisBValueId)   || 0,
+        HepatitisCValueId: parseInt(data.HepatitisCValueId)   || 0,
       };
       
       const response = await api.post('/findings', payload);
@@ -366,6 +380,10 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
     e.preventDefault();
     if (hasErrors) {
       toast.error('Please fix the highlighted errors before saving.');
+      return;
+    }
+    if (!hasAnyValue) {
+      toast.error('Enter at least one lab value before saving.');
       return;
     }
     saveFindings.mutate(formData);
@@ -467,6 +485,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
             min={LAB_LIMITS.FBSValue.min}
             max={LAB_LIMITS.FBSValue.max}
             error={errors.FBSValue}
+            required={false}
             result={interpretLocally(fbsValues, parseFloat(formData.FBSValue) || 0)}
           />
         </div>
@@ -486,6 +505,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
             min={LAB_LIMITS.HBA1CValue.min}
             max={LAB_LIMITS.HBA1CValue.max}
             error={errors.HBA1CValue}
+            required={false}
             result={interpretLocally(hba1cValues, parseFloat(formData.HBA1CValue) || 0)}
           />
         </div>
@@ -501,7 +521,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
               value={formData.LipidId}
               onChange={(e) => setFormData({ ...formData, LipidId: parseInt(e.target.value) })}
               style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-              required
+
             >
               <option value="0">Select Result</option>
               {lipidValues?.map((lipid: any) => (
@@ -526,6 +546,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
             min={LAB_LIMITS.MicroalbuminValue.min}
             max={LAB_LIMITS.MicroalbuminValue.max}
             error={errors.MicroalbuminValue}
+            required={false}
             result={interpretLocally(microalbuminValues, parseFloat(formData.MicroalbuminValue) || 0)}
           />
         </div>
@@ -544,6 +565,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
             min={LAB_LIMITS.BMDValue.min}
             max={LAB_LIMITS.BMDValue.max}
             error={errors.BMDValue}
+            required={false}
             result={interpretLocally(bmdValues, parseFloat(formData.BMDValue) || 0, true)}
           />
         </div>
@@ -580,7 +602,6 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
                 value={formData.HepatitisBValueId}
                 onChange={(e) => setFormData({ ...formData, HepatitisBValueId: parseInt(e.target.value) })}
                 style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-                required
               >
                 <option value="0">Select Result</option>
                 {hepatitisBValues?.map((value: any) => (
@@ -594,7 +615,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
                 value={formData.HepatitisCValueId}
                 onChange={(e) => setFormData({ ...formData, HepatitisCValueId: parseInt(e.target.value) })}
                 style={{ width: '100%', padding: '8px', border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px' }}
-                required
+                required={false}
               >
                 <option value="0">Select Result</option>
                 {hepatitisCValues?.map((value: any) => (
@@ -626,7 +647,7 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
           )}
           <button
             type="submit"
-            disabled={saveFindings.isPending || hasErrors}
+            disabled={saveFindings.isPending || hasErrors || !hasAnyValue}
             style={{
               flex: 2,
               padding: '12px',
@@ -635,17 +656,28 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
               borderRadius: '8px',
               color: oceanColors.mid,
               fontWeight: 'bold',
-              cursor: (saveFindings.isPending || hasErrors) ? 'not-allowed' : 'pointer',
+              cursor: (saveFindings.isPending || hasErrors || !hasAnyValue) ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              opacity: (saveFindings.isPending || hasErrors) ? 0.6 : 1,
+              opacity: (saveFindings.isPending || hasErrors || !hasAnyValue) ? 0.6 : 1,
             }}
           >
             {saveFindings.isPending ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
             Save Lab Findings
           </button>
+          {!hasAnyValue && (
+            <p style={{
+              fontSize: '12px',
+              color: oceanColors.textLight,
+              textAlign: 'center',
+              marginTop: '12px',
+              fontStyle: 'italic',
+            }}>
+              Enter at least one lab value to enable Save
+            </p>
+          )}
         </div>
       </form>
     </div>
