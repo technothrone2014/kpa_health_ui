@@ -95,7 +95,6 @@ export default function OncologyForm({ clientId, clientName, clientIdNumber, gen
       return response.data;
     },
     onSuccess: () => {
-      toast.success('Oncology screening saved successfully!');
       if (onSuccess) onSuccess();
     },
     onError: (error: any) => {

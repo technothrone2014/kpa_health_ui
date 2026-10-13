@@ -504,7 +504,6 @@ export default function FieldFindings({
     // 1s → 2s → 4s → up to 8s
     onSuccess: () => {
       try { localStorage.removeItem(`draft:tally:${clientId}`); } catch {}
-      toast.success('Field findings saved successfully!');
       if (onSuccess) onSuccess();
     },
     onError: (error: any) => {

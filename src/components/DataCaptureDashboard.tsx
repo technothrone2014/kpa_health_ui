@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { 
   Search, UserPlus, Activity, FlaskConical, Shield, 
   Users, Calendar, MapPin, ClipboardList, CheckCircle, 
-  AlertCircle, Loader2, User, Phone, IdCard
+  AlertCircle, Loader2, User, Phone, IdCard, X
 } from 'lucide-react';
 import api from '../api/client';
 import ClientRegistration from './ClientRegistration';
@@ -41,6 +41,7 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showRegistration, setShowRegistration] = useState(false);
+  const [lastSaved, setLastSaved] = useState<{ name: string; type: string } | null>(null);
   const { user } = useAuth();
 
   // ✅ Session-editable station — starts from the prop, adjustable per session
@@ -106,28 +107,44 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
 
   const handleFieldSuccess = () => {
     if (userRole === 'field_agent') {
-      toast.success('Field findings saved!');
-      setSelectedClient(null);
-      setStep('search');
+      const name = selectedClient?.FullName || 'Client';
+      toast.success('Field findings saved successfully!', { duration: 3000, icon: '✅' });
+      setLastSaved({ name, type: 'Field' });
+      setTimeout(() => {
+        setSelectedClient(null);
+        setStep('search');
+        setTimeout(() => setLastSaved(null), 4000);
+      }, 1500);
     } else {
       setStep('lab');
     }
   };
 
   const handleLabSuccess = () => {
-    toast.success('Lab findings saved!');
     if (userRole === 'lab_assistant') {
-      setSelectedClient(null);
-      setStep('search');
+      const name = selectedClient?.FullName || 'Client';
+      toast.success('Lab findings saved successfully!', { duration: 3000, icon: '✅' });
+      setLastSaved({ name, type: 'Lab' });
+      setTimeout(() => {
+        setSelectedClient(null);
+        setStep('search');
+        // Auto-dismiss the banner after 4 seconds
+        setTimeout(() => setLastSaved(null), 4000);
+      }, 1500);
     } else {
       setStep('oncology');
     }
   };
 
   const handleOncologySuccess = () => {
-    toast.success('Oncology screening saved!');
-    setSelectedClient(null);
-    setStep('search');
+    const name = selectedClient?.FullName || 'Client';
+    toast.success('Oncology screening saved successfully!', { duration: 3000, icon: '✅' });
+    setLastSaved({ name, type: 'Oncology' });
+    setTimeout(() => {
+      setSelectedClient(null);
+      setStep('search');
+      setTimeout(() => setLastSaved(null), 4000);
+    }, 1500);
   };
 
   const renderStepContent = () => {
@@ -135,6 +152,46 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
       case 'search':
         return (
           <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+            {lastSaved && (
+              <div
+                style={{
+                  background: `${oceanColors.success}15`,
+                  border: `1px solid ${oceanColors.success}40`,
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  animation: 'fadeIn 0.3s ease-out',
+                }}
+              >
+                <CheckCircle size={20} style={{ color: oceanColors.success, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontWeight: 'bold', color: oceanColors.success, fontSize: '14px' }}>
+                    {lastSaved.type} findings saved
+                  </p>
+                  <p style={{ margin: '2px 0 0', color: oceanColors.textLight, fontSize: '12px' }}>
+                    {lastSaved.name} • Ready for next client
+                  </p>
+                </div>
+                <button
+                  onClick={() => setLastSaved(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: oceanColors.textLight,
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                  }}
+                  aria-label="Dismiss"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <div style={{
                 width: '80px',
@@ -415,6 +472,20 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }

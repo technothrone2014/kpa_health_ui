@@ -408,7 +408,6 @@ export default function LabFindings({ clientId, clientName, clientIdNumber, stat
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),  // 1s → 2s → 4s → up to 8s
     onSuccess: () => {
       try { localStorage.removeItem(`draft:findings:${clientId}`); } catch {}
-      toast.success('Lab findings saved successfully!');
       if (onSuccess) onSuccess();
     },
     onError: (error: any) => {
