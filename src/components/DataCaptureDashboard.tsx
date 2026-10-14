@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import EditClientModal from './EditClientModal';
 import EditLabFindingsModal from './EditLabFindingsModal';
+import EditOncologyModal from './EditOncologyModal';
 
 const oceanColors = {
   deep: '#0B2F9E',
@@ -540,6 +541,19 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
 
       {userRole === 'lab_assistant' && (
         <EditLabFindingsModal
+          isOpen={editClientId !== null}
+          clientId={editClientId}
+          clientName={editClientName}
+          onClose={() => {
+            setEditClientId(null);
+            setEditClientName('');
+            if (searchTerm.trim()) searchClient();
+          }}
+        />
+      )}
+
+      {userRole === 'oncology_technician' && (
+        <EditOncologyModal
           isOpen={editClientId !== null}
           clientId={editClientId}
           clientName={editClientName}
