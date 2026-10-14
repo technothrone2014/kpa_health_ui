@@ -12,7 +12,7 @@ const oceanColors = {
   deep: '#0B2F9E', mid: '#1A4D8C', light: '#2B7BA8', surface: '#4AA3C2',
   gold: '#FFD700', navy: '#0A1C40', success: '#10B981', warning: '#F59E0B',
   danger: '#EF4444', info: '#3B82F6', textDark: '#1F2937', textLight: '#6B7280',
-  white: '#FFFFFF',
+  white: '#FFFFFF', foam: '#A8E6CF'
 };
 
 interface Props {
