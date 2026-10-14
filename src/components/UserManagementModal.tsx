@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Users, UserPlus, Search, Pencil, Power, PowerOff, X, Loader2,
-  CheckCircle, Loader2 as Loader,
+  CheckCircle,
 } from 'lucide-react';
 import api from '../api/client';
 import toast from 'react-hot-toast';
@@ -391,14 +391,63 @@ export default function UserManagementModal({ isOpen, onClose }: Props) {
             borderBottom: '1px solid #e2e8f0',
             display: 'flex', gap: '12px', flexWrap: 'wrap',
           }}>
-            <div style={{ flex: 1, minWidth: '220px', position: 'relative' }}>
-              <Search size={16} style={{
-                position: 'absolute', left: '12px', top: '50%',
-                transform: 'translateY(-50%)', color: oceanColors.textLight,
-              }} />
-              <input type="text" placeholder="Search by name, email, or phone…"
-                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ ...inputStyle, paddingLeft: '38px' }} />
+            <div style={{
+              position: 'relative',
+              width: 'fit-content',
+              maxWidth: '420px',
+              flexShrink: 0,
+            }}>
+              {/* Invisible mirror — determines the width based on content */}
+              <span
+                aria-hidden="true"
+                style={{
+                  visibility: 'hidden',
+                  whiteSpace: 'pre',
+                  display: 'inline-block',
+                  fontSize: '14px',
+                  padding: '10px 12px 10px 38px',
+                  border: '1px solid transparent',
+                  minWidth: '220px',
+                  maxWidth: '420px',
+                  boxSizing: 'border-box',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {searchTerm || 'Search by name, email, or phone…'}
+              </span>
+
+              <Search
+                size={16}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: oceanColors.textLight,
+                  pointerEvents: 'none',
+                }}
+              />
+
+              <input
+                type="text"
+                placeholder="Search by name, email, or phone…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  padding: '10px 12px 10px 38px',
+                  borderRadius: '8px',
+                  border: `1px solid ${oceanColors.mid}30`,
+                  fontSize: '14px',
+                  outline: 'none',
+                  background: 'white',
+                  boxSizing: 'border-box',
+                }}
+              />
             </div>
             <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
               style={{ ...inputStyle, maxWidth: '180px' }}>
