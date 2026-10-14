@@ -1,36 +1,44 @@
 // App.tsx - Fixed Field Agent Detection with Proper Role Loading
-
 import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Shield } from "lucide-react";
+import React from "react";
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import Employees from "./pages/Employees";
-import DataCorrection from "./pages/DataCorrection";
-import Dashboard from "./pages/Dashboard";
+
 import { 
   AppBar, Toolbar, Typography, Box, IconButton, Drawer, 
   List, ListItem, ListItemButton, ListItemIcon, ListItemText, 
   useMediaQuery, useTheme 
 } from "@mui/material";
-import MenuIcon from '@mui/icons-material/Menu';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import PeopleIcon from '@mui/icons-material/People';
-import DataUsageIcon from '@mui/icons-material/DataUsage';
-import AnchorIcon from '@mui/icons-material/Anchor';
-import WavesIcon from '@mui/icons-material/Waves';
+
 import CompassCalibrationIcon from '@mui/icons-material/CompassCalibration';
-import ScienceIcon from '@mui/icons-material/Science';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import LogoutIcon from '@mui/icons-material/Logout';
-import { useState, useEffect } from "react";
-import AdvancedAnalytics from './components/AdvancedAnalytics';
-import AIAssistant from './components/AIAssistant';
-import aiService from './api/aiService';
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import LoadingSpinner from "./components/LoadingSpinner";
+import ScienceIcon from '@mui/icons-material/Science';
+import PeopleIcon from '@mui/icons-material/People';
+import AnchorIcon from '@mui/icons-material/Anchor';
+import WavesIcon from '@mui/icons-material/Waves';
+import MenuIcon from '@mui/icons-material/Menu';
+
+import DataCorrection from "./pages/DataCorrection";
+import Employees from "./pages/Employees";
+import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+
 import DataCaptureDashboard from './components/DataCaptureDashboard';
-import React from "react";
-import { Shield } from "lucide-react";
+import UserManagementModal from './components/UserManagementModal';
+import AdvancedAnalytics from './components/AdvancedAnalytics';
+import LoadingSpinner from "./components/LoadingSpinner";
+import AIAssistant from './components/AIAssistant';
+
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import aiService from './api/aiService';
+
 
 const queryClient = new QueryClient();
 
@@ -163,6 +171,21 @@ const isUserOncologyTechnician = (user: any): boolean => {
 };
 
 // ============================================
+// Helper: Check if user is an administrator
+// ============================================
+const isUserAdmin = (user: any): boolean => {
+  if (!user) return false;
+  let roles = user.roles || [];
+  if (typeof roles === 'string') roles = [roles];
+  if (!Array.isArray(roles)) return false;
+  return roles.some((role: any) => {
+    if (!role) return false;
+    const lower = String(role).toLowerCase();
+    return lower === 'administrator' || lower === 'admin';
+  });
+};
+
+// ============================================
 // FIXED: Protected Route with Role-Based Access
 // ============================================
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
@@ -237,6 +260,7 @@ function AppContent() {
   const [showGlobalAI, setShowGlobalAI] = useState(false);
   const [aiStatus, setAiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const [showUserManagement, setShowUserManagement] = useState(false);
 
   // Determine if user is a field agent - using the helper function
   const isFieldAgent = React.useMemo(() => {
@@ -303,19 +327,35 @@ function AppContent() {
   // Menu items - Field agents see NONE
   // ============================================
   const getMenuItems = () => {
-    // Field agents should have NO menu items
-    if (isFieldAgent) {
-      console.log('🔍 getMenuItems: Field Agent - returning empty array');
-      return [];
-    }
-    
-    // Staff/Admin menu items
-    return [
+    if (isFieldAgent) return [];
+
+    const items: Array<{
+      text: string;
+      icon: React.ReactNode;
+      path?: string;
+      onClick?: () => void;
+      nauticalIcon: string;
+    }> = [
       { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', nauticalIcon: '🧭' },
-      { text: 'Clients', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨‍✈️' },
+      { text: 'Clients', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨✈️' },
       { text: 'Data Correction', icon: <DataUsageIcon />, path: '/data-correction', nauticalIcon: '⚓' },
       { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics', nauticalIcon: '📊' },
     ];
+
+    // Admin-only: Manage Users (opens modal, not route)
+    if (isUserAdmin(user)) {
+      items.push({
+        text: 'Manage Users',
+        icon: <ManageAccountsIcon />,
+        onClick: () => {
+          setShowUserManagement(true);
+          setMobileOpen(false);
+        },
+        nauticalIcon: '👥',
+      });
+    }
+
+    return items;
   };
 
   const menuItems = getMenuItems();
@@ -899,11 +939,11 @@ function AppContent() {
         <List sx={{ px: 2, py: 2 }}>
           {menuItems.map((item) => (
             <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
-              <ListItemButton 
-                component={Link} 
-                to={item.path}
+              <ListItemButton
+                {...(item.path ? { component: Link, to: item.path } : {})}
                 onClick={() => {
-                  setActivePath(item.path);
+                  if (item.path) setActivePath(item.path);
+                  if (item.onClick) item.onClick();
                   setMobileOpen(false);
                 }}
                 sx={{
@@ -911,7 +951,7 @@ function AppContent() {
                   py: 1.5,
                   px: 2,
                   transition: 'all 0.3s ease',
-                  background: activePath === item.path 
+                  background: item.path && activePath === item.path
                     ? `linear-gradient(135deg, ${oceanTheme.gold}, #FFA500)`
                     : 'transparent',
                   '&:hover': {
@@ -923,30 +963,27 @@ function AppContent() {
                   },
                 }}
               >
-                <ListItemIcon sx={{ 
-                  color: activePath === item.path ? oceanTheme.navy : oceanTheme.foam,
+                <ListItemIcon sx={{
+                  color: item.path && activePath === item.path ? oceanTheme.navy : oceanTheme.foam,
                 }}>
                   <Box sx={{ position: 'relative' }}>
                     {item.icon}
                     <Box sx={{
-                      position: 'absolute',
-                      top: -2,
-                      right: -2,
-                      fontSize: '10px',
-                      opacity: 0.7
+                      position: 'absolute', top: -2, right: -2,
+                      fontSize: '10px', opacity: 0.7,
                     }}>
                       {item.nauticalIcon}
                     </Box>
                   </Box>
                 </ListItemIcon>
-                <ListItemText 
-                  primary={item.text} 
-                  sx={{ 
-                    '& .MuiTypography-root': { 
-                      color: activePath === item.path ? oceanTheme.navy : oceanTheme.white,
-                      fontWeight: activePath === item.path ? 'bold' : 'normal',
-                    } 
-                  }} 
+                <ListItemText
+                  primary={item.text}
+                  sx={{
+                    '& .MuiTypography-root': {
+                      color: item.path && activePath === item.path ? oceanTheme.navy : oceanTheme.white,
+                      fontWeight: item.path && activePath === item.path ? 'bold' : 'normal',
+                    },
+                  }}
                 />
               </ListItemButton>
             </ListItem>
@@ -1163,6 +1200,10 @@ function AppContent() {
       </Box>
 
       {showGlobalAI && <AIAssistant onClose={() => setShowGlobalAI(false)} />}
+      <UserManagementModal
+        isOpen={showUserManagement}
+        onClose={() => setShowUserManagement(false)}
+      />      
     </Box>
   );
 }
