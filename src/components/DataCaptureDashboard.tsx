@@ -13,6 +13,7 @@ import OncologyForm from './OncologyForm';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import EditClientModal from './EditClientModal';
+import EditLabFindingsModal from './EditLabFindingsModal';
 
 const oceanColors = {
   deep: '#0B2F9E',
@@ -337,7 +338,13 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
                               setEditClientId(client.Id);
                               setEditClientName(client.FullName);
                             }}
-                            title="Edit client details or correct field findings"
+                            title={
+                              userRole === 'field_agent'
+                                ? 'Edit client details or field findings'
+                                : userRole === 'lab_assistant'
+                                  ? 'Edit lab findings for this client'
+                                  : 'Edit oncology findings for this client'
+                            }
                             style={{
                               padding: '6px 14px',
                               background: 'white',
@@ -518,17 +525,31 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
         </div>
       )}
 
-      <EditClientModal
-        isOpen={editClientId !== null}
-        clientId={editClientId}
-        clientName={editClientName}
-        onClose={() => {
-          setEditClientId(null);
-          setEditClientName('');
-          // Refresh search results so edits show up immediately
-          if (searchTerm.trim()) searchClient();
-        }}
-      />
+      {userRole === 'field_agent' && (
+        <EditClientModal
+          isOpen={editClientId !== null}
+          clientId={editClientId}
+          clientName={editClientName}
+          onClose={() => {
+            setEditClientId(null);
+            setEditClientName('');
+            if (searchTerm.trim()) searchClient();
+          }}
+        />
+      )}
+
+      {userRole === 'lab_assistant' && (
+        <EditLabFindingsModal
+          isOpen={editClientId !== null}
+          clientId={editClientId}
+          clientName={editClientName}
+          onClose={() => {
+            setEditClientId(null);
+            setEditClientName('');
+            if (searchTerm.trim()) searchClient();
+          }}
+        />
+      )}
 
       <style>{`
         @keyframes fadeIn {
