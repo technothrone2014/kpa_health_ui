@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Users, UserPlus, Search, Pencil, Power, PowerOff, X, Loader2,
@@ -38,6 +38,21 @@ const emptyForm = {
 };
 
 // ============================================
+// Shared styles
+// ============================================
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  minWidth: 0,
+  padding: '10px 12px',
+  borderRadius: '8px',
+  border: `1px solid ${oceanColors.mid}30`,
+  fontSize: '14px',
+  outline: 'none',
+  background: 'white',
+};
+
+// ============================================
 // Inner form modal — Create/Edit user
 // ============================================
 function UserFormModal({
@@ -46,7 +61,7 @@ function UserFormModal({
   editingUser: UserRow | null;
   roles: Role[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (user: UserRow, mode: 'create' | 'edit') => void;
 }) {
   const qc = useQueryClient();
   const [formData, setFormData] = useState({
@@ -61,31 +76,51 @@ function UserFormModal({
     } : {}),
   });
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 12px', borderRadius: '8px',
-    border: `1px solid ${oceanColors.mid}30`, fontSize: '14px',
-    outline: 'none', background: 'white',
-  };
-
   const createMut = useMutation({
     mutationFn: async (body: any) => (await api.post('/users', body)).data,
-    onSuccess: () => {
-      toast.success('User created successfully', { icon: '✅' });
+    onSuccess: (data) => {
+      toast.success('User created successfully', {
+        icon: '✅',
+        duration: 5000,
+      });
       qc.invalidateQueries({ queryKey: ['admin-users'] });
-      onSaved();
+      // Prefer server-returned row; fall back to a synthesized one
+      const created: UserRow = data?.user || data?.data || {
+        ...formData,
+        Id: data?.Id ?? data?.id ?? -1,
+        FullName: `${formData.FirstName} ${formData.LastName}`.trim(),
+        Roles: roles.filter((r) => formData.RoleIds.includes(r.Id)),
+        Status: true,
+      } as UserRow;
+      onSaved(created, 'create');
     },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to create user'),
+    onError: (e: any) =>
+      toast.error(e.response?.data?.message || 'Failed to create user', {
+        duration: 6000,
+      }),
   });
 
   const updateMut = useMutation({
     mutationFn: async ({ id, body }: { id: number; body: any }) =>
       (await api.put(`/users/${id}`, body)).data,
     onSuccess: () => {
-      toast.success('User updated successfully', { icon: '✅' });
+      toast.success('User updated successfully', {
+        icon: '✅',
+        duration: 5000,
+      });
       qc.invalidateQueries({ queryKey: ['admin-users'] });
-      onSaved();
+      const updated: UserRow = {
+        ...(editingUser as UserRow),
+        ...formData,
+        FullName: `${formData.FirstName} ${formData.LastName}`.trim(),
+        Roles: roles.filter((r) => formData.RoleIds.includes(r.Id)),
+      };
+      onSaved(updated, 'edit');
     },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to update user'),
+    onError: (e: any) =>
+      toast.error(e.response?.data?.message || 'Failed to update user', {
+        duration: 6000,
+      }),
   });
 
   const toggleRole = (roleId: number) => {
@@ -137,7 +172,7 @@ function UserFormModal({
     >
       <div style={{
         background: 'white', borderRadius: '20px', width: '100%',
-        maxWidth: '640px', maxHeight: '90vh', display: 'flex',
+        maxWidth: '680px', maxHeight: '90vh', display: 'flex',
         flexDirection: 'column', overflow: 'hidden',
         boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)',
       }}>
@@ -166,32 +201,36 @@ function UserFormModal({
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: '22px', overflowY: 'auto', flex: 1 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
-            <div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '14px',
+          }}>
+            <div style={{ minWidth: 0 }}>
               <label style={labelStyle}>First Name *</label>
               <input type="text" value={formData.FirstName}
                 onChange={(e) => setFormData({ ...formData, FirstName: e.target.value })}
                 style={inputStyle} required />
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <label style={labelStyle}>Last Name *</label>
               <input type="text" value={formData.LastName}
                 onChange={(e) => setFormData({ ...formData, LastName: e.target.value })}
                 style={inputStyle} required />
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
+            <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
               <label style={labelStyle}>Email *</label>
               <input type="email" value={formData.Email}
                 onChange={(e) => setFormData({ ...formData, Email: e.target.value })}
                 style={inputStyle} required />
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <label style={labelStyle}>Phone Number *</label>
               <input type="tel" value={formData.PhoneNumber}
                 onChange={(e) => setFormData({ ...formData, PhoneNumber: e.target.value })}
                 style={inputStyle} required />
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <label style={labelStyle}>Username</label>
               <input type="text" placeholder="Auto from email"
                 value={formData.UserName}
@@ -199,7 +238,7 @@ function UserFormModal({
                 style={inputStyle} />
             </div>
             {!editingUser && (
-              <div style={{ gridColumn: 'span 2' }}>
+              <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
                 <label style={labelStyle}>Initial Password * (min 8 chars)</label>
                 <input type="password" value={formData.Password}
                   onChange={(e) => setFormData({ ...formData, Password: e.target.value })}
@@ -211,13 +250,16 @@ function UserFormModal({
           <div style={{ marginTop: '18px' }}>
             <label style={labelStyle}>Roles * (select at least one)</label>
             <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '8px',
               background: '#f8fafc', padding: '12px', borderRadius: '10px',
             }}>
               {roles.map((r) => (
                 <label key={r.Id} style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
                   cursor: 'pointer', fontSize: '13px', color: oceanColors.textDark,
+                  minWidth: 0,
                 }}>
                   <input type="checkbox"
                     checked={formData.RoleIds.includes(r.Id)}
@@ -267,6 +309,13 @@ export default function UserManagementModal({ isOpen, onClose }: Props) {
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [pendingToggleId, setPendingToggleId] = useState<number | null>(null);
 
+  // 🔔 Feedback state — banner + green ring target
+  const [savedNotice, setSavedNotice] = useState<{
+    id: number | null;      // user id of the just-saved row (null if unknown)
+    label: string;
+    message: string;
+  } | null>(null);
+
   const { data: usersData, isLoading: usersLoading } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
@@ -310,24 +359,51 @@ export default function UserManagementModal({ isOpen, onClose }: Props) {
       return (await api.patch(`/users/${id}/status`, { Status })).data;
     },
     onSuccess: (_, vars) => {
-      toast.success(vars.Status ? 'User activated' : 'User deactivated', { icon: '✅' });
+      toast.success(vars.Status ? 'User activated' : 'User deactivated', {
+        icon: '✅',
+        duration: 5000,
+      });
       qc.invalidateQueries({ queryKey: ['admin-users'] });
     },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to update status'),
+    onError: (e: any) =>
+      toast.error(e.response?.data?.message || 'Failed to update status', {
+        duration: 6000,
+      }),
     onSettled: () => setPendingToggleId(null),
   });
+
+  // Auto-dismiss the banner after 5 seconds
+  useEffect(() => {
+    if (!savedNotice) return;
+    const t = setTimeout(() => setSavedNotice(null), 5000);
+    return () => clearTimeout(t);
+  }, [savedNotice]);
+
+  // Clear feedback when the whole modal closes
+  useEffect(() => {
+    if (!isOpen) setSavedNotice(null);
+  }, [isOpen]);
 
   const openCreate = () => { setEditingUser(null); setShowFormModal(true); };
   const openEdit = (user: UserRow) => { setEditingUser(user); setShowFormModal(true); };
   const closeFormModal = () => { setShowFormModal(false); setEditingUser(null); };
 
+  // Called from UserFormModal after a successful create/update
+  const handleFormSaved = (user: UserRow, mode: 'create' | 'edit') => {
+    setSavedNotice({
+      id: user?.Id ?? null,
+      message:
+        mode === 'create'
+          ? `User "${user?.FullName || ''}" created`
+          : `User "${user?.FullName || ''}" updated`,
+      label: `Saved at ${new Date().toLocaleTimeString()}`,
+    });
+    closeFormModal();
+  };
+
   if (!isOpen) return null;
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 12px', borderRadius: '8px',
-    border: `1px solid ${oceanColors.mid}30`, fontSize: '14px',
-    outline: 'none', background: 'white',
-  };
+  const justSavedId = savedNotice?.id ?? null;
 
   return (
     <>
@@ -385,6 +461,53 @@ export default function UserManagementModal({ isOpen, onClose }: Props) {
             </div>
           </div>
 
+          {/* 🔔 Success banner */}
+          {savedNotice && (
+            <div
+              style={{
+                margin: '16px 24px 0',
+                background: `${oceanColors.success}15`,
+                border: `1px solid ${oceanColors.success}40`,
+                borderRadius: '12px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                animation: 'fadeIn 0.3s ease-out',
+              }}
+            >
+              <CheckCircle
+                size={20}
+                style={{ color: oceanColors.success, flexShrink: 0 }}
+              />
+              <div style={{ flex: 1 }}>
+                <p style={{
+                  margin: 0, fontWeight: 'bold',
+                  color: oceanColors.success, fontSize: '14px',
+                }}>
+                  {savedNotice.message}
+                </p>
+                <p style={{
+                  margin: '2px 0 0',
+                  color: oceanColors.textLight, fontSize: '12px',
+                }}>
+                  {savedNotice.label}
+                </p>
+              </div>
+              <button
+                onClick={() => setSavedNotice(null)}
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: oceanColors.textLight, cursor: 'pointer',
+                  padding: '4px', display: 'flex',
+                }}
+                aria-label="Dismiss"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
           {/* Filters */}
           <div style={{
             padding: '16px 24px', background: '#f8fafc',
@@ -397,7 +520,6 @@ export default function UserManagementModal({ isOpen, onClose }: Props) {
               maxWidth: '420px',
               flexShrink: 0,
             }}>
-              {/* Invisible mirror — determines the width based on content */}
               <span
                 aria-hidden="true"
                 style={{
@@ -450,12 +572,12 @@ export default function UserManagementModal({ isOpen, onClose }: Props) {
               />
             </div>
             <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
-              style={{ ...inputStyle, maxWidth: '180px' }}>
+              style={{ ...inputStyle, maxWidth: '180px', width: 'auto' }}>
               <option value="all">All Roles</option>
               {roles?.map((r) => <option key={r.Id} value={r.Name}>{r.Name}</option>)}
             </select>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}
-              style={{ ...inputStyle, maxWidth: '150px' }}>
+              style={{ ...inputStyle, maxWidth: '150px', width: 'auto' }}>
               <option value="all">All Status</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -489,54 +611,71 @@ export default function UserManagementModal({ isOpen, onClose }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.map((u) => (
-                    <tr key={u.Id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={tdStyle}>
-                        <div style={{ fontWeight: '600', color: oceanColors.textDark }}>
-                          {u.FullName || `${u.FirstName} ${u.LastName}`}
-                        </div>
-                        <div style={{ fontSize: '11px', color: oceanColors.textLight }}>
-                          @{u.UserName}
-                        </div>
-                      </td>
-                      <td style={tdStyle}>{u.Email}</td>
-                      <td style={tdStyle}>{u.PhoneNumber}</td>
-                      <td style={tdStyle}>
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {(u.Roles || []).map((r) => (
-                            <span key={r.Id} style={{
-                              fontSize: '11px', fontWeight: 'bold',
-                              padding: '3px 8px', borderRadius: '10px',
-                              background: `${oceanColors.info}15`, color: oceanColors.info,
-                            }}>{r.Name}</span>
-                          ))}
-                        </div>
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{
-                          fontSize: '11px', fontWeight: 'bold',
-                          padding: '3px 10px', borderRadius: '10px',
-                          background: u.Status ? `${oceanColors.success}15` : `${oceanColors.danger}15`,
-                          color: u.Status ? oceanColors.success : oceanColors.danger,
-                        }}>{u.Status ? 'ACTIVE' : 'INACTIVE'}</span>
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <button onClick={() => openEdit(u)} title="Edit user"
-                          style={actionBtnStyle(oceanColors.deep)}>
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => toggleMut.mutate({ id: u.Id, Status: !u.Status })}
-                          disabled={pendingToggleId === u.Id}
-                          title={u.Status ? 'Deactivate' : 'Activate'}
-                          style={actionBtnStyle(u.Status ? oceanColors.danger : oceanColors.success, true)}>
-                          {pendingToggleId === u.Id
-                            ? <Loader2 size={14} className="animate-spin" />
-                            : u.Status ? <PowerOff size={14} /> : <Power size={14} />}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredUsers.map((u) => {
+                    const isJustSaved = justSavedId !== null && u.Id === justSavedId;
+                    return (
+                      <tr
+                        key={u.Id}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          // 💚 Green tint for the just-saved row
+                          background: isJustSaved
+                            ? `${oceanColors.success}08`
+                            : undefined,
+                          // Fading halo — we keep the animation gentle
+                          boxShadow: isJustSaved
+                            ? `inset 4px 0 0 ${oceanColors.success}`
+                            : undefined,
+                          transition: 'background 0.4s ease, box-shadow 0.4s ease',
+                        }}
+                      >
+                        <td style={tdStyle}>
+                          <div style={{ fontWeight: '600', color: oceanColors.textDark }}>
+                            {u.FullName || `${u.FirstName} ${u.LastName}`}
+                          </div>
+                          <div style={{ fontSize: '11px', color: oceanColors.textLight }}>
+                            @{u.UserName}
+                          </div>
+                        </td>
+                        <td style={tdStyle}>{u.Email}</td>
+                        <td style={tdStyle}>{u.PhoneNumber}</td>
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            {(u.Roles || []).map((r) => (
+                              <span key={r.Id} style={{
+                                fontSize: '11px', fontWeight: 'bold',
+                                padding: '3px 8px', borderRadius: '10px',
+                                background: `${oceanColors.info}15`, color: oceanColors.info,
+                              }}>{r.Name}</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{
+                            fontSize: '11px', fontWeight: 'bold',
+                            padding: '3px 10px', borderRadius: '10px',
+                            background: u.Status ? `${oceanColors.success}15` : `${oceanColors.danger}15`,
+                            color: u.Status ? oceanColors.success : oceanColors.danger,
+                          }}>{u.Status ? 'ACTIVE' : 'INACTIVE'}</span>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <button onClick={() => openEdit(u)} title="Edit user"
+                            style={actionBtnStyle(oceanColors.deep)}>
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => toggleMut.mutate({ id: u.Id, Status: !u.Status })}
+                            disabled={pendingToggleId === u.Id}
+                            title={u.Status ? 'Deactivate' : 'Activate'}
+                            style={actionBtnStyle(u.Status ? oceanColors.danger : oceanColors.success, true)}>
+                            {pendingToggleId === u.Id
+                              ? <Loader2 size={14} className="animate-spin" />
+                              : u.Status ? <PowerOff size={14} /> : <Power size={14} />}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -549,12 +688,16 @@ export default function UserManagementModal({ isOpen, onClose }: Props) {
           editingUser={editingUser}
           roles={roles || []}
           onClose={closeFormModal}
-          onSaved={closeFormModal}
+          onSaved={handleFormSaved}
         />
       )}
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
         .animate-spin { animation: spin 1s linear infinite; }
       `}</style>
     </>
@@ -572,7 +715,7 @@ const tdStyle: React.CSSProperties = {
 };
 const labelStyle: React.CSSProperties = {
   fontSize: '12px', fontWeight: '600',
-  color: oceanColors.textDark, display: 'block', marginBottom: '4px',
+  color: oceanColors.textDark, display: 'block', marginBottom: '6px',
 };
 const actionBtnStyle = (color: string, ml = false): React.CSSProperties => ({
   background: `${color}10`,
