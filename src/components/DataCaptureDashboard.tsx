@@ -12,7 +12,7 @@ import LabFindings from './LabFindings';
 import OncologyForm from './OncologyForm';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-
+import EditClientModal from './EditClientModal';
 
 const oceanColors = {
   deep: '#0B2F9E',
@@ -46,6 +46,8 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
 
   // ✅ Session-editable station — starts from the prop, adjustable per session
   const [localStationId, setLocalStationId] = useState<number>(stationId);
+  const [editClientId, setEditClientId] = useState<number | null>(null);
+  const [editClientName, setEditClientName] = useState<string>('');
 
   useEffect(() => {
     setLocalStationId(stationId);
@@ -301,10 +303,20 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
                         e.currentTarget.style.background = '#f8fafc';
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontWeight: 'bold', color: oceanColors.textDark }}>{client.FullName}</div>
-                          <div style={{ fontSize: '12px', color: oceanColors.textLight, marginTop: '4px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                        {/* Client info — restored */}
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 'bold', color: oceanColors.textDark }}>
+                            {client.FullName}
+                          </div>
+                          <div style={{
+                            fontSize: '12px',
+                            color: oceanColors.textLight,
+                            marginTop: '4px',
+                            display: 'flex',
+                            gap: '16px',
+                            flexWrap: 'wrap',
+                          }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <IdCard size={12} /> {client.IDNumber}
                             </span>
@@ -316,14 +328,43 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
                             </span>
                           </div>
                         </div>
-                        <div style={{
-                          padding: '4px 12px',
-                          background: oceanColors.success,
-                          color: 'white',
-                          borderRadius: '20px',
-                          fontSize: '11px'
-                        }}>
-                          Select
+
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditClientId(client.Id);
+                              setEditClientName(client.FullName);
+                            }}
+                            title="Edit client details or correct field findings"
+                            style={{
+                              padding: '6px 14px',
+                              background: 'white',
+                              color: oceanColors.deep,
+                              border: `1px solid ${oceanColors.deep}50`,
+                              borderRadius: '20px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <AlertCircle size={12} />
+                            Edit
+                          </button>
+                          <div style={{
+                            padding: '6px 14px',
+                            background: oceanColors.success,
+                            color: 'white',
+                            borderRadius: '20px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                          }}>
+                            Select
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -476,6 +517,18 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
           </div>
         </div>
       )}
+
+      <EditClientModal
+        isOpen={editClientId !== null}
+        clientId={editClientId}
+        clientName={editClientName}
+        onClose={() => {
+          setEditClientId(null);
+          setEditClientName('');
+          // Refresh search results so edits show up immediately
+          if (searchTerm.trim()) searchClient();
+        }}
+      />
 
       <style>{`
         @keyframes fadeIn {
