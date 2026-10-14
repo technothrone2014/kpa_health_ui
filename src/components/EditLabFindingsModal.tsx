@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FlaskConical, Save, X, Loader2, Pencil, MapPin, CheckCircle,
@@ -43,6 +43,7 @@ const labelStyle: React.CSSProperties = {
 
 export default function EditLabFindingsModal({ isOpen, clientId, clientName, onClose }: Props) {
   const qc = useQueryClient();
+  const [savedNotice, setSavedNotice] = useState<{ id: number; label: string } | null>(null);
 
   const { data: client } = useQuery({
     queryKey: ['client-edit', clientId],
@@ -59,7 +60,6 @@ export default function EditLabFindingsModal({ isOpen, clientId, clientName, onC
     enabled: !!clientId && isOpen,
   });
 
-  // Lookups for the dropdown fields
   const { data: lipidValues } = useQuery<any[]>({
     queryKey: ['lipid-values'],
     queryFn: async () => (await api.get('/lookups/lipid-values')).data || [],
@@ -78,6 +78,18 @@ export default function EditLabFindingsModal({ isOpen, clientId, clientName, onC
     staleTime: 30 * 60 * 1000,
     enabled: isOpen,
   });
+
+  // Auto-dismiss the success banner after 5 seconds
+  useEffect(() => {
+    if (!savedNotice) return;
+    const t = setTimeout(() => setSavedNotice(null), 5000);
+    return () => clearTimeout(t);
+  }, [savedNotice]);
+
+  // Reset the banner when the modal closes
+  useEffect(() => {
+    if (!isOpen) setSavedNotice(null);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -126,13 +138,76 @@ export default function EditLabFindingsModal({ isOpen, clientId, clientName, onC
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+
+          {/* 🔔 Success banner */}
+          {savedNotice && (
+            <div
+              style={{
+                background: `${oceanColors.success}15`,
+                border: `1px solid ${oceanColors.success}40`,
+                borderRadius: '12px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                animation: 'fadeIn 0.3s ease-out',
+              }}
+            >
+              <CheckCircle
+                size={20}
+                style={{ color: oceanColors.success, flexShrink: 0 }}
+              />
+              <div style={{ flex: 1 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontWeight: 'bold',
+                    color: oceanColors.success,
+                    fontSize: '14px',
+                  }}
+                >
+                  Lab findings updated successfully
+                </p>
+                <p
+                  style={{
+                    margin: '2px 0 0',
+                    color: oceanColors.textLight,
+                    fontSize: '12px',
+                  }}
+                >
+                  {savedNotice.label}
+                </p>
+              </div>
+              <button
+                onClick={() => setSavedNotice(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: oceanColors.textLight,
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                }}
+                aria-label="Dismiss"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
           <FindingsList
             findings={findings || []}
             loading={isLoading}
             lipidValues={lipidValues || []}
             hbvValues={hbvValues || []}
             hcvValues={hcvValues || []}
-            onSaved={() => {
+            justSavedId={savedNotice?.id ?? null}
+            onSaved={(id: number) => {
+              setSavedNotice({
+                id,
+                label: `Saved at ${format(new Date(), 'HH:mm:ss')}`,
+              });
               qc.invalidateQueries({ queryKey: ['client-findings', clientId] });
             }}
           />
@@ -141,6 +216,10 @@ export default function EditLabFindingsModal({ isOpen, clientId, clientName, onC
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
         .animate-spin { animation: spin 1s linear infinite; }
       `}</style>
     </div>
@@ -150,7 +229,7 @@ export default function EditLabFindingsModal({ isOpen, clientId, clientName, onC
 // ============================================
 // List of findings
 // ============================================
-function FindingsList({ findings, loading, lipidValues, hbvValues, hcvValues, onSaved }: any) {
+function FindingsList({ findings, loading, lipidValues, hbvValues, hcvValues, onSaved, justSavedId }: any) {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   if (loading) {
@@ -175,12 +254,13 @@ function FindingsList({ findings, loading, lipidValues, hbvValues, hcvValues, on
           key={f.Id}
           finding={f}
           editing={editingId === f.Id}
+          justSaved={justSavedId === f.Id}
           lipidValues={lipidValues}
           hbvValues={hbvValues}
           hcvValues={hcvValues}
           onStartEdit={() => setEditingId(f.Id)}
           onCancel={() => setEditingId(null)}
-          onSaved={() => { setEditingId(null); onSaved?.(); }}
+          onSaved={(id: number) => { setEditingId(null); onSaved?.(id); }}
         />
       ))}
     </div>
@@ -190,7 +270,11 @@ function FindingsList({ findings, loading, lipidValues, hbvValues, hcvValues, on
 // ============================================
 // Single finding row — collapsed / expanded
 // ============================================
-function FindingRow({ finding, editing, lipidValues, hbvValues, hcvValues, onStartEdit, onCancel, onSaved }: any) {
+function FindingRow({
+  finding, editing, justSaved,
+  lipidValues, hbvValues, hcvValues,
+  onStartEdit, onCancel, onSaved,
+}: any) {
   const [form, setForm] = useState({
     FBSValue:          finding.FBSValue          ?? '',
     HBA1CValue:        finding.HBA1CValue        ?? '',
@@ -202,15 +286,35 @@ function FindingRow({ finding, editing, lipidValues, hbvValues, hcvValues, onSta
     HepatitisCValueId: finding.HepatitisCValueId ?? 0,
   });
 
+  // ✅ Re-sync when the parent refetches and hands us a new `finding` prop
+  useEffect(() => {
+    setForm({
+      FBSValue:          finding.FBSValue          ?? '',
+      HBA1CValue:        finding.HBA1CValue        ?? '',
+      LipidId:           finding.LipidId           ?? 0,
+      MicroalbuminValue: finding.MicroalbuminValue ?? '',
+      BMDValue:          finding.BMDValue          ?? '',
+      PSAValue:          finding.PSAValue          ?? '',
+      HepatitisBValueId: finding.HepatitisBValueId ?? 0,
+      HepatitisCValueId: finding.HepatitisCValueId ?? 0,
+    });
+  }, [finding]);
+
   const saveMut = useMutation({
     mutationFn: async (body: any) =>
       (await api.put(`/findings/${finding.Id}`, body)).data,
     onSuccess: () => {
-      toast.success('Lab findings updated', { icon: '✅' });
-      onSaved?.();
+      toast.success('Lab findings updated successfully', {
+        icon: '✅',
+        duration: 5000,
+      });
+      onSaved?.(finding.Id);
     },
     onError: (e: any) =>
-      toast.error(e.response?.data?.message || 'Failed to update lab findings'),
+      toast.error(
+        e.response?.data?.message || 'Failed to update lab findings',
+        { duration: 6000 },
+      ),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -231,8 +335,15 @@ function FindingRow({ finding, editing, lipidValues, hbvValues, hcvValues, onSta
   if (!editing) {
     return (
       <div style={{
-        border: '1px solid #e2e8f0', borderRadius: '12px',
-        padding: '14px 16px', background: 'white',
+        // 💚 Green ring + tint briefly after save
+        border: justSaved
+          ? `2px solid ${oceanColors.success}`
+          : '1px solid #e2e8f0',
+        borderRadius: '12px',
+        padding: '14px 16px',
+        background: justSaved ? `${oceanColors.success}08` : 'white',
+        boxShadow: justSaved ? `0 0 0 4px ${oceanColors.success}20` : 'none',
+        transition: 'all 0.4s ease',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div>
