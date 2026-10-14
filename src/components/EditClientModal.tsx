@@ -90,7 +90,7 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
     enabled: isOpen,
   });
 
-  // Auto-dismiss the success banner after 5 seconds
+  // Auto-dismiss the success banner + ring after 5 seconds
   useEffect(() => {
     if (!savedNotice) return;
     const t = setTimeout(() => setSavedNotice(null), 5000);
@@ -105,6 +105,7 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
   if (!isOpen) return null;
 
   const justSavedId = savedNotice?.kind === 'findings' ? savedNotice.id : null;
+  const clientJustSaved = savedNotice?.kind === 'client';
 
   return (
     <div
@@ -219,6 +220,7 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
               client={client}
               loading={clientLoading}
               stations={stations || []}
+              justSaved={clientJustSaved}
               onSaved={() => {
                 setSavedNotice({
                   kind: 'client',
@@ -286,7 +288,7 @@ function TabButton({ active, onClick, children }: any) {
 // ============================================
 // Tab 1 — Client Details
 // ============================================
-function ClientDetailsTab({ client, loading, stations, onSaved }: any) {
+function ClientDetailsTab({ client, loading, stations, onSaved, justSaved }: any) {
   const [form, setForm] = useState<any>(null);
 
   useEffect(() => {
@@ -343,90 +345,104 @@ function ClientDetailsTab({ client, loading, stations, onSaved }: any) {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '16px',
-      }}>
-        <div style={{ minWidth: 0 }}>
-          <label style={labelStyle}>ID Number *</label>
-          <input type="text" value={form.IDNumber}
-            onChange={(e) => setForm({ ...form, IDNumber: e.target.value })}
-            style={inputStyle} required />
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <label style={labelStyle}>Phone Number *</label>
-          <input type="tel" value={form.PhoneNumber}
-            onChange={(e) => setForm({ ...form, PhoneNumber: e.target.value })}
-            style={inputStyle} required />
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <label style={labelStyle}>First Name *</label>
-          <input type="text" value={form.FirstName}
-            onChange={(e) => setForm({ ...form, FirstName: e.target.value })}
-            style={inputStyle} required />
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <label style={labelStyle}>Last Name *</label>
-          <input type="text" value={form.LastName}
-            onChange={(e) => setForm({ ...form, LastName: e.target.value })}
-            style={inputStyle} required />
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <label style={labelStyle}>Date of Birth *</label>
-          <input type="date" value={form.DateOfBirth}
-            max={format(new Date(), 'yyyy-MM-dd')}
-            onChange={(e) => setForm({ ...form, DateOfBirth: e.target.value })}
-            style={inputStyle} required />
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <label style={labelStyle}>Gender</label>
-          <select value={form.GenderId}
-            onChange={(e) => setForm({ ...form, GenderId: parseInt(e.target.value) })}
-            style={inputStyle}>
-            <option value={1}>Male</option>
-            <option value={2}>Female</option>
-          </select>
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <label style={labelStyle}>Category</label>
-          <select value={form.CategoryId}
-            onChange={(e) => setForm({ ...form, CategoryId: parseInt(e.target.value) })}
-            style={inputStyle}>
-            {categories?.length
-              ? categories.map((c: any) => <option key={c.Id} value={c.Id}>{c.Title}</option>)
-              : <option value={form.CategoryId}>Category {form.CategoryId}</option>}
-          </select>
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <label style={labelStyle}>Station</label>
-          <select value={form.StationId}
-            onChange={(e) => setForm({ ...form, StationId: parseInt(e.target.value) })}
-            style={inputStyle}>
-            {stations.map((s: any) => (
-              <option key={s.Id} value={s.Id}>{s.Title}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px', gap: '12px' }}>
-        <button type="submit" disabled={saveMut.isPending} style={{
-          padding: '12px 24px',
-          background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
-          border: 'none', borderRadius: '10px',
-          color: oceanColors.navy, fontWeight: 'bold',
-          cursor: saveMut.isPending ? 'not-allowed' : 'pointer',
-          display: 'flex', alignItems: 'center', gap: '8px',
-          opacity: saveMut.isPending ? 0.7 : 1,
+    // 💚 Padded wrapper — always present so layout never shifts;
+    //    ring + tint only while `justSaved` is true.
+    <div
+      style={{
+        padding: '8px',
+        borderRadius: '14px',
+        background: justSaved ? `${oceanColors.success}08` : 'transparent',
+        boxShadow: justSaved
+          ? `0 0 0 3px ${oceanColors.success}40`
+          : 'none',
+        transition: 'background 0.4s ease, box-shadow 0.4s ease',
+      }}
+    >
+      <form onSubmit={handleSubmit}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '16px',
         }}>
-          {saveMut.isPending
-            ? <><Loader2 size={16} className="animate-spin" /> Saving…</>
-            : <><Save size={16} /> Save Changes</>}
-        </button>
-      </div>
-    </form>
+          <div style={{ minWidth: 0 }}>
+            <label style={labelStyle}>ID Number *</label>
+            <input type="text" value={form.IDNumber}
+              onChange={(e) => setForm({ ...form, IDNumber: e.target.value })}
+              style={inputStyle} required />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <label style={labelStyle}>Phone Number *</label>
+            <input type="tel" value={form.PhoneNumber}
+              onChange={(e) => setForm({ ...form, PhoneNumber: e.target.value })}
+              style={inputStyle} required />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <label style={labelStyle}>First Name *</label>
+            <input type="text" value={form.FirstName}
+              onChange={(e) => setForm({ ...form, FirstName: e.target.value })}
+              style={inputStyle} required />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <label style={labelStyle}>Last Name *</label>
+            <input type="text" value={form.LastName}
+              onChange={(e) => setForm({ ...form, LastName: e.target.value })}
+              style={inputStyle} required />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <label style={labelStyle}>Date of Birth *</label>
+            <input type="date" value={form.DateOfBirth}
+              max={format(new Date(), 'yyyy-MM-dd')}
+              onChange={(e) => setForm({ ...form, DateOfBirth: e.target.value })}
+              style={inputStyle} required />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <label style={labelStyle}>Gender</label>
+            <select value={form.GenderId}
+              onChange={(e) => setForm({ ...form, GenderId: parseInt(e.target.value) })}
+              style={inputStyle}>
+              <option value={1}>Male</option>
+              <option value={2}>Female</option>
+            </select>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <label style={labelStyle}>Category</label>
+            <select value={form.CategoryId}
+              onChange={(e) => setForm({ ...form, CategoryId: parseInt(e.target.value) })}
+              style={inputStyle}>
+              {categories?.length
+                ? categories.map((c: any) => <option key={c.Id} value={c.Id}>{c.Title}</option>)
+                : <option value={form.CategoryId}>Category {form.CategoryId}</option>}
+            </select>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <label style={labelStyle}>Station</label>
+            <select value={form.StationId}
+              onChange={(e) => setForm({ ...form, StationId: parseInt(e.target.value) })}
+              style={inputStyle}>
+              {stations.map((s: any) => (
+                <option key={s.Id} value={s.Id}>{s.Title}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px', gap: '12px' }}>
+          <button type="submit" disabled={saveMut.isPending} style={{
+            padding: '12px 24px',
+            background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
+            border: 'none', borderRadius: '10px',
+            color: oceanColors.navy, fontWeight: 'bold',
+            cursor: saveMut.isPending ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            opacity: saveMut.isPending ? 0.7 : 1,
+          }}>
+            {saveMut.isPending
+              ? <><Loader2 size={16} className="animate-spin" /> Saving…</>
+              : <><Save size={16} /> Save Changes</>}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
