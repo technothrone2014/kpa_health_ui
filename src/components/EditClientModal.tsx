@@ -39,14 +39,16 @@ const labelStyle: React.CSSProperties = {
   display: 'block', marginBottom: '6px',
 };
 
-type SavedNotice =
-  | { kind: 'client'; label: string }
-  | { kind: 'findings'; id: number; label: string };
+// Unified notice — guarantees only one banner at a time
+type Notice =
+  | { kind: 'success-client'; label: string }
+  | { kind: 'success-findings'; id: number; label: string }
+  | { kind: 'error'; message: string };
 
 export default function EditClientModal({ isOpen, clientId, clientName, onClose }: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<'client' | 'findings'>('client');
-  const [savedNotice, setSavedNotice] = useState<SavedNotice | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
 
   // --- Fetch client ---
   const { data: client, isLoading: clientLoading } = useQuery({
@@ -90,22 +92,29 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
     enabled: isOpen,
   });
 
-  // Auto-dismiss the success banner + ring after 5 seconds
+  // Auto-dismiss SUCCESS notices after 5 s.
+  // Errors stay until the user dismisses them or tries a new save —
+  // the user needs time to read and act on them.
   useEffect(() => {
-    if (!savedNotice) return;
-    const t = setTimeout(() => setSavedNotice(null), 5000);
+    if (!notice) return;
+    if (notice.kind === 'error') return;
+    const t = setTimeout(() => setNotice(null), 5000);
     return () => clearTimeout(t);
-  }, [savedNotice]);
+  }, [notice]);
 
-  // Clear the banner whenever the modal closes
+  // Clear the notice when the modal closes or the tab changes
   useEffect(() => {
-    if (!isOpen) setSavedNotice(null);
+    if (!isOpen) setNotice(null);
   }, [isOpen]);
+
+  useEffect(() => {
+    setNotice(null);
+  }, [tab]);
 
   if (!isOpen) return null;
 
-  const justSavedId = savedNotice?.kind === 'findings' ? savedNotice.id : null;
-  const clientJustSaved = savedNotice?.kind === 'client';
+  const justSavedId = notice?.kind === 'success-findings' ? notice.id : null;
+  const clientJustSaved = notice?.kind === 'success-client';
 
   return (
     <div
@@ -166,53 +175,9 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
 
-          {/* 🔔 Success banner */}
-          {savedNotice && (
-            <div
-              style={{
-                background: `${oceanColors.success}15`,
-                border: `1px solid ${oceanColors.success}40`,
-                borderRadius: '12px',
-                padding: '12px 16px',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                animation: 'fadeIn 0.3s ease-out',
-              }}
-            >
-              <CheckCircle
-                size={20}
-                style={{ color: oceanColors.success, flexShrink: 0 }}
-              />
-              <div style={{ flex: 1 }}>
-                <p style={{
-                  margin: 0, fontWeight: 'bold',
-                  color: oceanColors.success, fontSize: '14px',
-                }}>
-                  {savedNotice.kind === 'client'
-                    ? 'Client details updated successfully'
-                    : 'Field findings updated successfully'}
-                </p>
-                <p style={{
-                  margin: '2px 0 0',
-                  color: oceanColors.textLight, fontSize: '12px',
-                }}>
-                  {savedNotice.label}
-                </p>
-              </div>
-              <button
-                onClick={() => setSavedNotice(null)}
-                style={{
-                  background: 'transparent', border: 'none',
-                  color: oceanColors.textLight, cursor: 'pointer',
-                  padding: '4px', display: 'flex',
-                }}
-                aria-label="Dismiss"
-              >
-                <X size={16} />
-              </button>
-            </div>
+          {/* 🔔 Notice banner — success OR error */}
+          {notice && (
+            <NoticeBanner notice={notice} onDismiss={() => setNotice(null)} />
           )}
 
           {tab === 'client' && (
@@ -222,12 +187,15 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
               stations={stations || []}
               justSaved={clientJustSaved}
               onSaved={() => {
-                setSavedNotice({
-                  kind: 'client',
+                setNotice({
+                  kind: 'success-client',
                   label: `Saved at ${format(new Date(), 'HH:mm:ss')}`,
                 });
                 qc.invalidateQueries({ queryKey: ['client-edit', clientId] });
                 qc.invalidateQueries({ queryKey: ['client', clientId] });
+              }}
+              onError={(message: string) => {
+                setNotice({ kind: 'error', message });
               }}
             />
           )}
@@ -239,12 +207,15 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
               rbsRemarks={rbsRemarks || []}
               justSavedId={justSavedId}
               onSaved={(id: number) => {
-                setSavedNotice({
-                  kind: 'findings',
+                setNotice({
+                  kind: 'success-findings',
                   id,
                   label: `Saved at ${format(new Date(), 'HH:mm:ss')}`,
                 });
                 qc.invalidateQueries({ queryKey: ['client-tallies', clientId] });
+              }}
+              onError={(message: string) => {
+                setNotice({ kind: 'error', message });
               }}
             />
           )}
@@ -259,6 +230,69 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
         }
         .animate-spin { animation: spin 1s linear infinite; }
       `}</style>
+    </div>
+  );
+}
+
+// ============================================
+// Notice banner — renders success or error
+// ============================================
+function NoticeBanner({ notice, onDismiss }: { notice: Notice; onDismiss: () => void }) {
+  const isError = notice.kind === 'error';
+  const tone = isError ? oceanColors.danger : oceanColors.success;
+  const title = isError
+    ? 'Update failed'
+    : notice.kind === 'success-client'
+      ? 'Client details updated successfully'
+      : 'Field findings updated successfully';
+  const subtitle = isError
+    ? notice.message
+    : notice.label;
+
+  return (
+    <div
+      role={isError ? 'alert' : 'status'}
+      style={{
+        background: `${tone}15`,
+        border: `1px solid ${tone}40`,
+        borderRadius: '12px',
+        padding: '12px 16px',
+        marginBottom: '16px',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '10px',
+        animation: 'fadeIn 0.3s ease-out',
+      }}
+    >
+      {isError
+        ? <AlertCircle size={20} style={{ color: tone, flexShrink: 0, marginTop: '2px' }} />
+        : <CheckCircle  size={20} style={{ color: tone, flexShrink: 0, marginTop: '2px' }} />}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{
+          margin: 0, fontWeight: 'bold',
+          color: tone, fontSize: '14px',
+        }}>
+          {title}
+        </p>
+        <p style={{
+          margin: '2px 0 0',
+          color: isError ? oceanColors.textDark : oceanColors.textLight,
+          fontSize: '12px', lineHeight: 1.5,
+        }}>
+          {subtitle}
+        </p>
+      </div>
+      <button
+        onClick={onDismiss}
+        style={{
+          background: 'transparent', border: 'none',
+          color: oceanColors.textLight, cursor: 'pointer',
+          padding: '4px', display: 'flex',
+        }}
+        aria-label="Dismiss"
+      >
+        <X size={16} />
+      </button>
     </div>
   );
 }
@@ -288,7 +322,9 @@ function TabButton({ active, onClick, children }: any) {
 // ============================================
 // Tab 1 — Client Details
 // ============================================
-function ClientDetailsTab({ client, loading, stations, onSaved, justSaved }: any) {
+function ClientDetailsTab({
+  client, loading, stations, onSaved, justSaved, onError,
+}: any) {
   const [form, setForm] = useState<any>(null);
 
   useEffect(() => {
@@ -317,10 +353,11 @@ function ClientDetailsTab({ client, loading, stations, onSaved, justSaved }: any
       });
       onSaved?.();
     },
-    onError: (e: any) =>
-      toast.error(e.response?.data?.message || 'Failed to update client', {
-        duration: 6000,
-      }),
+    onError: (e: any) => {
+      const message = e.response?.data?.message || 'Failed to update client';
+      toast.error(message, { duration: 6000 });
+      onError?.(message);
+    },
   });
 
   const { data: categories } = useQuery<any[]>({
@@ -345,16 +382,12 @@ function ClientDetailsTab({ client, loading, stations, onSaved, justSaved }: any
   };
 
   return (
-    // 💚 Padded wrapper — always present so layout never shifts;
-    //    ring + tint only while `justSaved` is true.
     <div
       style={{
         padding: '8px',
         borderRadius: '14px',
         background: justSaved ? `${oceanColors.success}08` : 'transparent',
-        boxShadow: justSaved
-          ? `0 0 0 3px ${oceanColors.success}40`
-          : 'none',
+        boxShadow: justSaved ? `0 0 0 3px ${oceanColors.success}40` : 'none',
         transition: 'background 0.4s ease, box-shadow 0.4s ease',
       }}
     >
@@ -449,7 +482,9 @@ function ClientDetailsTab({ client, loading, stations, onSaved, justSaved }: any
 // ============================================
 // Tab 2 — Field Findings list + edit
 // ============================================
-function FindingsTab({ tallies, loading, bpRemarks, rbsRemarks, onSaved, justSavedId }: any) {
+function FindingsTab({
+  tallies, loading, bpRemarks, rbsRemarks, onSaved, onError, justSavedId,
+}: any) {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   if (loading) {
@@ -480,13 +515,13 @@ function FindingsTab({ tallies, loading, bpRemarks, rbsRemarks, onSaved, justSav
           onStartEdit={() => setEditingId(t.Id)}
           onCancel={() => setEditingId(null)}
           onSaved={(id: number) => { setEditingId(null); onSaved?.(id); }}
+          onError={onError}
         />
       ))}
     </div>
   );
 }
 
-// Build a fresh form-state object from a tally record
 const formFromTally = (t: any) => ({
   Weight: t.Weight ?? '',
   Height: t.Height ?? '',
@@ -503,12 +538,10 @@ const formFromTally = (t: any) => ({
 function TallyRow({
   tally, editing, justSaved,
   bpRemarks, rbsRemarks,
-  onStartEdit, onCancel, onSaved,
+  onStartEdit, onCancel, onSaved, onError,
 }: any) {
   const [form, setForm] = useState(formFromTally(tally));
 
-  // ✅ Re-sync form whenever the row enters edit mode, so re-edits
-  //    always show the latest server values.
   useEffect(() => {
     if (editing) {
       setForm(formFromTally(tally));
@@ -526,10 +559,11 @@ function TallyRow({
       });
       onSaved?.(tally.Id);
     },
-    onError: (e: any) =>
-      toast.error(e.response?.data?.message || 'Failed to update findings', {
-        duration: 6000,
-      }),
+    onError: (e: any) => {
+      const message = e.response?.data?.message || 'Failed to update findings';
+      toast.error(message, { duration: 6000 });
+      onError?.(message);
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -547,11 +581,9 @@ function TallyRow({
     });
   };
 
-  // Collapsed view
   if (!editing) {
     return (
       <div style={{
-        // 💚 Green ring + tint briefly after a successful save
         border: justSaved
           ? `2px solid ${oceanColors.success}`
           : '1px solid #e2e8f0',
@@ -608,7 +640,6 @@ function TallyRow({
     );
   }
 
-  // Expanded edit view
   return (
     <form onSubmit={handleSubmit} style={{
       border: `2px solid ${oceanColors.gold}`, borderRadius: '12px',
