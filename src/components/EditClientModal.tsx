@@ -23,18 +23,30 @@ interface Props {
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', borderRadius: '8px',
-  border: `1px solid ${oceanColors.mid}30`, fontSize: '14px',
-  outline: 'none', background: 'white',
+  width: '100%',
+  boxSizing: 'border-box',
+  minWidth: 0,
+  padding: '10px 12px',
+  borderRadius: '8px',
+  border: `1px solid ${oceanColors.mid}30`,
+  fontSize: '14px',
+  outline: 'none',
+  background: 'white',
 };
+
 const labelStyle: React.CSSProperties = {
   fontSize: '12px', fontWeight: '600', color: oceanColors.textDark,
-  display: 'block', marginBottom: '4px',
+  display: 'block', marginBottom: '6px',
 };
+
+type SavedNotice =
+  | { kind: 'client'; label: string }
+  | { kind: 'findings'; id: number; label: string };
 
 export default function EditClientModal({ isOpen, clientId, clientName, onClose }: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<'client' | 'findings'>('client');
+  const [savedNotice, setSavedNotice] = useState<SavedNotice | null>(null);
 
   // --- Fetch client ---
   const { data: client, isLoading: clientLoading } = useQuery({
@@ -78,7 +90,21 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
     enabled: isOpen,
   });
 
+  // Auto-dismiss the success banner after 5 seconds
+  useEffect(() => {
+    if (!savedNotice) return;
+    const t = setTimeout(() => setSavedNotice(null), 5000);
+    return () => clearTimeout(t);
+  }, [savedNotice]);
+
+  // Clear the banner whenever the modal closes
+  useEffect(() => {
+    if (!isOpen) setSavedNotice(null);
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const justSavedId = savedNotice?.kind === 'findings' ? savedNotice.id : null;
 
   return (
     <div
@@ -138,12 +164,66 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+
+          {/* 🔔 Success banner */}
+          {savedNotice && (
+            <div
+              style={{
+                background: `${oceanColors.success}15`,
+                border: `1px solid ${oceanColors.success}40`,
+                borderRadius: '12px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                animation: 'fadeIn 0.3s ease-out',
+              }}
+            >
+              <CheckCircle
+                size={20}
+                style={{ color: oceanColors.success, flexShrink: 0 }}
+              />
+              <div style={{ flex: 1 }}>
+                <p style={{
+                  margin: 0, fontWeight: 'bold',
+                  color: oceanColors.success, fontSize: '14px',
+                }}>
+                  {savedNotice.kind === 'client'
+                    ? 'Client details updated successfully'
+                    : 'Field findings updated successfully'}
+                </p>
+                <p style={{
+                  margin: '2px 0 0',
+                  color: oceanColors.textLight, fontSize: '12px',
+                }}>
+                  {savedNotice.label}
+                </p>
+              </div>
+              <button
+                onClick={() => setSavedNotice(null)}
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: oceanColors.textLight, cursor: 'pointer',
+                  padding: '4px', display: 'flex',
+                }}
+                aria-label="Dismiss"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
           {tab === 'client' && (
             <ClientDetailsTab
               client={client}
               loading={clientLoading}
               stations={stations || []}
               onSaved={() => {
+                setSavedNotice({
+                  kind: 'client',
+                  label: `Saved at ${format(new Date(), 'HH:mm:ss')}`,
+                });
                 qc.invalidateQueries({ queryKey: ['client-edit', clientId] });
                 qc.invalidateQueries({ queryKey: ['client', clientId] });
               }}
@@ -155,7 +235,13 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
               loading={talliesLoading}
               bpRemarks={bpRemarks || []}
               rbsRemarks={rbsRemarks || []}
-              onSaved={() => {
+              justSavedId={justSavedId}
+              onSaved={(id: number) => {
+                setSavedNotice({
+                  kind: 'findings',
+                  id,
+                  label: `Saved at ${format(new Date(), 'HH:mm:ss')}`,
+                });
                 qc.invalidateQueries({ queryKey: ['client-tallies', clientId] });
               }}
             />
@@ -165,6 +251,10 @@ export default function EditClientModal({ isOpen, clientId, clientName, onClose 
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
         .animate-spin { animation: spin 1s linear infinite; }
       `}</style>
     </div>
@@ -219,11 +309,16 @@ function ClientDetailsTab({ client, loading, stations, onSaved }: any) {
   const saveMut = useMutation({
     mutationFn: async (body: any) => (await api.put(`/clients/${client.Id}`, body)).data,
     onSuccess: () => {
-      toast.success('Client details updated', { icon: '✅' });
+      toast.success('Client details updated successfully', {
+        icon: '✅',
+        duration: 5000,
+      });
       onSaved?.();
     },
     onError: (e: any) =>
-      toast.error(e.response?.data?.message || 'Failed to update client'),
+      toast.error(e.response?.data?.message || 'Failed to update client', {
+        duration: 6000,
+      }),
   });
 
   const { data: categories } = useQuery<any[]>({
@@ -249,39 +344,43 @@ function ClientDetailsTab({ client, loading, stations, onSaved }: any) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-        <div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '16px',
+      }}>
+        <div style={{ minWidth: 0 }}>
           <label style={labelStyle}>ID Number *</label>
           <input type="text" value={form.IDNumber}
             onChange={(e) => setForm({ ...form, IDNumber: e.target.value })}
             style={inputStyle} required />
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <label style={labelStyle}>Phone Number *</label>
           <input type="tel" value={form.PhoneNumber}
             onChange={(e) => setForm({ ...form, PhoneNumber: e.target.value })}
             style={inputStyle} required />
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <label style={labelStyle}>First Name *</label>
           <input type="text" value={form.FirstName}
             onChange={(e) => setForm({ ...form, FirstName: e.target.value })}
             style={inputStyle} required />
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <label style={labelStyle}>Last Name *</label>
           <input type="text" value={form.LastName}
             onChange={(e) => setForm({ ...form, LastName: e.target.value })}
             style={inputStyle} required />
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <label style={labelStyle}>Date of Birth *</label>
           <input type="date" value={form.DateOfBirth}
             max={format(new Date(), 'yyyy-MM-dd')}
             onChange={(e) => setForm({ ...form, DateOfBirth: e.target.value })}
             style={inputStyle} required />
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <label style={labelStyle}>Gender</label>
           <select value={form.GenderId}
             onChange={(e) => setForm({ ...form, GenderId: parseInt(e.target.value) })}
@@ -290,7 +389,7 @@ function ClientDetailsTab({ client, loading, stations, onSaved }: any) {
             <option value={2}>Female</option>
           </select>
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <label style={labelStyle}>Category</label>
           <select value={form.CategoryId}
             onChange={(e) => setForm({ ...form, CategoryId: parseInt(e.target.value) })}
@@ -300,7 +399,7 @@ function ClientDetailsTab({ client, loading, stations, onSaved }: any) {
               : <option value={form.CategoryId}>Category {form.CategoryId}</option>}
           </select>
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <label style={labelStyle}>Station</label>
           <select value={form.StationId}
             onChange={(e) => setForm({ ...form, StationId: parseInt(e.target.value) })}
@@ -317,7 +416,8 @@ function ClientDetailsTab({ client, loading, stations, onSaved }: any) {
           padding: '12px 24px',
           background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
           border: 'none', borderRadius: '10px',
-          color: oceanColors.navy, fontWeight: 'bold', cursor: saveMut.isPending ? 'not-allowed' : 'pointer',
+          color: oceanColors.navy, fontWeight: 'bold',
+          cursor: saveMut.isPending ? 'not-allowed' : 'pointer',
           display: 'flex', alignItems: 'center', gap: '8px',
           opacity: saveMut.isPending ? 0.7 : 1,
         }}>
@@ -333,7 +433,7 @@ function ClientDetailsTab({ client, loading, stations, onSaved }: any) {
 // ============================================
 // Tab 2 — Field Findings list + edit
 // ============================================
-function FindingsTab({ tallies, loading, bpRemarks, rbsRemarks, onSaved }: any) {
+function FindingsTab({ tallies, loading, bpRemarks, rbsRemarks, onSaved, justSavedId }: any) {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   if (loading) {
@@ -358,40 +458,62 @@ function FindingsTab({ tallies, loading, bpRemarks, rbsRemarks, onSaved }: any) 
           key={t.Id}
           tally={t}
           editing={editingId === t.Id}
+          justSaved={justSavedId === t.Id}
           bpRemarks={bpRemarks}
           rbsRemarks={rbsRemarks}
           onStartEdit={() => setEditingId(t.Id)}
           onCancel={() => setEditingId(null)}
-          onSaved={() => { setEditingId(null); onSaved?.(); }}
+          onSaved={(id: number) => { setEditingId(null); onSaved?.(id); }}
         />
       ))}
     </div>
   );
 }
 
-function TallyRow({ tally, editing, bpRemarks, rbsRemarks, onStartEdit, onCancel, onSaved }: any) {
-  const [form, setForm] = useState({
-    Weight: tally.Weight ?? '',
-    Height: tally.Height ?? '',
-    Waist: tally.Waist ?? '',
-    Hip: tally.Hip ?? '',
-    Systolic: tally.Systolic ?? '',
-    Diastolic: tally.Diastolic ?? '',
-    BPRemarkId: tally.BPRemarkId ?? '',
-    RBSValue: tally.RBSValue ?? '',
-    RBSRemarkId: tally.RBSRemarkId ?? '',
-    ReferralIds: [] as number[],
-  });
+// Build a fresh form-state object from a tally record
+const formFromTally = (t: any) => ({
+  Weight: t.Weight ?? '',
+  Height: t.Height ?? '',
+  Waist: t.Waist ?? '',
+  Hip: t.Hip ?? '',
+  Systolic: t.Systolic ?? '',
+  Diastolic: t.Diastolic ?? '',
+  BPRemarkId: t.BPRemarkId ?? '',
+  RBSValue: t.RBSValue ?? '',
+  RBSRemarkId: t.RBSRemarkId ?? '',
+  ReferralIds: [] as number[],
+});
+
+function TallyRow({
+  tally, editing, justSaved,
+  bpRemarks, rbsRemarks,
+  onStartEdit, onCancel, onSaved,
+}: any) {
+  const [form, setForm] = useState(formFromTally(tally));
+
+  // ✅ Re-sync form whenever the row enters edit mode, so re-edits
+  //    always show the latest server values.
+  useEffect(() => {
+    if (editing) {
+      setForm(formFromTally(tally));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
 
   const saveMut = useMutation({
     mutationFn: async (body: any) =>
       (await api.put(`/tallies/${tally.Id}`, body)).data,
     onSuccess: () => {
-      toast.success('Field findings updated', { icon: '✅' });
-      onSaved?.();
+      toast.success('Field findings updated successfully', {
+        icon: '✅',
+        duration: 5000,
+      });
+      onSaved?.(tally.Id);
     },
     onError: (e: any) =>
-      toast.error(e.response?.data?.message || 'Failed to update findings'),
+      toast.error(e.response?.data?.message || 'Failed to update findings', {
+        duration: 6000,
+      }),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -413,8 +535,15 @@ function TallyRow({ tally, editing, bpRemarks, rbsRemarks, onStartEdit, onCancel
   if (!editing) {
     return (
       <div style={{
-        border: '1px solid #e2e8f0', borderRadius: '12px',
-        padding: '14px 16px', background: 'white',
+        // 💚 Green ring + tint briefly after a successful save
+        border: justSaved
+          ? `2px solid ${oceanColors.success}`
+          : '1px solid #e2e8f0',
+        borderRadius: '12px',
+        padding: '14px 16px',
+        background: justSaved ? `${oceanColors.success}08` : 'white',
+        boxShadow: justSaved ? `0 0 0 4px ${oceanColors.success}20` : 'none',
+        transition: 'all 0.4s ease',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div>
@@ -436,7 +565,11 @@ function TallyRow({ tally, editing, bpRemarks, rbsRemarks, onStartEdit, onCancel
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '12px', fontSize: '12px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          gap: '10px', marginTop: '12px', fontSize: '12px',
+        }}>
           <div><strong>BMI:</strong> {tally.BMIValue?.toFixed?.(1) ?? '—'} <span style={{ color: oceanColors.textLight }}>({tally.BMIInterpretation || 'N/A'})</span></div>
           <div><strong>BP:</strong> {tally.Systolic}/{tally.Diastolic} <span style={{ color: oceanColors.textLight }}>({tally.BPInterpretation || 'N/A'})</span></div>
           <div><strong>RBS:</strong> {tally.RBSValue} <span style={{ color: oceanColors.textLight }}>({tally.RBSInterpretation || 'N/A'})</span></div>
@@ -469,49 +602,71 @@ function TallyRow({ tally, editing, bpRemarks, rbsRemarks, onStartEdit, onCancel
         Editing findings from {format(new Date(tally.PostedOn), 'dd MMM yyyy • HH:mm')}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-        <div><label style={labelStyle}>Weight (kg)</label>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '14px',
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>Weight (kg)</label>
           <input type="number" step="0.1" value={form.Weight}
             onChange={(e) => setForm({ ...form, Weight: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>Height (cm)</label>
+            style={inputStyle} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>Height (cm)</label>
           <input type="number" step="0.1" value={form.Height}
             onChange={(e) => setForm({ ...form, Height: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>Waist (cm)</label>
+            style={inputStyle} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>Waist (cm)</label>
           <input type="number" step="0.1" value={form.Waist}
             onChange={(e) => setForm({ ...form, Waist: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>Hip (cm)</label>
+            style={inputStyle} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>Hip (cm)</label>
           <input type="number" step="0.1" value={form.Hip}
             onChange={(e) => setForm({ ...form, Hip: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>Systolic (mmHg)</label>
+            style={inputStyle} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>Systolic (mmHg)</label>
           <input type="number" value={form.Systolic}
             onChange={(e) => setForm({ ...form, Systolic: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>Diastolic (mmHg)</label>
+            style={inputStyle} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>Diastolic (mmHg)</label>
           <input type="number" value={form.Diastolic}
             onChange={(e) => setForm({ ...form, Diastolic: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>BP Remark</label>
+            style={inputStyle} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>BP Remark</label>
           <select value={form.BPRemarkId}
             onChange={(e) => setForm({ ...form, BPRemarkId: e.target.value ? Number(e.target.value) : '' })}
             style={inputStyle}>
             <option value="">Select…</option>
             {bpRemarks.map((r: any) => <option key={r.Id} value={r.Id}>{r.Title}</option>)}
-          </select></div>
-        <div><label style={labelStyle}>RBS Value (mmol/L)</label>
+          </select>
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>RBS Value (mmol/L)</label>
           <input type="number" step="0.1" value={form.RBSValue}
             onChange={(e) => setForm({ ...form, RBSValue: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>RBS Remark</label>
+            style={inputStyle} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>RBS Remark</label>
           <select value={form.RBSRemarkId}
             onChange={(e) => setForm({ ...form, RBSRemarkId: e.target.value ? Number(e.target.value) : '' })}
             style={inputStyle}>
             <option value="">Select…</option>
             {rbsRemarks.map((r: any) => <option key={r.Id} value={r.Id}>{r.Title}</option>)}
-          </select></div>
+          </select>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
