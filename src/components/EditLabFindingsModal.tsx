@@ -22,13 +22,23 @@ interface Props {
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', borderRadius: '8px',
-  border: `1px solid ${oceanColors.mid}30`, fontSize: '14px',
-  outline: 'none', background: 'white',
+  width: '100%',
+  boxSizing: 'border-box',
+  minWidth: 0,
+  padding: '10px 12px',
+  borderRadius: '8px',
+  border: `1px solid ${oceanColors.mid}30`,
+  fontSize: '14px',
+  outline: 'none',
+  background: 'white',
 };
+
 const labelStyle: React.CSSProperties = {
-  fontSize: '12px', fontWeight: '600', color: oceanColors.textDark,
-  display: 'block', marginBottom: '4px',
+  fontSize: '12px',
+  fontWeight: '600',
+  color: oceanColors.textDark,
+  display: 'block',
+  marginBottom: '6px',
 };
 
 export default function EditLabFindingsModal({ isOpen, clientId, clientName, onClose }: Props) {
@@ -268,65 +278,224 @@ function FindingRow({ finding, editing, lipidValues, hbvValues, hcvValues, onSta
         Editing lab findings from {format(new Date(finding.PostedOn), 'dd MMM yyyy • HH:mm')}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-        <div><label style={labelStyle}>FBS (mmol/L)</label>
-          <input type="number" step="0.1" value={form.FBSValue}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '14px',
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>FBS (mmol/L)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={form.FBSValue}
             onChange={(e) => setForm({ ...form, FBSValue: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>HbA1c (%)</label>
-          <input type="number" step="0.1" value={form.HBA1CValue}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: `1px solid ${oceanColors.mid}30`,
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+            }}
+          />
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>HbA1c (%)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={form.HBA1CValue}
             onChange={(e) => setForm({ ...form, HBA1CValue: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>Lipid Profile</label>
-          <select value={form.LipidId}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: `1px solid ${oceanColors.mid}30`,
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+            }}
+          />
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>Lipid Profile</label>
+          <select
+            value={form.LipidId}
             onChange={(e) => setForm({ ...form, LipidId: parseInt(e.target.value) })}
-            style={inputStyle}>
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: `1px solid ${oceanColors.mid}30`,
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+            }}
+          >
             <option value={0}>Not tested</option>
-            {lipidValues.map((r: any) => <option key={r.Id} value={r.Id}>{r.Title}</option>)}
-          </select></div>
-        <div><label style={labelStyle}>Microalbumin (mg/L)</label>
-          <input type="number" step="0.1" value={form.MicroalbuminValue}
+            {lipidValues.map((r: any) => (
+              <option key={r.Id} value={r.Id}>{r.Title}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>Microalbumin (mg/L)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={form.MicroalbuminValue}
             onChange={(e) => setForm({ ...form, MicroalbuminValue: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>BMD T-Score</label>
-          <input type="number" step="0.01" value={form.BMDValue}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: `1px solid ${oceanColors.mid}30`,
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+            }}
+          />
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>BMD T-Score</label>
+          <input
+            type="number"
+            step="0.01"
+            value={form.BMDValue}
             onChange={(e) => setForm({ ...form, BMDValue: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>PSA (ng/mL)</label>
-          <input type="number" step="0.01" value={form.PSAValue}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: `1px solid ${oceanColors.mid}30`,
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+            }}
+          />
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>PSA (ng/mL)</label>
+          <input
+            type="number"
+            step="0.01"
+            value={form.PSAValue}
             onChange={(e) => setForm({ ...form, PSAValue: e.target.value })}
-            style={inputStyle} /></div>
-        <div><label style={labelStyle}>Hepatitis B</label>
-          <select value={form.HepatitisBValueId}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: `1px solid ${oceanColors.mid}30`,
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+            }}
+          />
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>Hepatitis B</label>
+          <select
+            value={form.HepatitisBValueId}
             onChange={(e) => setForm({ ...form, HepatitisBValueId: parseInt(e.target.value) })}
-            style={inputStyle}>
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: `1px solid ${oceanColors.mid}30`,
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+            }}
+          >
             <option value={0}>Not tested</option>
-            {hbvValues.map((r: any) => <option key={r.Id} value={r.Id}>{r.Title}</option>)}
-          </select></div>
-        <div><label style={labelStyle}>Hepatitis C</label>
-          <select value={form.HepatitisCValueId}
+            {hbvValues.map((r: any) => (
+              <option key={r.Id} value={r.Id}>{r.Title}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <label style={labelStyle}>Hepatitis C</label>
+          <select
+            value={form.HepatitisCValueId}
             onChange={(e) => setForm({ ...form, HepatitisCValueId: parseInt(e.target.value) })}
-            style={inputStyle}>
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: `1px solid ${oceanColors.mid}30`,
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+            }}
+          >
             <option value={0}>Not tested</option>
-            {hcvValues.map((r: any) => <option key={r.Id} value={r.Id}>{r.Title}</option>)}
-          </select></div>
+            {hcvValues.map((r: any) => (
+              <option key={r.Id} value={r.Id}>{r.Title}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-        <button type="button" onClick={onCancel} style={{
-          flex: 1, padding: '10px', background: 'white',
-          border: `1px solid ${oceanColors.mid}30`, borderRadius: '8px',
-          cursor: 'pointer', color: oceanColors.textDark,
-        }}>Cancel</button>
-        <button type="submit" disabled={saveMut.isPending} style={{
-          flex: 2, padding: '10px',
-          background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
-          border: 'none', borderRadius: '8px',
-          color: oceanColors.navy, fontWeight: 'bold',
-          cursor: saveMut.isPending ? 'not-allowed' : 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-          opacity: saveMut.isPending ? 0.7 : 1,
-        }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            flex: 1,
+            padding: '10px',
+            background: 'white',
+            border: `1px solid ${oceanColors.mid}30`,
+            borderRadius: '8px',
+            cursor: 'pointer',
+            color: oceanColors.textDark,
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={saveMut.isPending}
+          style={{
+            flex: 2,
+            padding: '10px',
+            background: `linear-gradient(135deg, ${oceanColors.gold}, #FFA500)`,
+            border: 'none',
+            borderRadius: '8px',
+            color: oceanColors.navy,
+            fontWeight: 'bold',
+            cursor: saveMut.isPending ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            opacity: saveMut.isPending ? 0.7 : 1,
+          }}
+        >
           {saveMut.isPending
             ? <><Loader2 size={16} className="animate-spin" /> Saving…</>
             : <><CheckCircle size={16} /> Save Correction</>}
