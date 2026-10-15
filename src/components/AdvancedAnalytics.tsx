@@ -1,10 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   Search, Download, FileText, FileSpreadsheet, FileJson,
   Send, Sparkles, RefreshCw, Filter, X, Calendar,
   Users, MapPin, ChevronDown, ChevronRight, Database,
   Copy, CheckCircle, TrendingUp, Activity, Heart, Scale,
-  Droplets, AlertTriangle, Award, Clock, BarChart3
+  Droplets, AlertTriangle, Award, Clock, BarChart3, FlaskConical, ShieldCheck
 } from 'lucide-react';
 import { format, subMonths, subYears } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -28,6 +28,8 @@ const oceanColors = {
   textDark: '#1F2937',
   textLight: '#6B7280',
 };
+
+type AnalyticsDomain = 'field' | 'lab' | 'oncology';
 
 // Pre-defined query templates for quick access
 const queryTemplates = [
@@ -75,6 +77,45 @@ const queryTemplates = [
   },
 ];
 
+type QueryTemplate = (typeof queryTemplates)[number];
+
+const domainQueryTemplates: Record<AnalyticsDomain, QueryTemplate[]> = {
+  field: queryTemplates,
+  lab: [
+    { icon: FlaskConical, title: 'FBS Results', description: 'Each client FBS result by screening event', query: 'Show all FBS test results', color: oceanColors.info },
+    { icon: Activity, title: 'Abnormal HbA1c', description: 'HbA1c results outside normal classification', query: 'Show abnormal HbA1c results', color: oceanColors.warning },
+    { icon: ShieldCheck, title: 'Hepatitis B Positive', description: 'Positive or reactive Hepatitis B results', query: 'Show positive Hepatitis B results', color: oceanColors.danger },
+    { icon: Calendar, title: 'Latest Lab Results', description: 'Latest result per client and test', query: 'Show the latest lab test results per client', color: oceanColors.success },
+    { icon: FlaskConical, title: 'Lipid Profile', description: 'Lipid results with screening history', query: 'Show all lipid profile results', color: oceanColors.info },
+    { icon: Users, title: 'All Lab Findings', description: 'Every recorded lab test event', query: 'Show all lab findings', color: oceanColors.deep },
+  ],
+  oncology: [
+    { icon: ShieldCheck, title: 'Breast Exam Results', description: 'Results by client and screening event', query: 'Show all breast exam results', color: oceanColors.info },
+    { icon: Activity, title: 'Abnormal PAP Smears', description: 'PAP smear results marked abnormal', query: 'Show abnormal PAP smear results', color: oceanColors.warning },
+    { icon: FlaskConical, title: 'VIA Results', description: 'VIA Villi results by screening event', query: 'Show all VIA Villi results', color: oceanColors.success },
+    { icon: Calendar, title: 'Latest Oncology Results', description: 'Latest result per client and test', query: 'Show the latest oncology results per client', color: oceanColors.info },
+    { icon: Users, title: 'All Oncology Findings', description: 'Every recorded oncology screening event', query: 'Show all oncology findings', color: oceanColors.deep },
+  ],
+};
+
+const domainCopy: Record<AnalyticsDomain, { title: string; description: string; placeholder: string }> = {
+  field: {
+    title: 'Intelligent Query Engine',
+    description: 'Ask natural language questions to generate custom field health reports for download',
+    placeholder: "Ask about field readings, e.g. 'Show employees with hypertension'",
+  },
+  lab: {
+    title: 'Lab Analytics',
+    description: 'Generate reports from lab results, retaining each client screening event',
+    placeholder: "Ask about lab tests, e.g. 'Show abnormal FBS results by station'",
+  },
+  oncology: {
+    title: 'Oncology Analytics',
+    description: 'Generate reports from oncology screenings, retaining each client screening event',
+    placeholder: "Ask about oncology screenings, e.g. 'Show abnormal PAP smear results'",
+  },
+};
+
 // Available report fields for custom selection
 const availableFields = [
   { group: 'Client Info', fields: ['FullName', 'IDNumber', 'PhoneNumber', 'Gender', 'Category', 'Station'] },
@@ -85,7 +126,7 @@ const availableFields = [
   { group: 'Risk Assessment', fields: ['RiskLevel', 'ConditionsCount', 'AbnormalConditions', 'RiskScore'] },
 ];
 
-export default function AdvancedAnalytics() {
+export default function AdvancedAnalytics({ domain = 'field' }: { domain?: AnalyticsDomain }) {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [queryResult, setQueryResult] = useState<any>(null);
@@ -102,7 +143,18 @@ export default function AdvancedAnalytics() {
     gender: 'all'
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [availableStations, setAvailableStations] = useState<Array<{ Id: number; Title: string }>>([]);
   const queryEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    api.get('/analytics/stations')
+      .then(response => {
+        if (active) setAvailableStations(response.data?.data || []);
+      })
+      .catch(error => console.error('Failed to load analytics stations:', error));
+    return () => { active = false; };
+  }, []);
 
   // Execute natural language query
   const executeQuery = async (queryText: string) => {
@@ -116,6 +168,7 @@ export default function AdvancedAnalytics() {
     try {
       const response = await api.post('/analytics/intelligent-query', {
         query: queryText,
+        domain,
         filters: activeFilters,
         selectedFields: selectedFields.length > 0 ? selectedFields : undefined
       });
@@ -162,7 +215,7 @@ export default function AdvancedAnalytics() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `health_report_${format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
+        a.download = `${domain}_health_report_${format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
         a.click();
         URL.revokeObjectURL(url);
       } else if (exportFormat === 'csv') {
@@ -180,14 +233,14 @@ export default function AdvancedAnalytics() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `health_report_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`;
+        a.download = `${domain}_health_report_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`;
         a.click();
         URL.revokeObjectURL(url);
       } else {
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Health Data');
-        XLSX.writeFile(wb, `health_report_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, `${domain} Data`);
+        XLSX.writeFile(wb, `${domain}_health_report_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
       }
       
       toast.success(`Report exported as ${exportFormat.toUpperCase()}`);
@@ -259,11 +312,11 @@ export default function AdvancedAnalytics() {
                 </div>
                 <div>
                   <h1 style={{ fontSize: 'clamp(28px, 4vw, 36px)', fontWeight: 'bold', color: oceanColors.white, margin: 0 }}>
-                    Intelligent Query Engine
+                    {domainCopy[domain].title}
                     <span style={{ color: oceanColors.gold, marginLeft: '12px' }}>🔍</span>
                   </h1>
                   <p style={{ color: 'rgba(255,255,255,0.8)', marginTop: '8px', fontSize: '15px' }}>
-                    Ask natural language questions to generate custom health reports for download
+                    {domainCopy[domain].description}
                   </p>
                 </div>
               </div>
@@ -326,6 +379,7 @@ export default function AdvancedAnalytics() {
                 <label style={{ fontSize: '13px', fontWeight: '600', color: oceanColors.textDark }}>Station</label>
                 <select value={activeFilters.station} onChange={(e) => setActiveFilters({...activeFilters, station: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${oceanColors.surface}40`, fontSize: '14px', background: 'white' }}>
                   <option value="all">All Stations</option>
+                  {availableStations.map(station => <option key={station.Id} value={station.Title}>{station.Title}</option>)}
                 </select>
               </div>
               <div>
@@ -414,7 +468,7 @@ export default function AdvancedAnalytics() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && executeQuery(query)}
-                placeholder="Ask anything about your health data... e.g., 'Show me all high risk employees' or 'List clients with hypertension'"
+                placeholder={domainCopy[domain].placeholder}
                 style={{
                   width: '100%',
                   padding: '16px 16px 16px 48px',
@@ -465,7 +519,7 @@ export default function AdvancedAnalytics() {
               Quick queries:
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-              {queryTemplates.map((template, idx) => (
+              {domainQueryTemplates[domain].map((template, idx) => (
                 <button
                   key={idx}
                   onClick={() => {
@@ -543,7 +597,10 @@ export default function AdvancedAnalytics() {
                     Query Results
                   </h3>
                   <p style={{ fontSize: '13px', color: oceanColors.textLight, margin: '2px 0 0 0' }}>
-                    {queryResult.count} records found • {queryResult.executionTime}
+                    {queryResult.count} {domain === 'field' ? 'records' : 'test results'} found
+                    {queryResult.eventCount !== undefined && ` • ${queryResult.eventCount} screening events`}
+                    {queryResult.uniqueClients !== undefined && ` • ${queryResult.uniqueClients} unique clients`}
+                    {' • '}{queryResult.executionTime}
                   </p>
                 </div>
               </div>

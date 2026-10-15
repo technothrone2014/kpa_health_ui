@@ -339,7 +339,9 @@ function AppContent() {
       { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', nauticalIcon: '🧭' },
       { text: 'Clients', icon: <PeopleIcon />, path: '/employees', nauticalIcon: '👨✈️' },
       { text: 'Data Correction', icon: <DataUsageIcon />, path: '/data-correction', nauticalIcon: '⚓' },
-      { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics', nauticalIcon: '📊' },
+      { text: 'Field Analytics', icon: <AnalyticsIcon />, path: '/analytics', nauticalIcon: '📊' },
+      { text: 'Lab Analytics', icon: <ScienceIcon />, path: '/lab-analytics', nauticalIcon: '🧪' },
+      { text: 'Oncology Analytics', icon: <Shield size={22} />, path: '/oncology-analytics', nauticalIcon: '🩺' },
     ];
 
     // Admin-only: Manage Users (opens modal, not route)
@@ -1182,7 +1184,17 @@ function AppContent() {
           } />
           <Route path="/analytics" element={
             <ProtectedRoute>
-              <AdvancedAnalytics />
+              <AdvancedAnalytics key="field" domain="field" />
+            </ProtectedRoute>
+          } />
+          <Route path="/lab-analytics" element={
+            <ProtectedRoute>
+              <AdvancedAnalytics key="lab" domain="lab" />
+            </ProtectedRoute>
+          } />
+          <Route path="/oncology-analytics" element={
+            <ProtectedRoute>
+              <AdvancedAnalytics key="oncology" domain="oncology" />
             </ProtectedRoute>
           } />
           <Route path="/field-capture" element={
