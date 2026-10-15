@@ -72,13 +72,22 @@ export default function ClientRegistration({ onSuccess, onCancel, initialData }:
   });
 
   // Fetch stations for dropdown
-  const { data: stations } = useQuery({
+  const { data: stations, isLoading: stationsLoading } = useQuery({
     queryKey: ['stations'],
     queryFn: async () => {
-      const response = await api.get('/analytics/clients/category-station');
-      return response.data;
+      const response = await api.get('/analytics/stations');
+      return response.data?.data || [];
     },
   });
+
+  useEffect(() => {
+    if (!stations?.length) return;
+    setFormData(current =>
+      stations.some((station: { Id: number }) => station.Id === current.StationId)
+        ? current
+        : { ...current, StationId: stations[0].Id }
+    );
+  }, [stations]);
 
   // Search existing clients
   const searchClient = async () => {
@@ -475,9 +484,11 @@ export default function ClientRegistration({ onSuccess, onCancel, initialData }:
                 outline: 'none'
               }}
             >
-              <option value="1">BANDARI CLINIC</option>
-              <option value="2">SHIFT MANAGER</option>
-              <option value="3">KAPENGURIA</option>
+              {stationsLoading && <option value="">Loading stations...</option>}
+              {!stationsLoading && !stations?.length && <option value="">No active stations available</option>}
+              {stations?.map((station: { Id: number; Title: string }) => (
+                <option key={station.Id} value={station.Id}>{station.Title}</option>
+              ))}
             </select>
           </div>
         </div>
