@@ -2,9 +2,36 @@
 import api from "./client";
 import { Employee } from "../types/Employee";
 
-// Remove the extra /api/v1 since base URL already includes it
-export const getEmployees = async (): Promise<Employee[]> => {
-  const response = await api.get<Employee[]>("/employees");
+export interface EmployeeListQuery {
+  search?: string;
+  status?: 'all' | 'active' | 'inactive';
+  startDate?: string;
+  endDate?: string;
+  stations?: string[];
+  categories?: string[];
+  gender?: 'all' | 'male' | 'female';
+  page?: number;
+  pageSize?: number;
+  sortBy?: keyof Employee;
+  sortDirection?: 'asc' | 'desc';
+  all?: boolean;
+}
+
+export interface EmployeePage {
+  data: Employee[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export const getEmployees = async (query: EmployeeListQuery = {}): Promise<EmployeePage> => {
+  const params = new URLSearchParams();
+  Object.entries(query).forEach(([key, value]) => {
+    if (Array.isArray(value)) value.forEach(item => params.append(key, item));
+    else if (value !== undefined && value !== '') params.set(key, String(value));
+  });
+
+  const response = await api.get<EmployeePage>(`/employees?${params.toString()}`);
   return response.data;
 };
 

@@ -5,6 +5,13 @@ import PatientProfile from "./PatientProfile";
 
 interface EmployeeTableProps {
   employees: Employee[];
+  total: number;
+  currentPage: number;
+  totalPages: number;
+  sortField: keyof Employee;
+  sortDirection: "asc" | "desc";
+  onPageChange: (page: number) => void;
+  onSort: (field: keyof Employee) => void;
 }
 
 const oceanColors = {
@@ -21,34 +28,13 @@ const oceanColors = {
   textLight: '#6B7280',
 };
 
-export default function EmployeeTable({ employees }: EmployeeTableProps) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [sortField, setSortField] = useState<keyof Employee>("FullName");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+export default function EmployeeTable({
+  employees, total, currentPage, totalPages, sortField, sortDirection, onPageChange, onSort,
+}: EmployeeTableProps) {
   const [selectedPatient, setSelectedPatient] = useState<Employee | null>(null);
 
-  const handleSort = (field: keyof Employee) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  const sortedEmployees = [...employees].sort((a, b) => {
-    const aValue = a[sortField];
-    const bValue = b[sortField];
-    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-    return 0;
-  });
-
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentEmployees = sortedEmployees.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(sortedEmployees.length / itemsPerPage);
+  const indexOfFirstItem = total === 0 ? 0 : (currentPage - 1) * 10 + 1;
+  const indexOfLastItem = Math.min(currentPage * 10, total);
 
   return (
     <div>
@@ -56,17 +42,17 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: oceanColors.dark }}>
-              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => handleSort("Id")}>ID</th>
-              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => handleSort("FullName")}>Full Name</th>
-              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => handleSort("IDNumber")}>ID Number</th>
-              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => handleSort("CategoryTitle")}>Category</th>
-              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => handleSort("StationTitle")}>Station</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => onSort("Id")}>ID</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => onSort("FullName")}>Full Name</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => onSort("IDNumber")}>ID Number</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => onSort("CategoryTitle")}>Category</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600', cursor: 'pointer' }} onClick={() => onSort("StationTitle")}>Station</th>
               <th style={{ padding: '16px', textAlign: 'left', color: oceanColors.gold, fontWeight: '600' }}>Status</th>
               <th style={{ padding: '16px', textAlign: 'right', color: oceanColors.gold, fontWeight: '600' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {currentEmployees.map((employee, index) => (
+            {employees.map((employee, index) => (
               <tr 
                 key={employee.Id} 
                 style={{ 
@@ -152,11 +138,11 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
         borderRadius: '0 0 12px 12px'
       }}>
         <div style={{ color: oceanColors.textLight, fontSize: '14px' }}>
-          Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, sortedEmployees.length)} of {sortedEmployees.length} results
+          Showing {indexOfFirstItem} to {indexOfLastItem} of {total} results
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
             style={{
               padding: '8px 12px',
@@ -175,7 +161,7 @@ export default function EmployeeTable({ employees }: EmployeeTableProps) {
             Page {currentPage} of {totalPages}
           </span>
           <button
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
             style={{
               padding: '8px 12px',

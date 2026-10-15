@@ -1,11 +1,12 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Search, Plus, ChevronDown, Download, Users, Anchor, Ship, Waves, Filter, 
   Calendar, MapPin, Briefcase, FileSpreadsheet, FileJson, FileText,
   X, RefreshCw, AlertTriangle, CheckCircle
 } from "lucide-react";
-import { getEmployees } from "../api/employees";
+import { EmployeeListQuery, getEmployees } from "../api/employees";
+import { Employee } from "../types/Employee";
 import LoadingSpinner from "../components/LoadingSpinner";
 import EmployeeTable from "../components/EmployeeTable";
 import { format } from "date-fns";
@@ -47,13 +48,9 @@ const categories = ['EMPLOYEE', 'DEPENDENT', 'PORT USER'];
 type ExportFormat = 'csv' | 'json' | 'xlsx';
 
 export default function Employees() {
-  const { data: employees, isLoading, error, refetch } = useQuery({
-    queryKey: ["employees"],
-    queryFn: getEmployees,
-  });
-
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [showFilters, setShowFilters] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -65,59 +62,56 @@ export default function Employees() {
   const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
   const [exportFormat, setExportFormat] = useState<ExportFormat>('csv');
   const [isExporting, setIsExporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState<keyof Employee>("FullName");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const pageSize = 10;
 
-  // Filtered employees with advanced filters
-  const filteredEmployees = useMemo(() => {
-    if (!employees) return [];
-    
-    return employees.filter((emp) => {
-      // Search filter
-      const matchesSearch = searchTerm === "" || 
-        emp.FullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.IDNumber?.includes(searchTerm) ||
-        emp.StationTitle?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Status filter
-      const matchesStatus = statusFilter === "all" ||
-        (statusFilter === "active" && emp.Status === true) ||
-        (statusFilter === "inactive" && emp.Status === false);
-      
-      // Date range filter (based on PostedOn)
-      let matchesDateRange = true;
-      if (dateRange.start) {
-        const postedDate = new Date(emp.PostedOn);
-        const startDate = new Date(dateRange.start);
-        if (postedDate < startDate) matchesDateRange = false;
-      }
-      if (dateRange.end && matchesDateRange) {
-        const postedDate = new Date(emp.PostedOn);
-        const endDate = new Date(dateRange.end);
-        if (postedDate > endDate) matchesDateRange = false;
-      }
-      
-      // Station filter
-      const matchesStation = selectedStations.length === 0 || 
-        selectedStations.includes(emp.StationTitle);
-      
-      // Category filter
-      const matchesCategory = selectedCategories.length === 0 || 
-        selectedCategories.includes(emp.CategoryTitle);
-      
-      // Gender filter
-      const matchesGender = genderFilter === "all" ||
-        (genderFilter === "male" && emp.GenderTitle?.toLowerCase() === 'male') ||
-        (genderFilter === "female" && emp.GenderTitle?.toLowerCase() === 'female');
-      
-      return matchesSearch && matchesStatus && matchesDateRange && 
-             matchesStation && matchesCategory && matchesGender;
-    });
-  }, [employees, searchTerm, statusFilter, dateRange, selectedStations, selectedCategories, genderFilter]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter, dateRange.start, dateRange.end, selectedStations, selectedCategories, genderFilter]);
+
+  const query: EmployeeListQuery = {
+    search: debouncedSearch,
+    status: statusFilter,
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+    stations: selectedStations,
+    categories: selectedCategories,
+    gender: genderFilter,
+    page: currentPage,
+    pageSize,
+    sortBy: sortField,
+    sortDirection,
+  };
+
+  const { data: employeePage, isLoading, error, refetch } = useQuery({
+    queryKey: ["employees", query],
+    queryFn: () => getEmployees(query),
+    placeholderData: previousData => previousData,
+    staleTime: 30_000,
+  });
+  const employees = employeePage?.data || [];
+  const totalEmployees = employeePage?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(totalEmployees / pageSize));
+
+  const handleSort = (field: keyof Employee) => {
+    setSortDirection(current => field === sortField && current === 'asc' ? 'desc' : 'asc');
+    setSortField(field);
+    setCurrentPage(1);
+  };
 
   // Export handlers
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const exportData = filteredEmployees.map(emp => ({
+      const exportResult = await getEmployees({ ...query, all: true });
+      const exportData = exportResult.data.map(emp => ({
         'ID': emp.Id,
         'Full Name': emp.FullName,
         'ID Number': emp.IDNumber,
@@ -409,7 +403,7 @@ export default function Employees() {
               
               <button
                 onClick={handleExport}
-                disabled={isExporting || filteredEmployees.length === 0}
+                disabled={isExporting || totalEmployees === 0}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -425,7 +419,7 @@ export default function Employees() {
                 }}
               >
                 {isExporting ? <RefreshCw size={18} className="animate-spin" /> : <Download size={18} />}
-                Export ({filteredEmployees.length})
+                Export ({totalEmployees})
               </button>
             </div>
           </div>
@@ -666,7 +660,16 @@ export default function Employees() {
         border: `1px solid ${oceanColors.secondary}20`,
         boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
       }}>
-        <EmployeeTable employees={filteredEmployees} />
+        <EmployeeTable
+          employees={employees}
+          total={totalEmployees}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onPageChange={setCurrentPage}
+          onSort={handleSort}
+        />
       </div>
       
       {/* Footer Stats */}
@@ -687,7 +690,7 @@ export default function Employees() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Ship size={16} style={{ color: oceanColors.primary }} />
             <span style={{ color: oceanColors.textDark, fontSize: '14px' }}>
-              Total Crew: {filteredEmployees.length} members
+              Total Crew: {totalEmployees} members
             </span>
           </div>
           {selectedStations.length > 0 && (
