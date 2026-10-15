@@ -326,13 +326,6 @@ export default function Dashboard() {
     enabled: !!filters.startDate,
   });
 
-  // Fetch high risk clients
-  const { data: highRiskClients, refetch: refetchHighRisk } = useQuery({
-    queryKey: ['high-risk-clients', filters],
-    queryFn: async () => (await api.get(`/analytics/clients/high-risk?${paramString}`)).data.data || [],
-    enabled: !!filters.startDate,
-  });
-
   // Fetch station distribution - using stationParamString (without station filter)
   const { data: stationDistribution, refetch: refetchStation } = useQuery({
     queryKey: ['station-distribution', filters],
@@ -384,7 +377,6 @@ export default function Dashboard() {
     setRefreshing(true);
     await Promise.all([
       refetchHealth(), 
-      refetchHighRisk(),
       refetchStation(),
       refetchCategory()
     ]);
@@ -1101,7 +1093,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <HighRiskModal isOpen={showHighRiskModal} onClose={() => setShowHighRiskModal(false)} patients={highRiskClients} filters={filters} onFilterChange={setFilters} availableStations={availableStations} availableCategories={availableCategories} />
+      <HighRiskModal isOpen={showHighRiskModal} onClose={() => setShowHighRiskModal(false)} patients={healthStatus?.highRiskPatients || []} filters={filters} onFilterChange={setFilters} availableStations={availableStations} availableCategories={availableCategories} />
       <TechnicalConfigModal
         isOpen={showTechnicalConfig}
         onClose={() => setShowTechnicalConfig(false)}
