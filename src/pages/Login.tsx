@@ -19,6 +19,43 @@ const oceanColors = {
 
 type LoginMethod = 'password' | 'otp';
 
+const normalizeOTPIdentifier = (input: string): { value: string; error?: string } => {
+  const value = input.trim();
+  if (!value) return { value, error: 'Enter an email, username, or Kenyan mobile number.' };
+
+  if (value.includes('@')) {
+    const [local, domain, ...extra] = value.split('@');
+    const localValid = local.length > 0 && local.length <= 64 &&
+      !local.startsWith('.') && !local.endsWith('.') && !local.includes('..') &&
+      /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+$/i.test(local);
+    const labels = domain?.split('.') || [];
+    const domainValid = !!domain && domain.length <= 253 &&
+      labels.every(label => label.length <= 63 && /^[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?$/i.test(label));
+
+    if (extra.length > 0 || !localValid || !domainValid || /\s/.test(value)) {
+      return { value, error: 'Enter a valid email address.' };
+    }
+    return { value: value.toLowerCase() };
+  }
+
+  if (/^[+\d\s().-]+$/.test(value)) {
+    let digits = value.replace(/\D/g, '');
+    if (digits.startsWith('00')) digits = digits.slice(2);
+
+    let nationalNumber = digits;
+    if (digits.startsWith('254')) nationalNumber = digits.slice(3);
+    else if (digits.startsWith('0')) nationalNumber = digits.slice(1);
+    if (nationalNumber.startsWith('0')) nationalNumber = nationalNumber.slice(1);
+
+    if (!/^[17]\d{8}$/.test(nationalNumber)) {
+      return { value, error: 'Enter a valid Kenyan mobile number, such as 0705 172 600 or +254 705 172 600.' };
+    }
+    return { value: `+254${nationalNumber}` };
+  }
+
+  return { value: value.toLowerCase() };
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const { loginWithPassword, loginWithOTP, verifyOTP } = useAuth();
@@ -33,15 +70,23 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const otpIdentifier = loginMethod === 'otp' ? normalizeOTPIdentifier(identifier) : null;
+    if (otpIdentifier?.error) {
+      setError(otpIdentifier.error);
+      return;
+    }
+
+    const submittedIdentifier = otpIdentifier?.value || identifier.trim();
+    if (otpIdentifier) setIdentifier(submittedIdentifier);
     setLoading(true);
     setError('');
 
     try {
       let result;
       if (loginMethod === 'password') {
-        result = await loginWithPassword(identifier, password);
+        result = await loginWithPassword(submittedIdentifier, password);
       } else {
-        result = await loginWithOTP(identifier);
+        result = await loginWithOTP(submittedIdentifier);
       }
       
       // After login, we always need OTP verification
@@ -110,15 +155,21 @@ export default function Login() {
   };
 
   const handleResendOTP = async () => {
+    const otpIdentifier = normalizeOTPIdentifier(identifier);
+    if (otpIdentifier.error) {
+      setError(otpIdentifier.error);
+      return;
+    }
+    setIdentifier(otpIdentifier.value);
     setLoading(true);
     setError('');
 
     try {
       let result;
       if (loginMethod === 'password') {
-        result = await loginWithPassword(identifier, password);
+        result = await loginWithPassword(identifier.trim(), password);
       } else {
-        result = await loginWithOTP(identifier);
+        result = await loginWithOTP(otpIdentifier.value);
       }
       
       if (result.success && result.requiresOTP) {
@@ -260,7 +311,7 @@ export default function Login() {
                   color: oceanColors.deep,
                   marginBottom: '8px'
                 }}>
-                  Email / Username / Phone Number
+                  {loginMethod === 'otp' ? 'Email / Username / Kenyan Mobile Number' : 'Email / Username / Phone Number'}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <User size={18} style={{
@@ -273,8 +324,11 @@ export default function Login() {
                   <input
                     type="text"
                     value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="Enter your email, username, or phone number"
+                    onChange={(e) => { setIdentifier(e.target.value); setError(''); }}
+                    inputMode={loginMethod === 'otp' ? (identifier.includes('@') ? 'email' : 'tel') : undefined}
+                    autoComplete="username"
+                    maxLength={254}
+                    placeholder={loginMethod === 'otp' ? 'Email, username, or 07… / +254…' : 'Enter your email, username, or phone number'}
                     required
                     style={{
                       width: '100%',
@@ -286,7 +340,13 @@ export default function Login() {
                       transition: 'all 0.3s'
                     }}
                     onFocus={(e) => e.currentTarget.style.borderColor = oceanColors.gold}
-                    onBlur={(e) => e.currentTarget.style.borderColor = `${oceanColors.mid}30`}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = `${oceanColors.mid}30`;
+                      if (loginMethod === 'otp') {
+                        const normalized = normalizeOTPIdentifier(identifier);
+                        if (!normalized.error) setIdentifier(normalized.value);
+                      }
+                    }}
                   />
                 </div>
               </div>
