@@ -1111,17 +1111,17 @@ function AppContent() {
       </Drawer>
 
       {/* Main content for Staff/Admin */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
+      <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
         {/* Mobile App Bar */}
         {isAuthenticated && (
           <AppBar 
             position="sticky" 
             sx={{ 
               background: `linear-gradient(135deg, ${oceanTheme.deep}, ${oceanTheme.mid})`,
-              mb: 3,
+              mb: 0,
               display: { xs: 'block', sm: 'none' },
               boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-              borderRadius: '16px',
+              borderRadius: 0,
               borderBottom: `2px solid ${oceanTheme.gold}`
             }}
           >
