@@ -44,7 +44,8 @@ type ViewState =
   | 'remarks'
   | 'field-interpretations'
   | 'lab-interpretations'
-  | 'screening-results';
+  | 'oncology-screening'
+  | 'lab-results';
 
 type RemarkTab = 'bp-remarks' | 'rbs-remarks';
 
@@ -63,13 +64,18 @@ const LAB_INTERPRETATIONS: { key: RangeConfigType; label: string; subtitle: stri
   { key: 'bmd', label: 'BMD', subtitle: 'Bone Mineral Density T-scores' },
 ];
 
-const SCREENING_RESULTS: { key: SimpleConfigType; label: string; subtitle: string }[] = [
+// Oncology screening results (female-only fields live here too)
+const ONCOLOGY_SCREENING: { key: SimpleConfigType; label: string; subtitle: string }[] = [
   { key: 'breast-exam', label: 'Breast Exam', subtitle: 'Breast exam result options' },
-  { key: 'pap-smear', label: 'PAP Smear', subtitle: 'PAP smear result options' },
-  { key: 'via-villi', label: 'VIA Villi', subtitle: 'VIA Villi result options' },
-  { key: 'hepatitis-b', label: 'Hepatitis B', subtitle: 'Hepatitis B screening results' },
-  { key: 'hepatitis-c', label: 'Hepatitis C', subtitle: 'Hepatitis C screening results' },
-  { key: 'lipid', label: 'Lipids', subtitle: 'Lipid profile result options' },
+  { key: 'pap-smear',   label: 'PAP Smear',   subtitle: 'PAP smear result options' },
+  { key: 'via-villi',   label: 'VIA Villi',   subtitle: 'VIA Villi result options' },
+];
+
+// Lab result option lists (non-range lookups)
+const LAB_RESULTS: { key: SimpleConfigType; label: string; subtitle: string }[] = [
+  { key: 'lipid',       label: 'Lipids',       subtitle: 'Lipid profile result options' },
+  { key: 'hepatitis-b', label: 'Hepatitis B',  subtitle: 'Hepatitis B screening results' },
+  { key: 'hepatitis-c', label: 'Hepatitis C',  subtitle: 'Hepatitis C screening results' },
 ];
 
 interface Props {
@@ -824,9 +830,15 @@ export default function TechnicalConfigModal({ isOpen, onClose }: Props) {
                 />
                 <MenuCard
                   icon={<ShieldCheck size={28} />}
-                  title="Screening & Lab Results"
-                  description="Breast, PAP, VIA, Hepatitis and Lipid result options"
-                  onClick={() => setView('screening-results')}
+                  title="Oncology Screening"
+                  description="Breast Exam, PAP Smear and VIA Villi result options"
+                  onClick={() => setView('oncology-screening')}
+                />
+                <MenuCard
+                  icon={<Beaker size={28} />}
+                  title="Lab Results"
+                  description="Lipid, Hepatitis B and Hepatitis C result options"
+                  onClick={() => setView('lab-results')}
                 />
               </div>
             </div>
@@ -949,18 +961,42 @@ export default function TechnicalConfigModal({ isOpen, onClose }: Props) {
             </div>
           )}
 
-          {/* === SCREENING & LAB RESULTS === */}
-          {view === 'screening-results' && (
+          {/* === ONCOLOGY SCREENING === */}
+          {view === 'oncology-screening' && (
             <div>
               <BackButton onClick={() => setView('menu')} />
               <InfoBanner>
-                These are the option lists shown in the Oncology and Lab capture forms.
+                These are the result options shown in the Oncology capture form.
                 Deactivating hides them from new captures — historical data stays intact.
               </InfoBanner>
               <TabbedView
-                tabs={SCREENING_RESULTS.map(t => ({ key: t.key, label: t.label }))}
+                tabs={ONCOLOGY_SCREENING.map(t => ({ key: t.key, label: t.label }))}
                 renderTab={(key) => {
-                  const cfg = SCREENING_RESULTS.find(t => t.key === key)!;
+                  const cfg = ONCOLOGY_SCREENING.find(t => t.key === key)!;
+                  return (
+                    <LookupManager
+                      type={cfg.key}
+                      title={cfg.label}
+                      subtitle={cfg.subtitle}
+                    />
+                  );
+                }}
+              />
+            </div>
+          )}
+
+          {/* === LAB RESULTS === */}
+          {view === 'lab-results' && (
+            <div>
+              <BackButton onClick={() => setView('menu')} />
+              <InfoBanner>
+                These are the option lists shown in the Lab capture form.
+                Deactivating hides them from new captures — historical data stays intact.
+              </InfoBanner>
+              <TabbedView
+                tabs={LAB_RESULTS.map(t => ({ key: t.key, label: t.label }))}
+                renderTab={(key) => {
+                  const cfg = LAB_RESULTS.find(t => t.key === key)!;
                   return (
                     <LookupManager
                       type={cfg.key}
