@@ -4,6 +4,10 @@ import axios from 'axios';
 // This correctly uses the environment variable which is set to /api/v1
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://kpa-health-api.onrender.com/api/v1';
 
+if (import.meta.env.PROD && /^http:\/\//i.test(API_BASE_URL)) {
+  throw new Error('VITE_API_URL must use HTTPS in production');
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
