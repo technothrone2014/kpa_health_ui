@@ -56,6 +56,23 @@ const oceanTheme = {
   danger: '#EF4444',
 };
 
+const getUserRoles = (user: any): string[] => {
+  const roles = user?.roles ?? user?.role ?? user?.Roles ?? [];
+
+  if (Array.isArray(roles)) {
+    return roles
+      .filter((role) => role !== null && role !== undefined)
+      .map((role) => String(role).trim())
+      .filter(Boolean);
+  }
+
+  if (typeof roles === 'string') {
+    return roles.trim() ? [roles.trim()] : [];
+  }
+
+  return [];
+};
+
 // ============================================
 // Helper: Check if user is a field agent
 // ============================================
@@ -70,34 +87,8 @@ const isUserFieldAgent = (user: any): boolean => {
   console.log('🔍 isUserFieldAgent - User Email:', user.Email);
   console.log('🔍 isUserFieldAgent - User keys:', Object.keys(user));
   
-  let roles = user.roles || [];
+  const roles = getUserRoles(user);
   console.log('🔍 isUserFieldAgent - roles from user:', roles);
-  console.log('🔍 isUserFieldAgent - roles type:', typeof roles);
-  console.log('🔍 isUserFieldAgent - is roles array?', Array.isArray(roles));
-  
-  // If roles is a string, convert to array
-  if (typeof roles === 'string') {
-    console.log('🔍 isUserFieldAgent - roles is a string, converting to array');
-    roles = [roles];
-  }
-  
-  // If roles is not an array, try to get it from user.role
-  if (!Array.isArray(roles) && user.role) {
-    console.log('🔍 isUserFieldAgent - trying user.role:', user.role);
-    roles = [user.role];
-  }
-  
-  // If still not an array, try user.Roles
-  if (!Array.isArray(roles) && user.Roles) {
-    console.log('🔍 isUserFieldAgent - trying user.Roles:', user.Roles);
-    roles = Array.isArray(user.Roles) ? user.Roles : [user.Roles];
-  }
-  
-  // If roles is still not an array, return false
-  if (!Array.isArray(roles)) {
-    console.log('🔍 isUserFieldAgent - Could not find roles array, returning false');
-    return false;
-  }
   
   console.log('🔍 isUserFieldAgent - Normalized roles array:', roles);
   console.log('🔍 isUserFieldAgent - Roles array length:', roles.length);
@@ -138,10 +129,7 @@ const isUserFieldAgent = (user: any): boolean => {
 // Helper: Check if user is a lab assistant
 // ============================================
 const isUserLabAssistant = (user: any): boolean => {
-  if (!user) return false;
-  let roles = user.roles || [];
-  if (typeof roles === 'string') roles = [roles];
-  if (!Array.isArray(roles)) return false;
+  const roles = getUserRoles(user);
   return roles.some((role: any) => {
     if (!role) return false;
     const lower = String(role).toLowerCase();
@@ -156,10 +144,7 @@ const isUserLabAssistant = (user: any): boolean => {
 // Helper: Check if user is an oncology technician
 // ============================================
 const isUserOncologyTechnician = (user: any): boolean => {
-  if (!user) return false;
-  let roles = user.roles || [];
-  if (typeof roles === 'string') roles = [roles];
-  if (!Array.isArray(roles)) return false;
+  const roles = getUserRoles(user);
   return roles.some((role: any) => {
     if (!role) return false;
     const lower = String(role).toLowerCase();
@@ -174,10 +159,7 @@ const isUserOncologyTechnician = (user: any): boolean => {
 // Helper: Check if user is an administrator
 // ============================================
 const isUserAdmin = (user: any): boolean => {
-  if (!user) return false;
-  let roles = user.roles || [];
-  if (typeof roles === 'string') roles = [roles];
-  if (!Array.isArray(roles)) return false;
+  const roles = getUserRoles(user);
   return roles.some((role: any) => {
     if (!role) return false;
     const lower = String(role).toLowerCase();
@@ -201,7 +183,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
 
   // If allowedRoles is specified, check if user has the required role
   if (allowedRoles && allowedRoles.length > 0) {
-    const userRoles = (user?.roles || []).map(r => r.toLowerCase());
+    const userRoles = getUserRoles(user).map(r => r.toLowerCase());
     const hasRequiredRole = allowedRoles.some(role => 
       userRoles.includes(role.toLowerCase())
     );

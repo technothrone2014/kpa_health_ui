@@ -160,16 +160,18 @@ export default function Login() {
       setError(otpIdentifier.error);
       return;
     }
-    setIdentifier(otpIdentifier.value);
+
+    const submittedIdentifier = otpIdentifier.value;
+    setIdentifier(submittedIdentifier);
     setLoading(true);
     setError('');
 
     try {
       let result;
       if (loginMethod === 'password') {
-        result = await loginWithPassword(identifier.trim(), password);
+        result = await loginWithPassword(submittedIdentifier, password);
       } else {
-        result = await loginWithOTP(otpIdentifier.value);
+        result = await loginWithOTP(submittedIdentifier);
       }
       
       if (result.success && result.requiresOTP) {

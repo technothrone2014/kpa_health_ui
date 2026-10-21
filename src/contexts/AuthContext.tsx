@@ -60,6 +60,21 @@ const TOKEN_KEY = 'kpa_health_token';
 const USER_KEY = 'kpa_health_user';
 const AUTH_INITIALIZED_KEY = 'kpa_health_auth_initialized';
 
+const normalizeRoles = (roles?: unknown): string[] => {
+  if (Array.isArray(roles)) {
+    return roles
+      .filter((role): role is string | number => role !== null && role !== undefined)
+      .map((role) => String(role).trim())
+      .filter(Boolean);
+  }
+
+  if (typeof roles === 'string') {
+    return roles.trim() ? [roles.trim()] : [];
+  }
+
+  return [];
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -90,10 +105,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userStr = localStorage.getItem(USER_KEY);
       if (userStr) {
         const parsed = JSON.parse(userStr);
-        // Ensure roles is always an array
-        if (!parsed.roles) {
-          parsed.roles = [];
-        }
+        parsed.roles = normalizeRoles(parsed.roles ?? parsed.role ?? parsed.Roles);
         return parsed;
       }
     } catch (e) {
@@ -104,14 +116,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Update saveUserData
   const saveUserData = (userData: User) => {
-    // Ensure roles is always an array
-    if (!userData.roles) {
-      userData.roles = [];
-    }
+    const normalizedRoles = normalizeRoles(userData.roles ?? (userData as any).role ?? (userData as any).Roles);
     
     const userToSave = {
       ...userData,
-      roles: Array.isArray(userData.roles) ? [...userData.roles] : []
+      roles: normalizedRoles
     };
     
     console.log('💾 saveUserData - Saving user with roles:', userToSave.roles);
@@ -163,11 +172,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('🔍 /auth/me roles type:', typeof userData.roles);
           console.log('🔍 /auth/me is roles an array?', Array.isArray(userData.roles));
           
-          // Make sure roles is an array
-          if (userData.roles && !Array.isArray(userData.roles)) {
-            console.log('🔍 /auth/me roles is not an array, converting...');
-            userData.roles = [userData.roles];
-          }
+          userData.roles = normalizeRoles(userData.roles ?? userData.role ?? userData.Roles);
           
           saveUserData(userData);
           localStorage.setItem(AUTH_INITIALIZED_KEY, 'true');
@@ -258,13 +263,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setToken(response.data.token);
         
         // ✅ CRITICAL FIX: Extract roles from the response
-        const roles = response.data.roles || [];
+        const roles = normalizeRoles(response.data.roles ?? response.data.user?.roles ?? response.data.user?.role ?? response.data.user?.Roles);
         
         if (response.data.user) {
           // ✅ Merge roles into user data
           const userData = {
             ...response.data.user,
-            roles: roles
+            roles,
           };
           console.log('🔍 verifyOTP - User data with roles being saved:', userData);
           saveUserData(userData);
