@@ -89,7 +89,7 @@ const getStringValue = (obj: any, ...possibleKeys: string[]): string => {
 };
 
 export default function PatientProfile({ patient, onClose }: PatientProfileProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'history' | 'insights'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'history' | 'lab' | 'oncology' | 'insights'>('overview');
   const [isExporting, setIsExporting] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [aiInsights, setAiInsights] = useState<string | null>(null);
@@ -167,6 +167,36 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
       const response = await api.get(`/patients/${patient.Id}/trends`);
       return response.data;
     },
+  });
+
+  const {
+    data: labFindings = [],
+    isLoading: labFindingsLoading,
+    error: labFindingsError,
+    refetch: refetchLabFindings,
+  } = useQuery<any[]>({
+    queryKey: ['client-findings', patient.Id],
+    queryFn: async () => {
+      const response = await api.get(`/clients/${patient.Id}/findings`);
+      const records = response.data?.data ?? response.data;
+      return Array.isArray(records) ? records : [];
+    },
+    enabled: activeTab === 'lab',
+  });
+
+  const {
+    data: oncologyFindings = [],
+    isLoading: oncologyFindingsLoading,
+    error: oncologyFindingsError,
+    refetch: refetchOncologyFindings,
+  } = useQuery<any[]>({
+    queryKey: ['client-oncologies', patient.Id],
+    queryFn: async () => {
+      const response = await api.get(`/clients/${patient.Id}/oncologies`);
+      const records = response.data?.data ?? response.data;
+      return Array.isArray(records) ? records : [];
+    },
+    enabled: activeTab === 'oncology',
   });
 
   // Generate AI Insights when insights tab is opened
@@ -379,6 +409,124 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
     .filter((d: any) => d.systolic !== null || d.diastolic !== null || d.bmi !== null || d.rbs !== null)
     .sort((a: any, b: any) => a.timestamp - b.timestamp) || [];
 
+  const renderClinicalRecords = (
+    records: any[],
+    isLoading: boolean,
+    error: unknown,
+    refetch: () => void,
+    fields: { label: string; valueKey: string; interpretationKey?: string; unit?: string }[],
+    emptyMessage: string
+  ) => {
+    if (isLoading) {
+      return <p style={{ color: oceanColors.textLight, textAlign: 'center', padding: '32px' }}>Loading findings...</p>;
+    }
+
+    if (error) {
+      return (
+        <div style={{ textAlign: 'center', padding: '32px' }}>
+          <p style={{ color: oceanColors.danger }}>Unable to load findings. Please try again.</p>
+          <button
+            onClick={() => { void refetch(); }}
+            style={{
+              padding: '8px 14px',
+              border: 'none',
+              borderRadius: '8px',
+              background: oceanColors.deep,
+              color: oceanColors.white,
+              cursor: 'pointer',
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+
+    if (records.length === 0) {
+      return <p style={{ color: oceanColors.textLight, textAlign: 'center', padding: '32px' }}>{emptyMessage}</p>;
+    }
+
+    return (
+      <div style={{ display: 'grid', gap: '16px' }}>
+        {records.map((record, index) => {
+          const results = fields.flatMap(({ label, valueKey, interpretationKey, unit }) => {
+            const value = record[valueKey];
+            const interpretation = interpretationKey ? record[interpretationKey] : null;
+            if ((value === null || value === undefined || value === '') &&
+                (interpretation === null || interpretation === undefined || interpretation === '')) {
+              return [];
+            }
+
+            return [{
+              label,
+              value: value === null || value === undefined || value === ''
+                ? null
+                : `${value}${unit ? ` ${unit}` : ''}`,
+              interpretation,
+            }];
+          });
+          const postedOn = record.PostedOn ? new Date(record.PostedOn) : null;
+          const recordedDate = postedOn && !Number.isNaN(postedOn.getTime())
+            ? format(postedOn, 'PPP')
+            : 'Date not recorded';
+
+          return (
+            <section
+              key={record.Id ?? `${record.PostedOn ?? 'record'}-${index}`}
+              style={{
+                border: `1px solid ${oceanColors.mid}20`,
+                borderRadius: '12px',
+                padding: '16px',
+                background: '#fff',
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '8px',
+                marginBottom: '12px',
+                color: oceanColors.textLight,
+                fontSize: '13px',
+              }}>
+                <strong style={{ color: oceanColors.deep }}>{recordedDate}</strong>
+                {record.StationTitle && <span>{record.StationTitle}</span>}
+              </div>
+              {results.length > 0 ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: '10px',
+                }}>
+                  {results.map((result) => (
+                    <div
+                      key={result.label}
+                      style={{ background: '#f8fafc', borderRadius: '8px', padding: '10px 12px' }}
+                    >
+                      <div style={{ color: oceanColors.textLight, fontSize: '12px', marginBottom: '4px' }}>
+                        {result.label}
+                      </div>
+                      <div style={{ color: oceanColors.textDark, fontWeight: 600, fontSize: '14px' }}>
+                        {result.value ?? result.interpretation}
+                      </div>
+                      {result.value && result.interpretation && (
+                        <div style={{ color: oceanColors.textLight, fontSize: '12px', marginTop: '3px' }}>
+                          {result.interpretation}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: oceanColors.textLight, margin: 0 }}>No results recorded for this entry.</p>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    );
+  };
+
   // Export function
   const handleExport = async () => {
     setIsExporting(true);
@@ -561,7 +709,7 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: `1px solid ${oceanColors.mid}20`, background: '#f8fafc', overflowX: 'auto' }}>
-          {['overview', 'trends', 'history', 'insights'].map((tab) => (
+          {['overview', 'trends', 'history', 'lab', 'oncology', 'insights'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
@@ -583,9 +731,17 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
               {tab === 'overview' && <Eye size={18} />}
               {tab === 'trends' && <TrendingUp size={18} />}
               {tab === 'history' && <FileText size={18} />}
+              {tab === 'lab' && <Droplets size={18} />}
+              {tab === 'oncology' && <Shield size={18} />}
               {tab === 'insights' && <Brain size={18} />}
               <span style={{ textTransform: 'capitalize' }}>
-                {tab === 'insights' ? "Sister's Insights" : tab}
+                {tab === 'insights'
+                  ? "Sister's Insights"
+                  : tab === 'lab'
+                    ? 'Lab Findings'
+                    : tab === 'oncology'
+                      ? 'Oncology'
+                      : tab}
               </span>
             </button>
           ))}
@@ -1138,6 +1294,37 @@ export default function PatientProfile({ patient, onClose }: PatientProfileProps
                 </tbody>
               </table>
             </div>
+          )}
+
+          {activeTab === 'lab' && renderClinicalRecords(
+            labFindings,
+            labFindingsLoading,
+            labFindingsError,
+            refetchLabFindings,
+            [
+              { label: 'Fasting Blood Sugar', valueKey: 'FBSValue', interpretationKey: 'FBSInterpretation', unit: 'mmol/L' },
+              { label: 'HbA1c', valueKey: 'HBA1CValue', interpretationKey: 'HBA1CInterpretation', unit: '%' },
+              { label: 'Lipid Profile', valueKey: 'LipidTitle' },
+              { label: 'Microalbumin', valueKey: 'MicroalbuminValue', interpretationKey: 'MicroalbuminInterpretation', unit: 'mg/L' },
+              { label: 'Bone Mineral Density', valueKey: 'BMDValue', interpretationKey: 'BMDInterpretation' },
+              { label: 'PSA', valueKey: 'PSAValue', interpretationKey: 'PSAInterpretation', unit: 'ng/mL' },
+              { label: 'Hepatitis B', valueKey: 'HepatitisBTitle' },
+              { label: 'Hepatitis C', valueKey: 'HepatitisCTitle' },
+            ],
+            'No lab findings have been recorded for this patient.'
+          )}
+
+          {activeTab === 'oncology' && renderClinicalRecords(
+            oncologyFindings,
+            oncologyFindingsLoading,
+            oncologyFindingsError,
+            refetchOncologyFindings,
+            [
+              { label: 'Breast Examination', valueKey: 'BreastExamTitle' },
+              { label: 'Pap Smear', valueKey: 'PAPSmearTitle' },
+              { label: 'VIA/VILLI', valueKey: 'ViaVilliTitle' },
+            ],
+            'No oncology findings have been recorded for this patient.'
           )}
 
           {activeTab === 'insights' && (
