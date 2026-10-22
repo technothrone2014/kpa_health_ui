@@ -356,15 +356,18 @@ export default function Dashboard() {
         ? '/analytics/participation/daily' 
         : '/analytics/participation/periods';
       const response = await api.get(`${endpoint}?${paramString}`);
-      return response.data.data || [];
+      return {
+        data: response.data.data || [],
+        totalUniqueClients: Number(response.data.totalUniqueClients) || 0
+      };
     },
     enabled: !!filters.startDate,
   });
 
   // Format data for participation chart
   const participationData = React.useMemo(() => {
-    if (!participationTrends) return [];
-    return participationTrends.map((p: any) => ({
+    if (!participationTrends?.data) return [];
+    return participationTrends.data.map((p: any) => ({
       label: p.period_label || p.date_label || p.screening_date,
       tallies: parseInt(p.total_tallies) || parseInt(p.tally_count) || 0,
       clients: parseInt(p.total_unique_clients) || parseInt(p.unique_clients) || 0,
@@ -676,9 +679,9 @@ export default function Dashboard() {
                         </p>
                       </div>
                       <div>
-                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px' }}>Total Clients</span>
+                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px' }}>Unique Clients in Range</span>
                         <p style={{ color: oceanColors.white, fontSize: '15px', fontWeight: 'bold', margin: 0 }}>
-                          {participationData.reduce((sum: number, d: any) => sum + d.clients, 0).toLocaleString()}
+                          {(participationTrends?.totalUniqueClients || 0).toLocaleString()}
                         </p>
                       </div>
                       <div>
