@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { createWorker } from 'tesseract.js';
+import { createWorker, PSM } from 'tesseract.js';
 import { ArrowLeft, Check, FileText, Loader2, RotateCcw, RotateCw, ScanText, Upload, X } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -245,32 +245,107 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
     try {
       const pdf = await getDocument({ data: await file.arrayBuffer() }).promise;
       if (pdf.numPages > 30) throw new Error('The PDF may contain no more than 30 pages.');
+      let pageNumberProgress = 1;
+      const pageCountProgress = pdf.numPages;
       const worker = await createWorker('eng', 1, {
         logger: (message) => {
-          if (message.status === 'recognizing text' && message.progress) {
-            setProgress(Math.round(message.progress * 100));
+          if (message.status === 'recognizing text') {
+            const pageProgress = ((pageNumberProgress - 1) + message.progress / 3) / pageCountProgress;
+            setProgress(Math.round(pageProgress * 100));
           }
         },
       });
       const nextPages: OCRPage[] = [];
       try {
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-          setStatus(`Rendering and scanning page ${pageNumber} of ${pdf.numPages} locally…`);
+          pageNumberProgress = pageNumber;
+          setStatus(`Rendering page ${pageNumber} of ${pdf.numPages} at high resolution…`);
           const page = await pdf.getPage(pageNumber);
           const pageRotation = ((page.rotate + rotation) % 360 + 360) % 360;
-          const viewport = page.getViewport({ scale: 2, rotation: pageRotation });
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.ceil(viewport.width);
-          canvas.height = Math.ceil(viewport.height);
-          const context = canvas.getContext('2d');
+          const viewport = page.getViewport({ scale: 3.5, rotation: pageRotation });
+          const sourceCanvas = document.createElement('canvas');
+          sourceCanvas.width = Math.ceil(viewport.width);
+          sourceCanvas.height = Math.ceil(viewport.height);
+          const context = sourceCanvas.getContext('2d');
           if (!context) throw new Error('Your browser could not prepare a page for OCR.');
           await page.render({ canvasContext: context, viewport }).promise;
-          const result = await worker.recognize(canvas);
+
+          const scanCanvas = document.createElement('canvas');
+          scanCanvas.width = sourceCanvas.width;
+          scanCanvas.height = sourceCanvas.height;
+          const scanContext = scanCanvas.getContext('2d');
+          if (!scanContext) throw new Error('Your browser could not prepare the high-resolution scan.');
+          if ('filter' in scanContext) scanContext.filter = 'grayscale(1) contrast(1.25)';
+          scanContext.drawImage(sourceCanvas, 0, 0);
+
+          const recognizeRegion = async (
+            section: string,
+            rectangle: { left: number; top: number; width: number; height: number },
+            pageSegmentationMode: PSM
+          ) => {
+            setStatus(`Recognizing ${section} on page ${pageNumber} of ${pdf.numPages} locally…`);
+            await worker.setParameters({
+              tessedit_pageseg_mode: pageSegmentationMode,
+              preserve_interword_spaces: '1',
+              user_defined_dpi: '252',
+            });
+            const result = await worker.recognize(scanCanvas, { rectangle });
+            return result.data.text.trim();
+          };
+
+          const metadataText = await recognizeRegion(
+            'title, station, month, and date',
+            {
+              left: Math.round(scanCanvas.width * 0.07),
+              top: Math.round(scanCanvas.height * 0.005),
+              width: Math.round(scanCanvas.width * 0.86),
+              height: Math.round(scanCanvas.height * 0.105),
+            },
+            PSM.SPARSE_TEXT
+          );
+          const tableText = await recognizeRegion(
+            'table headings and handwritten rows',
+            {
+              left: Math.round(scanCanvas.width * 0.05),
+              top: Math.round(scanCanvas.height * 0.10),
+              width: Math.round(scanCanvas.width * 0.90),
+              height: Math.round(scanCanvas.height * 0.75),
+            },
+            PSM.SPARSE_TEXT
+          );
+          const keyText = await recognizeRegion(
+            'referral key',
+            {
+              left: Math.round(scanCanvas.width * 0.02),
+              top: Math.round(scanCanvas.height * 0.84),
+              width: Math.round(scanCanvas.width * 0.96),
+              height: Math.round(scanCanvas.height * 0.14),
+            },
+            PSM.SINGLE_BLOCK
+          );
+          const text = [
+            'DOCUMENT TITLE AND STATION / MONTH / DATE:',
+            metadataText || '(No text recognized in this section)',
+            'FIELD TABLE (read each line as one numbered row):',
+            tableText || '(No text recognized in this section)',
+            'REFERRAL KEY:',
+            keyText || '(No text recognized in this section)',
+          ].join('\n');
+          const previewCanvas = document.createElement('canvas');
+          previewCanvas.width = Math.round(scanCanvas.width * 0.375);
+          previewCanvas.height = Math.round(scanCanvas.height * 0.375);
+          const previewContext = previewCanvas.getContext('2d');
+          if (!previewContext) throw new Error('Your browser could not prepare the scan preview.');
+          previewContext.drawImage(scanCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
           nextPages.push({
             pageNumber,
-            text: result.data.text.trim(),
-            preview: canvas.toDataURL('image/jpeg', 0.55),
+            text,
+            preview: previewCanvas.toDataURL('image/jpeg', 0.6),
           });
+          sourceCanvas.width = 0;
+          sourceCanvas.height = 0;
+          scanCanvas.width = 0;
+          scanCanvas.height = 0;
           setProgress(Math.round((pageNumber / pdf.numPages) * 100));
         }
       } finally {
@@ -311,7 +386,11 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
         const corrections = examples.length
           ? `\nPrior de-identified human corrections (field, mistaken value, corrected value):\n${JSON.stringify(examples.slice(0, 40))}\n`
           : '';
-        const prompt = `Extract the handwritten field-screening table from this OCR text. Return exactly one JSON object with keys "captureDate", "station", and "rows". "captureDate" must be YYYY-MM-DD or null. Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Port User), idNumber, phoneNumber, age, sex (Male or Female), weight, height, hip, waist, systolic, diastolic, rbs, bpMedication, diabetesMedication, referrals. Use null for blank or uncertain values; do not guess, infer missing measurements, or create rows without evidence. Medication answers should be "Y", "N", or null. Referrals must contain the printed referral codes, including prefixes such as E, D, or PU where visible. The referral key is: E=Employee, D=Dependent, PU=Port User; 1=Cancer Screening, 2=Dental Screening, 3=Eye Screening, 4=HbA1c, 5=Lipid Profile, 6=Microalbumin, 7=PSA, 8=FBS, 9=LFTs, 10=Creatinine Clearance, 11=Hepatitis B/C. Keep all extracted values as written; do not correct or clinically interpret them. If a digit or word is uncertain, use null. Do not output markdown.${corrections}\nPage ${page.pageNumber} OCR text:\n${page.text}`;
+        const prompt = `Extract the field-screening sheet from the OCR text, which has been separated into document-header, field-table, and referral-key regions. Return exactly one JSON object with keys "captureDate", "station", and "rows". Use only the document-header region for station and capture date; captureDate must be YYYY-MM-DD or null. A month without a readable day is not a complete capture date.
+
+The printed table columns from left to right are: NO, NAME, CAT, C/NO (ID/check number), TEL, AGE, SEX, WT, HT, HIP CIRCU (cm), WAIST CIRCUM (cm), SYST, DIAS, RBS, HIGH BP (known/on-treatment Y/N), DIABETES (known/on-treatment Y/N), REFERRALS, COMMENT. The first column is a pre-printed row number 1-15. Extract only rows supported by the table region. Carefully keep values in their printed column and row; do not shift a value into a neighboring field to make it look plausible. Comments are not a substitute for the two medication columns.
+
+Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Port User), idNumber, phoneNumber, age, sex (Male or Female), weight, height, hip, waist, systolic, diastolic, rbs, bpMedication, diabetesMedication, referrals. Use null for blank or uncertain values; do not guess, infer missing measurements, or create rows without evidence. Medication answers should be "Y", "N", or null. Referrals must contain the printed referral codes, including prefixes such as E, D, or PU where visible. The referral key is: E=Employee, D=Dependent, PU=Port User; 1=Cancer Screening, 2=Dental Screening, 3=Eye Screening, 4=HbA1c, 5=Lipid Profile, 6=Microalbumin, 7=PSA, 8=FBS, 9=LFTs, 10=Creatinine Clearance, 11=Hepatitis B/C. Keep all extracted values as written; do not correct or clinically interpret them. If a digit or word is uncertain, use null. Do not output markdown.${corrections}\nPage ${page.pageNumber} OCR text:\n${page.text}`;
         const response = await aiService.chat({
           messages: [
             { role: 'system', content: 'You convert OCR text from health-screening forms into conservative structured data. Never invent missing fields or values.' },
