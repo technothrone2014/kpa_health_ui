@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import EditClientModal from './EditClientModal';
 import EditLabFindingsModal from './EditLabFindingsModal';
 import EditOncologyModal from './EditOncologyModal';
+const ManualSheetOCR = React.lazy(() => import('./ManualSheetOCR'));
 
 const oceanColors = {
   deep: '#0B2F9E',
@@ -27,7 +28,7 @@ const oceanColors = {
   textLight: '#6B7280',
 };
 
-type CaptureStep = 'search' | 'register' | 'field' | 'lab' | 'oncology';
+type CaptureStep = 'search' | 'register' | 'field' | 'lab' | 'oncology' | 'manualSheet';
 type UserRole = 'field_agent' | 'lab_assistant' | 'oncology_technician';
 
 interface DataCaptureDashboardProps {
@@ -257,25 +258,47 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
             </div>
 
             {userRole === 'field_agent' && (
-              <button
-                onClick={() => setShowRegistration(true)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: 'transparent',
-                  border: `1px solid ${oceanColors.mid}30`,
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  color: oceanColors.textDark,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                <UserPlus size={18} />
-                Register New Client
-              </button>
+              <div style={{ display: 'grid', gap: 10 }}>
+                <button
+                  onClick={() => setShowRegistration(true)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: 'transparent',
+                    border: `1px solid ${oceanColors.mid}30`,
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    color: oceanColors.textDark,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <UserPlus size={18} />
+                  Register New Client
+                </button>
+                <button
+                  onClick={() => setStep('manualSheet')}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: `${oceanColors.deep}08`,
+                    border: `1px solid ${oceanColors.deep}40`,
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    color: oceanColors.deep,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontWeight: 600,
+                  }}
+                >
+                  <ClipboardList size={18} />
+                  Scan Manual Sheet (OCR)
+                </button>
+              </div>
             )}
 
             {searchResults.length > 0 && (
@@ -399,6 +422,20 @@ export default function DataCaptureDashboard({ userRole, userId, stationId }: Da
             }}
             onSuccess={handleFieldSuccess}
           />
+        );
+
+      case 'manualSheet':
+        return (
+          <React.Suspense fallback={<div style={{ padding: 24, textAlign: 'center' }}>Loading OCR tools…</div>}>
+            <ManualSheetOCR
+              stationId={localStationId}
+              onClose={() => setStep('search')}
+              onSuccess={(count) => {
+                toast.success(`${count} manual-sheet row(s) imported successfully.`);
+                setStep('search');
+              }}
+            />
+          </React.Suspense>
         );
 
       case 'lab':
