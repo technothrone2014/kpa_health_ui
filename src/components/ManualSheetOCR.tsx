@@ -35,8 +35,6 @@ const FEEDBACK_FIELD_MAP: Record<string, string> = {
   systolic: 'Systolic',
   diastolic: 'Diastolic',
   rbs: 'RBS',
-  bpMedication: 'BPMedication',
-  diabetesMedication: 'DiabetesMedication',
   referralCodes: 'Referrals',
 };
 
@@ -46,16 +44,14 @@ type LookupData = {
   genders: Lookup[];
   stations: Lookup[];
   referrals: Lookup[];
-  bpRemarks: Lookup[];
-  rbsRemarks: Lookup[];
 };
 
 type ExtractedRow = {
   rowNumber?: number;
   name?: string | null;
   category?: string | null;
-  idNumber?: string | null;
-  phoneNumber?: string | null;
+  idNumber?: string | number | null;
+  phoneNumber?: string | number | null;
   age?: number | string | null;
   sex?: string | null;
   weight?: number | string | null;
@@ -65,8 +61,6 @@ type ExtractedRow = {
   systolic?: number | string | null;
   diastolic?: number | string | null;
   rbs?: number | string | null;
-  bpMedication?: string | null;
-  diabetesMedication?: string | null;
   referrals?: string | string[] | number[] | null;
 };
 
@@ -89,8 +83,6 @@ type ReviewRow = {
   systolic: string;
   diastolic: string;
   rbs: string;
-  bpRemarkId: string;
-  rbsRemarkId: string;
   referralCodes: string;
   original: Record<string, string>;
   clientMatches?: Array<{ Id: number; FullName: string; IDNumber: string | null; PhoneNumber: string | null }>;
@@ -113,8 +105,8 @@ const getLookupId = (value: string | null | undefined, options: Lookup[]): strin
   const found = options.find((option) => {
     const title = option.Title.toLowerCase();
     if (cleaned === title) return true;
-    if (cleaned === 'd' || cleaned.includes('dependent')) return title.includes('dependent');
-    if (cleaned === 'e' || cleaned.includes('employee')) return title.includes('employee');
+    if (['d', 'dep'].includes(cleaned) || cleaned.includes('dependent')) return title.includes('dependent');
+    if (['e', 'emp'].includes(cleaned) || cleaned.includes('employee')) return title.includes('employee');
     if (cleaned === 'pu' || cleaned.includes('port user')) return title.includes('port user');
     if (cleaned === 'm' || cleaned === 'male') return title === 'male';
     if (cleaned === 'f' || cleaned === 'female') return title === 'female';
@@ -129,28 +121,11 @@ const toInputValue = (value: number | string | null | undefined): string => {
   return text.toLowerCase() === 'null' || text.toLowerCase() === 'n/a' ? '' : text;
 };
 
-const normalizeMedication = (value: string | null | undefined): string => {
-  const answer = (value || '').trim().toLowerCase();
-  if (['y', 'yes', 'true', 'on tx', 'known on tx', '1'].includes(answer)) return 'yes';
-  if (['n', 'no', 'false', 'not on tx', '0'].includes(answer)) return 'no';
-  return '';
-};
-
-const resolveRemark = (answer: string, options: Lookup[]): string => {
-  if (!answer) return '';
-  const exact = options.find((option) => normalize(option.Title) === normalize(answer));
-  if (exact) return String(exact.Id);
-  const candidate = options.find((option) => {
-    const title = option.Title.toLowerCase();
-    const saysYes = answer === 'yes';
-    if (saysYes) {
-      return (title.includes('known') || title.includes('yes') || title.includes('on tx')) &&
-        !title.includes('not known') && !title.includes('not on');
-    }
-    return title.includes('not known') || title.includes('not on') ||
-      title.includes('no ') || title === 'no' || title.includes('negative');
-  });
-  return candidate ? String(candidate.Id) : '';
+const toPhoneNumber = (value: string | number | null | undefined): string => {
+  const phoneNumber = value === null || value === undefined ? '' : String(value).trim();
+  return typeof value === 'number' && /^\d{9}$/.test(phoneNumber)
+    ? `0${phoneNumber}`
+    : phoneNumber;
 };
 
 const parseCaptureDate = (value: unknown): string => {
@@ -163,6 +138,7 @@ const parseCaptureDate = (value: unknown): string => {
 };
 
 const getReferralIds = (codes: string, options: Lookup[]): { ids: number[]; unresolved: string[] } => {
+  if (!codes.trim() || /^n\s*\/\s*a$/i.test(codes.trim())) return { ids: [], unresolved: [] };
   const tokens = codes.match(/(?:PU|[ED])?\s*\d+/gi) || [];
   const codeNumbers = [...new Set(tokens.map((token) => Number(token.match(/\d+/)?.[0])))];
   const ids: number[] = [];
@@ -281,7 +257,8 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
           const recognizeRegion = async (
             section: string,
             rectangle: { left: number; top: number; width: number; height: number },
-            pageSegmentationMode: PSM
+            pageSegmentationMode: PSM,
+            includeWordPositions = false
           ) => {
             setStatus(`Recognizing ${section} on page ${pageNumber} of ${pdf.numPages} locally…`);
             await worker.setParameters({
@@ -290,6 +267,30 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
               user_defined_dpi: '252',
             });
             const result = await worker.recognize(scanCanvas, { rectangle });
+            if (includeWordPositions) {
+              const words = result.data.words.filter((word) =>
+                word.text.trim() &&
+                Number.isFinite(word.bbox.x0) &&
+                Number.isFinite(word.bbox.y0) &&
+                Number.isFinite(word.bbox.x1) &&
+                Number.isFinite(word.bbox.y1)
+              );
+              if (words.length === 0) return result.data.text.trim();
+              const minX = Math.min(...words.map((word) => word.bbox.x0));
+              const maxX = Math.max(...words.map((word) => word.bbox.x1));
+              const minY = Math.min(...words.map((word) => word.bbox.y0));
+              const maxY = Math.max(...words.map((word) => word.bbox.y1));
+              const xRange = Math.max(maxX - minX, 1);
+              const yRange = Math.max(maxY - minY, 1);
+              return words
+                .sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0)
+                .map((word) => {
+                  const x = Math.round(((word.bbox.x0 + word.bbox.x1) / 2 - minX) / xRange * 1000);
+                  const y = Math.round(((word.bbox.y0 + word.bbox.y1) / 2 - minY) / yRange * 1000);
+                  return `[x=${x},y=${y}] ${word.text}`;
+                })
+                .join('\n');
+            }
             return result.data.text.trim();
           };
 
@@ -311,25 +312,14 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
               width: Math.round(scanCanvas.width * 0.90),
               height: Math.round(scanCanvas.height * 0.75),
             },
-            PSM.SPARSE_TEXT
-          );
-          const keyText = await recognizeRegion(
-            'referral key',
-            {
-              left: Math.round(scanCanvas.width * 0.02),
-              top: Math.round(scanCanvas.height * 0.84),
-              width: Math.round(scanCanvas.width * 0.96),
-              height: Math.round(scanCanvas.height * 0.14),
-            },
-            PSM.SINGLE_BLOCK
+            PSM.SPARSE_TEXT,
+            true
           );
           const text = [
             'DOCUMENT TITLE AND STATION / MONTH / DATE:',
             metadataText || '(No text recognized in this section)',
-            'FIELD TABLE (read each line as one numbered row):',
+            'FIELD TABLE (word positions are normalized from 0 to 1000 across the table region):',
             tableText || '(No text recognized in this section)',
-            'REFERRAL KEY:',
-            keyText || '(No text recognized in this section)',
           ].join('\n');
           const previewCanvas = document.createElement('canvas');
           previewCanvas.width = Math.round(scanCanvas.width * 0.375);
@@ -374,7 +364,10 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
       let examples: Array<{ Field: string; OCRValue: string; CorrectedValue: string }> = [];
       if (useCorrectionExamples) {
         const feedback = await api.get('/manual-sheets/feedback');
-        examples = feedback.data.examples || [];
+        const supportedFields = new Set(Object.values(FEEDBACK_FIELD_MAP));
+        examples = (feedback.data.examples || []).filter((example: { Field: string }) =>
+          supportedFields.has(example.Field)
+        );
       }
 
       const nextRows: ReviewRow[] = [];
@@ -386,11 +379,13 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
         const corrections = examples.length
           ? `\nPrior de-identified human corrections (field, mistaken value, corrected value):\n${JSON.stringify(examples.slice(0, 40))}\n`
           : '';
-        const prompt = `Extract the field-screening sheet from the OCR text, which has been separated into document-header, field-table, and referral-key regions. Return exactly one JSON object with keys "captureDate", "station", and "rows". Use only the document-header region for station and capture date; captureDate must be YYYY-MM-DD or null. A month without a readable day is not a complete capture date.
+        const prompt = `Extract numbered client rows from this scanned field-screening sheet. Return exactly one JSON object with keys "captureDate", "station", and "rows". Use only the document-header region for station and capture date; captureDate must be YYYY-MM-DD or null. A month without a readable day is not a complete capture date.
 
-The printed table columns from left to right are: NO, NAME, CAT, C/NO (ID/check number), TEL, AGE, SEX, WT, HT, HIP CIRCU (cm), WAIST CIRCUM (cm), SYST, DIAS, RBS, HIGH BP (known/on-treatment Y/N), DIABETES (known/on-treatment Y/N), REFERRALS, COMMENT. The first column is a pre-printed row number 1-15. Extract only rows supported by the table region. Carefully keep values in their printed column and row; do not shift a value into a neighboring field to make it look plausible. Comments are not a substitute for the two medication columns.
+The field table has exactly these columns from left to right: 1. NO (preprinted row number 1-15), 2. NAME (full name), 3. CAT (E=Employee, PU=Port User, DEP=Dependent), 4. C/NO (ID/check number; digits written on two lines belong together), 5. TEL (Kenyan mobile number, usually 10 digits and beginning 0), 6. AGE (age as written), 7. SEX (M or F), 8. WT (weight in kg), 9. HT (height in cm), 10. Hip circumference in cm, 11. Waist circumference in cm, 12. SYST (systolic), 13. DIAS (diastolic), 14. RBS, 15. REFERRALS.
 
-Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Port User), idNumber, phoneNumber, age, sex (Male or Female), weight, height, hip, waist, systolic, diastolic, rbs, bpMedication, diabetesMedication, referrals. Use null for blank or uncertain values; do not guess, infer missing measurements, or create rows without evidence. Medication answers should be "Y", "N", or null. Referrals must contain the printed referral codes, including prefixes such as E, D, or PU where visible. The referral key is: E=Employee, D=Dependent, PU=Port User; 1=Cancer Screening, 2=Dental Screening, 3=Eye Screening, 4=HbA1c, 5=Lipid Profile, 6=Microalbumin, 7=PSA, 8=FBS, 9=LFTs, 10=Creatinine Clearance, 11=Hepatitis B/C. Keep all extracted values as written; do not correct or clinically interpret them. If a digit or word is uncertain, use null. Do not output markdown.${corrections}\nPage ${page.pageNumber} OCR text:\n${page.text}`;
+Return each row with exactly these data fields: rowNumber, name, category, idNumber, phoneNumber, age, sex, weight, height, hip, waist, systolic, diastolic, rbs, referrals. Do not extract medication, comment, or other fields. Do not infer fields from column titles or use/interpret a referral key. Referrals are only the numbers written in that row, joined by commas, or "N/A" when none are written. Use the printed row number and the word positions [x=0..1000,y=0..1000] to keep values in their original row and column; x increases from left to right and y from top to bottom. Ignore table headings, document decoration, and the referral key. Do not shift values to neighboring fields to make them seem plausible.
+
+Use null for blank or uncertain values; do not guess, infer missing measurements, or create rows without evidence. Return category as E, PU, or DEP, and sex as M or F. Keep ID/check numbers and telephone numbers as strings so leading zeroes are preserved. Join the two parts of a split C/NO into one digit string. Use numeric values for age and measurements. Keep referral codes as their printed numbers, separated by commas, or return "N/A". If a digit or word is uncertain, use null. Do not output markdown.${corrections}\nPage ${page.pageNumber} OCR text:\n${page.text}`;
         const response = await aiService.chat({
           messages: [
             { role: 'system', content: 'You convert OCR text from health-screening forms into conservative structured data. Never invent missing fields or values.' },
@@ -427,8 +422,6 @@ Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Por
             systolic: toInputValue(raw.systolic),
             diastolic: toInputValue(raw.diastolic),
             rbs: toInputValue(raw.rbs),
-            bpMedication: normalizeMedication(raw.bpMedication),
-            diabetesMedication: normalizeMedication(raw.diabetesMedication),
             referralCodes: referrals,
           };
           nextRows.push({
@@ -440,7 +433,7 @@ Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Por
             name: String(raw.name || ''),
             categoryId,
             idNumber: String(raw.idNumber || ''),
-            phoneNumber: String(raw.phoneNumber || ''),
+            phoneNumber: toPhoneNumber(raw.phoneNumber),
             age: toInputValue(raw.age),
             genderId,
             weight: toInputValue(raw.weight),
@@ -450,8 +443,6 @@ Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Por
             systolic: toInputValue(raw.systolic),
             diastolic: toInputValue(raw.diastolic),
             rbs: toInputValue(raw.rbs),
-            bpRemarkId: resolveRemark(sourceValues.bpMedication, options.bpRemarks),
-            rbsRemarkId: resolveRemark(sourceValues.diabetesMedication, options.rbsRemarks),
             referralCodes: referrals,
             original: sourceValues,
           });
@@ -546,8 +537,6 @@ Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Por
         systolic: row.systolic === '' ? null : Number(row.systolic),
         diastolic: row.diastolic === '' ? null : Number(row.diastolic),
         rbs: row.rbs === '' ? null : Number(row.rbs),
-        bpRemarkId: row.bpRemarkId ? Number(row.bpRemarkId) : null,
-        rbsRemarkId: row.rbsRemarkId ? Number(row.rbsRemarkId) : null,
         referralIds: referralMappings[index].ids,
       }));
       const result = await api.post('/manual-sheets/import', {
@@ -564,11 +553,7 @@ Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Por
               ? lookups.categories.find((item) => String(item.Id) === row.categoryId)?.Title || ''
               : field === 'gender'
                 ? lookups.genders.find((item) => String(item.Id) === row.genderId)?.Title || ''
-                : field === 'bpMedication'
-                  ? lookups.bpRemarks.find((item) => String(item.Id) === row.bpRemarkId)?.Title || ''
-                  : field === 'diabetesMedication'
-                    ? lookups.rbsRemarks.find((item) => String(item.Id) === row.rbsRemarkId)?.Title || ''
-                    : row[field as keyof ReviewRow];
+                : row[field as keyof ReviewRow];
             return String(row.original[field]).trim() !== String(value ?? '').trim();
           })
           .map(([field]) => {
@@ -576,11 +561,7 @@ Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Por
               ? lookups.categories.find((item) => String(item.Id) === row.categoryId)?.Title || ''
               : field === 'gender'
                 ? lookups.genders.find((item) => String(item.Id) === row.genderId)?.Title || ''
-                : field === 'bpMedication'
-                  ? lookups.bpRemarks.find((item) => String(item.Id) === row.bpRemarkId)?.Title || ''
-                  : field === 'diabetesMedication'
-                    ? lookups.rbsRemarks.find((item) => String(item.Id) === row.rbsRemarkId)?.Title || ''
-                    : String(row[field as keyof ReviewRow] ?? '');
+                : String(row[field as keyof ReviewRow] ?? '');
             return {
               field: FEEDBACK_FIELD_MAP[field],
               ocrValue: row.original[field],
@@ -735,7 +716,7 @@ Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Por
       {rows.length > 0 && lookups && (
         <>
           <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: 12, fontSize: 12, marginBottom: 14 }}>
-            AI-extracted values are provisional. Confirm identity, category, sex, measurements, medication remarks, and referral codes against the scanned sheet before importing.
+            AI-extracted values are provisional. Confirm identity, category, sex, measurements, and referral codes against the scanned sheet before importing.
           </div>
           <div style={{ display: 'grid', gap: 14 }}>
             {rows.map((row) => {
@@ -774,21 +755,7 @@ Each row must have rowNumber (1-15), name, category (Employee, Dependent, or Por
                     {renderInput(row, 'systolic', 'Systolic', 'number')}
                     {renderInput(row, 'diastolic', 'Diastolic', 'number')}
                     {renderInput(row, 'rbs', 'RBS', 'number')}
-                    <label style={labelStyle}>
-                      High BP medication
-                      <select value={row.bpRemarkId} onChange={(e) => updateRow(row.key, 'bpRemarkId', e.target.value)} style={selectStyle}>
-                        <option value="">Not stated on sheet</option>
-                        {lookups.bpRemarks.map((item) => <option key={item.Id} value={item.Id}>{item.Title}</option>)}
-                      </select>
-                    </label>
-                    <label style={labelStyle}>
-                      Diabetes medication
-                      <select value={row.rbsRemarkId} onChange={(e) => updateRow(row.key, 'rbsRemarkId', e.target.value)} style={selectStyle}>
-                        <option value="">Not stated on sheet</option>
-                        {lookups.rbsRemarks.map((item) => <option key={item.Id} value={item.Id}>{item.Title}</option>)}
-                      </select>
-                    </label>
-                    {renderInput(row, 'referralCodes', 'Referral code(s), e.g. E1, D3, PU11')}
+                    {renderInput(row, 'referralCodes', 'Referral number(s), e.g. 1, 4, 7 or N/A')}
                   </div>
                   {referralResult.unresolved.length > 0 && (
                     <p style={{ color: '#b45309', fontSize: 12, margin: '8px 0' }}>
