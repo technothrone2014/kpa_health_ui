@@ -268,13 +268,20 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
             });
             const result = await worker.recognize(scanCanvas, { rectangle });
             if (includeWordPositions) {
-              const words = result.data.words.filter((word) =>
+              const words = (
+                result.data as typeof result.data & {
+                  words?: Array<{
+                    text: string;
+                    bbox: { x0: number; y0: number; x1: number; y1: number };
+                  }>;
+                }
+              ).words?.filter((word) =>
                 word.text.trim() &&
                 Number.isFinite(word.bbox.x0) &&
                 Number.isFinite(word.bbox.y0) &&
                 Number.isFinite(word.bbox.x1) &&
                 Number.isFinite(word.bbox.y1)
-              );
+              ) ?? [];
               if (words.length === 0) return result.data.text.trim();
               const minX = Math.min(...words.map((word) => word.bbox.x0));
               const maxX = Math.max(...words.map((word) => word.bbox.x1));
