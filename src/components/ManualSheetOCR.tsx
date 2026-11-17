@@ -7,6 +7,8 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import api from '../api/client';
 import aiService from '../api/aiService';
+import { FIELD_LIMITS, validateField } from '../utils/fieldValidation';
+import type { FieldKey } from '../utils/fieldValidation';
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -31,6 +33,15 @@ const FIRST_ROW_X_RANGES = [
   { field: 'RBS', left: 755, right: 820 },
   { field: 'REFERRALS', left: 820, right: 900 },
 ];
+const REVIEW_FIELD_VALIDATION: Partial<Record<keyof ReviewRow, FieldKey>> = {
+  weight: 'Weight',
+  height: 'Height',
+  waist: 'Waist',
+  hip: 'Hip',
+  systolic: 'Systolic',
+  diastolic: 'Diastolic',
+  rbs: 'RBSValue',
+};
 
 const REFERRAL_CODES: Record<number, { title: string; match: string[] }> = {
   1: { title: 'Cancer screening', match: ['cancer'] },
@@ -86,6 +97,17 @@ type ExtractedRow = {
   referrals?: string | string[] | number[] | null;
 };
 
+type ClientMatch = {
+  Id: number;
+  FullName: string;
+  IDNumber: string | null;
+  PhoneNumber: string | null;
+  CategoryId: number;
+  GenderId: number;
+  CategoryTitle: string | null;
+  GenderTitle: string | null;
+};
+
 type ReviewRow = {
   key: string;
   page: number;
@@ -107,7 +129,7 @@ type ReviewRow = {
   rbs: string;
   referralCodes: string;
   original: Record<string, string>;
-  clientMatches?: Array<{ Id: number; FullName: string; IDNumber: string | null; PhoneNumber: string | null }>;
+  clientMatches?: ClientMatch[];
   searching?: boolean;
 };
 
@@ -144,6 +166,49 @@ const groupFirstRowCandidatesByColumn = (text: string): string => {
     `Pass A by column: ${grouped.A.join(' | ') || '(no positioned words)'}`,
     `Pass B by column: ${grouped.B.join(' | ') || '(no positioned words)'}`,
   ].join('\n');
+};
+
+const getReviewFieldError = (row: ReviewRow, field: keyof ReviewRow): string | null => {
+  if (field === 'age' && row.age.trim()) {
+    const age = Number(row.age);
+    if (!Number.isInteger(age) || age < 0 || age > 120) {
+      return 'Age must be a whole number between 0 and 120.';
+    }
+  }
+  const validationField = REVIEW_FIELD_VALIDATION[field];
+  if (validationField) {
+    const error = validateField(validationField, String(row[field] ?? ''));
+    if (error) return error;
+  }
+  if (field === 'systolic' && row.systolic && row.diastolic && Number(row.systolic) <= Number(row.diastolic)) {
+    return 'Systolic must be greater than diastolic.';
+  }
+  if (field === 'diastolic' && row.systolic && row.diastolic && Number(row.diastolic) >= Number(row.systolic)) {
+    return 'Diastolic must be less than systolic.';
+  }
+  return null;
+};
+
+const getReviewRowErrors = (row: ReviewRow): string[] =>
+  (['age', ...Object.keys(REVIEW_FIELD_VALIDATION)] as Array<keyof ReviewRow>)
+    .map((field) => getReviewFieldError(row, field))
+    .filter((error): error is string => Boolean(error));
+
+const getNewClientRegistrationError = (row: ReviewRow): string | null => {
+  if (!row.idNumber.trim()) return 'A check number is required to register a new client.';
+  if (row.idNumber.trim().length > 20) return 'Check number must be at most 20 characters.';
+  if (!row.name.trim()) return 'Client name is required for a new client.';
+  const [firstName, ...lastNameParts] = row.name.trim().replace(/\s+/g, ' ').split(' ');
+  if (lastNameParts.length === 0) return 'Enter both first and last name for a new client.';
+  if (firstName.length > 20 || lastNameParts.join(' ').length > 20) {
+    return 'The first and last names must each be at most 20 characters.';
+  }
+  if (!row.phoneNumber.trim()) return 'Phone number is required for a new client.';
+  if (row.phoneNumber.trim().length > 20) return 'Phone number must be at most 20 characters.';
+  if (!row.age.trim()) return 'Age is required to register a new client from this sheet.';
+  if (!row.categoryId) return 'Category is required for a new client.';
+  if (!row.genderId) return 'Sex is required for a new client.';
+  return getReviewFieldError(row, 'age');
 };
 
 const getLookupId = (value: string | null | undefined, options: Lookup[]): string => {
@@ -218,6 +283,7 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
   const fileInput = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [rotation, setRotation] = useState(270);
+  const [fineRotation, setFineRotation] = useState(0);
   const [pages, setPages] = useState<OCRPage[]>([]);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [lookups, setLookups] = useState<LookupData | null>(null);
@@ -295,12 +361,21 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
           await page.render({ canvasContext: context, viewport }).promise;
 
           const scanCanvas = document.createElement('canvas');
-          scanCanvas.width = sourceCanvas.width;
-          scanCanvas.height = sourceCanvas.height;
+          const fineRadians = fineRotation * Math.PI / 180;
+          const cosine = Math.cos(fineRadians);
+          const sine = Math.sin(fineRadians);
+          scanCanvas.width = Math.ceil(
+            Math.abs(sourceCanvas.width * cosine) + Math.abs(sourceCanvas.height * sine)
+          );
+          scanCanvas.height = Math.ceil(
+            Math.abs(sourceCanvas.width * sine) + Math.abs(sourceCanvas.height * cosine)
+          );
           const scanContext = scanCanvas.getContext('2d');
           if (!scanContext) throw new Error('Your browser could not prepare the high-resolution scan.');
           if ('filter' in scanContext) scanContext.filter = 'grayscale(1) contrast(1.25)';
-          scanContext.drawImage(sourceCanvas, 0, 0);
+          scanContext.translate(scanCanvas.width / 2, scanCanvas.height / 2);
+          scanContext.rotate(fineRadians);
+          scanContext.drawImage(sourceCanvas, -sourceCanvas.width / 2, -sourceCanvas.height / 2);
 
           const recognizeRegion = async (
             section: string,
@@ -317,7 +392,7 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
             });
             const result = await worker.recognize(
               scanCanvas,
-              { rectangle },
+              { rectangle, rotateAuto: fineRotation === 0 },
               { blocks: includeWordPositions }
             );
             if (includeWordPositions) {
@@ -462,7 +537,7 @@ The field table has exactly these columns from left to right: 1. NO (preprinted 
 
 Return each row with exactly these data fields: rowNumber, name, category, idNumber, phoneNumber, age, sex, weight, height, hip, waist, systolic, diastolic, rbs, referrals. Do not extract medication, comment, or other fields. Do not infer fields from column titles or use/interpret a referral key. Referrals are only the numbers written in that row, joined by commas, or "N/A" when none are written. Use the printed row number and the word positions [x=0..1000,y=0..1000] to keep values in their original row and column; x increases from left to right and y from top to bottom. Ignore table headings, document decoration, and the referral key. Do not shift values to neighboring fields to make them seem plausible.
 
-The OCR contains two readings of the same handwritten row, with the detected words also grouped by their x-position into likely columns. Treat both readings as noisy candidates, not ground truth. Do not require the two passes to agree: use the clearest candidate for each column when its position and field type support it. Handwriting and OCR can confuse O/0, I/l/1, S/5, Z/2, B/8, and G/6; consider these only when a visible candidate and the field context support that reading. Do not replace characters mechanically. Preserve the best visible spelling for names; never guess a person's name from a client record or unrelated context. For numeric fields, use the expected field format and valid ranges to resolve a visible ambiguity, not to discard every imperfect reading. Use null only when no candidate can be read with reasonable confidence or the candidates remain equally plausible.
+The OCR contains two readings of the same handwritten row, with detected words grouped by their x-position into likely columns. Treat both as noisy candidates, not ground truth. Do not require the two passes to agree: use the clearest candidate for each column when its position and field type support it. Handwriting and OCR can confuse O/0, I/l/1, S/5, Z/2, B/8, and G/6; consider these only when a visible candidate and the field context support that reading. Do not replace characters mechanically. Preserve the best visible spelling for names; never guess a person's name from a client record or unrelated context. For numeric fields, use the expected field format and valid ranges to resolve a visible ambiguity, not to discard every imperfect reading. If different passes report different values at nearly the same x/y position, they are alternate readings of one handwritten mark, not multiple marks. In particular, do not combine alternate readings of a single referral mark into multiple referral codes; include multiple codes only when separate marks are visible. Use null only when no candidate can be read with reasonable confidence or the candidates remain equally plausible.
 
 Use null for blank or uncertain values; do not guess, infer missing measurements, or create rows without evidence. Return category as E, PU, or DEP, and sex as M or F. Keep ID/check numbers and telephone numbers as strings so leading zeroes are preserved. Join the two parts of a split C/NO into one digit string. Use numeric values for age and measurements. Keep referral codes as their printed numbers, separated by commas, or return "N/A". If a digit or word is uncertain, use null. Do not use any words outside the provided first-row crop to fill a field. Do not output markdown.${corrections}\nPage 1, first-row-only OCR text:\n${page.text}`;
         const response = await aiService.chat({
@@ -491,7 +566,13 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
           const referrals = Array.isArray(raw.referrals)
             ? raw.referrals.map(String).join(', ')
             : String(raw.referrals || '');
+          const extractedName = String(raw.name || '');
+          const extractedIdNumber = String(raw.idNumber || '');
+          const extractedPhoneNumber = toPhoneNumber(raw.phoneNumber);
           const sourceValues: Record<string, string> = {
+            name: extractedName,
+            idNumber: extractedIdNumber,
+            phoneNumber: extractedPhoneNumber,
             category: raw.category || '',
             gender: raw.sex || '',
             age: toInputValue(raw.age),
@@ -510,10 +591,10 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
             rowNumber,
             clientId: null,
             createNew: false,
-            name: String(raw.name || ''),
+            name: extractedName,
             categoryId,
-            idNumber: String(raw.idNumber || ''),
-            phoneNumber: toPhoneNumber(raw.phoneNumber),
+            idNumber: extractedIdNumber,
+            phoneNumber: extractedPhoneNumber,
             age: toInputValue(raw.age),
             genderId,
             weight: toInputValue(raw.weight),
@@ -553,28 +634,72 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
   };
 
   const updateRow = (key: string, field: keyof ReviewRow, value: ReviewRow[keyof ReviewRow]) => {
-    setRows((current) => current.map((row) => row.key === key ? { ...row, [field]: value } : row));
+    setRows((current) => current.map((row) => {
+      if (row.key !== key) return row;
+      const updated = { ...row, [field]: value };
+      return field === 'idNumber'
+        ? { ...updated, clientId: null, createNew: false, clientMatches: undefined, searching: false }
+        : updated;
+    }));
   };
 
   const findClients = async (row: ReviewRow) => {
-    const query = row.idNumber || row.phoneNumber || row.name;
-    if (!query.trim()) return;
-    updateRow(row.key, 'searching', true);
+    const checkNumber = row.idNumber.trim();
+    if (!checkNumber) {
+      toast.error('Enter the C/NO check number before searching for an existing client.');
+      return;
+    }
+    setRows((current) => current.map((item) => item.key === row.key
+      ? { ...item, searching: true, clientMatches: undefined, clientId: null, createNew: false }
+      : item));
     try {
-      const response = await api.get(`/clients/search?q=${encodeURIComponent(query)}`);
-      const exactMatches = (response.data || []).filter((client: any) =>
-        (row.idNumber && client.IDNumber === row.idNumber) ||
-        (row.phoneNumber && client.PhoneNumber === row.phoneNumber) ||
-        (!row.idNumber && !row.phoneNumber)
+      const response = await api.get(
+        `/clients/search?q=${encodeURIComponent(checkNumber)}&field=idNumber`
       );
-      setRows((current) => current.map((item) => item.key === row.key
-        ? { ...item, clientMatches: exactMatches, searching: false }
-        : item));
+      const exactMatches = (response.data || []).filter((client: ClientMatch) =>
+        client.IDNumber?.trim() === checkNumber
+      );
+      setRows((current) => current.map((item) => {
+        if (item.key !== row.key) return item;
+        if (item.idNumber.trim() !== checkNumber) return { ...item, searching: false };
+        return { ...item, clientMatches: exactMatches, clientId: null, createNew: false, searching: false };
+      }));
     } catch (error) {
       console.error('Manual-sheet client lookup failed:', error);
       updateRow(row.key, 'searching', false);
       toast.error('Could not search for an existing client.');
     }
+  };
+
+  const selectClient = (row: ReviewRow, selectedId: string) => {
+    const client = row.clientMatches?.find((item) => String(item.Id) === selectedId);
+    setRows((current) => current.map((item) => {
+      if (item.key !== row.key) return item;
+      if (!client) {
+        return {
+          ...item,
+          clientId: null,
+          createNew: false,
+          name: item.original.name || '',
+          categoryId: getLookupId(item.original.category, lookups?.categories || []),
+          idNumber: item.original.idNumber || '',
+          phoneNumber: item.original.phoneNumber || '',
+          age: item.original.age || '',
+          genderId: getLookupId(item.original.gender, lookups?.genders || []),
+        };
+      }
+      return {
+        ...item,
+        clientId: client.Id,
+        createNew: false,
+        name: client.FullName,
+        categoryId: String(client.CategoryId),
+        idNumber: client.IDNumber || '',
+        phoneNumber: client.PhoneNumber || '',
+        age: '',
+        genderId: String(client.GenderId),
+      };
+    }));
   };
 
   const saveReviewedRows = async () => {
@@ -583,12 +708,25 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
       toast.error('Choose the capture date and station.');
       return;
     }
-    if (rows.some((row) => !row.name.trim() || !row.categoryId || !row.genderId)) {
-      toast.error('Every imported row needs a client name, category, and sex.');
+    if (rows.some((row) => !row.clientId && !row.createNew)) {
+      toast.error('Search for an existing client by C/NO or confirm registering a new client after an exact no-match.');
       return;
     }
-    if (rows.some((row) => !row.clientId && !row.createNew)) {
-      toast.error('Search for an existing client or explicitly confirm creating a new client for unmatched rows.');
+    const newClientError = rows
+      .filter((row) => !row.clientId && row.createNew)
+      .map(getNewClientRegistrationError)
+      .find((error) => error !== null);
+    if (newClientError) {
+      toast.error(newClientError);
+      return;
+    }
+    const fieldError = rows.flatMap((row) => getReviewRowErrors(row))[0];
+    if (fieldError) {
+      toast.error(`Correct the field finding before importing: ${fieldError}`);
+      return;
+    }
+    if (rows.some((row) => row.clientId && !row.clientMatches?.some((client) => client.Id === row.clientId))) {
+      toast.error('The selected client is no longer available in the C/NO search results. Search again.');
       return;
     }
     const referralMappings = rows.map((row) => getReferralIds(row.referralCodes, lookups.referrals));
@@ -600,25 +738,28 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
     setBusy(true);
     setStatus('Saving reviewed rows in one database transaction…');
     try {
-      const payloadRows = rows.map((row, index) => ({
-        rowNumber: row.rowNumber,
-        clientId: row.clientId,
-        createNew: row.createNew,
-        name: row.name.trim(),
-        categoryId: Number(row.categoryId),
-        idNumber: row.idNumber.trim() || null,
-        phoneNumber: row.phoneNumber.trim() || null,
-        age: row.age === '' ? null : Number(row.age),
-        genderId: Number(row.genderId),
-        weight: row.weight === '' ? null : Number(row.weight),
-        height: row.height === '' ? null : Number(row.height),
-        hip: row.hip === '' ? null : Number(row.hip),
-        waist: row.waist === '' ? null : Number(row.waist),
-        systolic: row.systolic === '' ? null : Number(row.systolic),
-        diastolic: row.diastolic === '' ? null : Number(row.diastolic),
-        rbs: row.rbs === '' ? null : Number(row.rbs),
-        referralIds: referralMappings[index].ids,
-      }));
+      const payloadRows = rows.map((row, index) => {
+        const client = row.clientMatches?.find((item) => item.Id === row.clientId);
+        return {
+          rowNumber: row.rowNumber,
+          clientId: row.clientId,
+          createNew: row.createNew,
+          name: client?.FullName || row.name.trim(),
+          categoryId: Number(client?.CategoryId ?? row.categoryId),
+          idNumber: (client?.IDNumber ?? row.idNumber.trim()) || null,
+          phoneNumber: (client?.PhoneNumber ?? row.phoneNumber.trim()) || null,
+          age: client || row.age === '' ? null : Number(row.age),
+          genderId: Number(client?.GenderId ?? row.genderId),
+          weight: row.weight === '' ? null : Number(row.weight),
+          height: row.height === '' ? null : Number(row.height),
+          hip: row.hip === '' ? null : Number(row.hip),
+          waist: row.waist === '' ? null : Number(row.waist),
+          systolic: row.systolic === '' ? null : Number(row.systolic),
+          diastolic: row.diastolic === '' ? null : Number(row.diastolic),
+          rbs: row.rbs === '' ? null : Number(row.rbs),
+          referralIds: referralMappings[index].ids,
+        };
+      });
       const result = await api.post('/manual-sheets/import', {
         captureDate,
         stationId: Number(selectedStation),
@@ -628,6 +769,7 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
       if (useCorrectionExamples) {
         const feedbackEntries = rows.flatMap((row) => Object.entries(FEEDBACK_FIELD_MAP)
           .filter(([field]) => row.original[field] !== undefined)
+          .filter(([field]) => !(row.clientId && field === 'age'))
           .filter(([field]) => {
             const value = field === 'category'
               ? lookups.categories.find((item) => String(item.Id) === row.categoryId)?.Title || ''
@@ -694,17 +836,27 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
     field: keyof ReviewRow,
     label: string,
     type: 'text' | 'number' = 'text'
-  ) => (
-    <label key={String(field)} style={labelStyle}>
-      {label}
-      <input
-        type={type}
-        value={String(row[field] ?? '')}
-        onChange={(event) => updateRow(row.key, field, event.target.value)}
-        style={inputStyle}
-      />
-    </label>
-  );
+  ) => {
+    const validationField = REVIEW_FIELD_VALIDATION[field];
+    const limits = validationField ? FIELD_LIMITS[validationField] : undefined;
+    const error = getReviewFieldError(row, field);
+    return (
+      <label key={String(field)} style={labelStyle}>
+        {label}
+        <input
+          type={type}
+          value={String(row[field] ?? '')}
+          onChange={(event) => updateRow(row.key, field, event.target.value)}
+          min={limits?.min ?? (field === 'age' ? 0 : undefined)}
+          max={limits?.max ?? (field === 'age' ? 120 : undefined)}
+          step={field === 'rbs' ? 'any' : undefined}
+          aria-invalid={Boolean(error)}
+          style={{ ...inputStyle, borderColor: error ? '#dc2626' : '#cbd5e1' }}
+        />
+        {error && <span role="alert" style={{ display: 'block', color: '#b91c1c', marginTop: 3 }}>{error}</span>}
+      </label>
+    );
+  };
 
   return (
     <section style={{ maxWidth: 1100, margin: '0 auto', padding: 20, color: '#1f2937' }}>
@@ -723,7 +875,7 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
       </header>
 
       <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 12, fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
-        Only page 1 and its first table row are OCR-processed in this test. Two local OCR layout passes are compared to accommodate handwriting; the browser sends their text and positions—not the PDF image—to the configured AI chat service. No other pages or rows are extracted.
+        Only page 1 and its first table row are OCR-processed in this test. Two local OCR layout passes are compared to accommodate handwriting; the browser sends their text and positions—not the PDF image—to the configured AI chat service. Existing clients are matched by exact C/NO only. No other pages or rows are extracted.
       </div>
       <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, marginBottom: 14 }}>
         <input type="checkbox" checked={useCorrectionExamples} onChange={(e) => setUseCorrectionExamples(e.target.checked)} />
@@ -753,6 +905,22 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
             </button>
           </div>
           <span style={{ fontWeight: 400 }}>Current rotation: {rotation}°</span>
+          <span style={{ ...labelStyle, fontWeight: 400, marginTop: 8 }}>
+            Fine tilt: {fineRotation.toFixed(1)}°
+            <input
+              type="range"
+              min={-5}
+              max={5}
+              step={0.1}
+              value={fineRotation}
+              onChange={(event) => setFineRotation(Number(event.target.value))}
+              style={{ display: 'block', width: '100%', margin: '6px 0' }}
+            />
+            {fineRotation === 0
+              ? 'Automatic small-tilt correction is on.'
+              : 'Manual fine rotation is applied; automatic correction is off.'}
+            {fineRotation !== 0 && ' Positive values rotate clockwise.'}
+          </span>
         </label>
       </div>
 
@@ -801,6 +969,7 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
           <div style={{ display: 'grid', gap: 14 }}>
             {rows.map((row) => {
               const referralResult = getReferralIds(row.referralCodes, lookups.referrals);
+              const matchedClient = row.clientMatches?.find((client) => client.Id === row.clientId);
               return (
                 <article key={row.key} style={{ border: '1px solid #cbd5e1', borderRadius: 12, padding: 14, background: '#fff' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -810,24 +979,45 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
                     </button>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
-                    {renderInput(row, 'name', 'Client name')}
-                    {renderInput(row, 'idNumber', 'ID / check number')}
-                    {renderInput(row, 'phoneNumber', 'Phone number')}
-                    {renderInput(row, 'age', 'Age', 'number')}
-                    <label style={labelStyle}>
-                      Category
-                      <select value={row.categoryId} onChange={(e) => updateRow(row.key, 'categoryId', e.target.value)} style={selectStyle}>
-                        <option value="">Select category</option>
-                        {lookups.categories.map((item) => <option key={item.Id} value={item.Id}>{item.Title}</option>)}
-                      </select>
-                    </label>
-                    <label style={labelStyle}>
-                      Sex
-                      <select value={row.genderId} onChange={(e) => updateRow(row.key, 'genderId', e.target.value)} style={selectStyle}>
-                        <option value="">Select sex</option>
-                        {lookups.genders.map((item) => <option key={item.Id} value={item.Id}>{item.Title}</option>)}
-                      </select>
-                    </label>
+                    {matchedClient ? (
+                      <div style={{
+                        gridColumn: '1 / -1',
+                        padding: 10,
+                        border: '1px solid #bbf7d0',
+                        borderRadius: 7,
+                        background: '#f0fdf4',
+                        fontSize: 12,
+                      }}>
+                        <strong>Existing client matched by C/NO</strong>
+                        <div style={{ marginTop: 4 }}>
+                          {matchedClient.FullName} · ID {matchedClient.IDNumber || '—'} · Phone {matchedClient.PhoneNumber || '—'}
+                          {' · '}{matchedClient.CategoryTitle || 'Category unavailable'}
+                          {' · '}{matchedClient.GenderTitle || 'Sex unavailable'}
+                        </div>
+                        <div style={{ marginTop: 4 }}>Identity details will be taken from the client record; only findings below will be imported.</div>
+                      </div>
+                    ) : (
+                      <>
+                        {renderInput(row, 'name', 'Client name')}
+                        {renderInput(row, 'idNumber', 'C/NO check number')}
+                        {renderInput(row, 'phoneNumber', 'Phone number')}
+                        {renderInput(row, 'age', 'Age', 'number')}
+                        <label style={labelStyle}>
+                          Category
+                          <select value={row.categoryId} onChange={(e) => updateRow(row.key, 'categoryId', e.target.value)} style={selectStyle}>
+                            <option value="">Select category</option>
+                            {lookups.categories.map((item) => <option key={item.Id} value={item.Id}>{item.Title}</option>)}
+                          </select>
+                        </label>
+                        <label style={labelStyle}>
+                          Sex
+                          <select value={row.genderId} onChange={(e) => updateRow(row.key, 'genderId', e.target.value)} style={selectStyle}>
+                            <option value="">Select sex</option>
+                            {lookups.genders.map((item) => <option key={item.Id} value={item.Id}>{item.Title}</option>)}
+                          </select>
+                        </label>
+                      </>
+                    )}
                     {renderInput(row, 'weight', 'Weight (kg)', 'number')}
                     {renderInput(row, 'height', 'Height (cm)', 'number')}
                     {renderInput(row, 'hip', 'Hip circumference (cm)', 'number')}
@@ -846,35 +1036,51 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
                     </p>
                   )}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 10 }}>
-                    <button type="button" onClick={() => findClients(row)} disabled={row.searching} style={{ ...buttonStyle, padding: '7px 10px', fontSize: 12 }}>
-                      {row.searching ? <Loader2 className="spin" size={14} /> : <ArrowLeft size={14} />}
-                      Find existing client
-                    </button>
-                    {row.clientId && (
-                      <button type="button" onClick={() => updateRow(row.key, 'clientId', null)} style={{ ...buttonStyle, background: '#64748b', padding: '7px 10px', fontSize: 12 }}>
-                        Use automatic match / create new
+                    {!row.clientId && (
+                      <button
+                        type="button"
+                        onClick={() => findClients(row)}
+                        disabled={row.searching || !row.idNumber.trim()}
+                        style={{ ...buttonStyle, padding: '7px 10px', fontSize: 12 }}
+                      >
+                        {row.searching ? <Loader2 className="spin" size={14} /> : <ArrowLeft size={14} />}
+                        Search existing client by C/NO
                       </button>
                     )}
-                    {!row.clientId && (
+                    {row.clientId && (
+                      <button
+                        type="button"
+                        onClick={() => selectClient(row, '')}
+                        style={{ ...buttonStyle, background: '#64748b', padding: '7px 10px', fontSize: 12 }}
+                      >
+                        Clear existing-client match
+                      </button>
+                    )}
+                    {!row.clientId && row.clientMatches?.length === 0 && (
+                      <>
+                        <span style={{ fontSize: 12, color: '#475569' }}>
+                          No exact C/NO match. Correct the number or review the details before registering a new client.
+                        </span>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 400 }}>
                         <input
                           type="checkbox"
                           checked={row.createNew}
                           onChange={(e) => updateRow(row.key, 'createNew', e.target.checked)}
                         />
-                        Create a new client if no exact ID/phone match exists
+                        Register a new client from these reviewed details
                       </label>
+                      </>
                     )}
-                    {row.clientMatches && (
+                    {!row.clientId && row.clientMatches && row.clientMatches.length > 0 && (
                       <select
-                        value={row.clientId || ''}
-                        onChange={(e) => updateRow(row.key, 'clientId', e.target.value ? Number(e.target.value) : null)}
+                        value=""
+                        onChange={(e) => selectClient(row, e.target.value)}
                         style={{ ...selectStyle, maxWidth: 400 }}
                       >
-                        <option value="">Auto-match by exact ID/phone or create new</option>
+                        <option value="">Select exact C/NO match</option>
                         {row.clientMatches.map((client) => (
                           <option key={client.Id} value={client.Id}>
-                            {client.FullName} · ID {client.IDNumber || '—'} · {client.PhoneNumber || '—'}
+                            {client.FullName} · {client.CategoryTitle || 'Category unavailable'} · {client.GenderTitle || 'Sex unavailable'}
                           </option>
                         ))}
                       </select>
@@ -894,7 +1100,14 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
             <button
               type="button"
               onClick={saveReviewedRows}
-              disabled={busy || rows.length === 0 || rows.some((row) => getReferralIds(row.referralCodes, lookups.referrals).unresolved.length > 0)}
+              disabled={
+                busy ||
+                rows.length === 0 ||
+                rows.some((row) => !row.clientId && !row.createNew) ||
+                rows.some((row) => row.createNew && getNewClientRegistrationError(row) !== null) ||
+                rows.some((row) => getReviewRowErrors(row).length > 0) ||
+                rows.some((row) => getReferralIds(row.referralCodes, lookups.referrals).unresolved.length > 0)
+              }
               style={{ ...buttonStyle, background: '#047857' }}
             >
               {busy ? <Loader2 className="spin" size={16} /> : <Check size={16} />}

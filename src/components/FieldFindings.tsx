@@ -7,6 +7,7 @@ import {
 import api from '../api/client';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { FIELD_LIMITS, validateField } from '../utils/fieldValidation';
 
 const oceanColors = {
   deep: '#0B2F9E',
@@ -20,31 +21,6 @@ const oceanColors = {
   textLight: '#6B7280',
   white: '#FFFFFF',
 };
-
-// ============================================
-// VALIDATION RULES
-// ============================================
-const FIELD_LIMITS = {
-  Weight:   { min: 5,  max: 300, unit: 'kg' },
-  Height:   { min: 30, max: 250, unit: 'cm' },
-  Waist:    { min: 30, max: 200, unit: 'cm' },
-  Hip:      { min: 30, max: 200, unit: 'cm' },
-  Systolic: { min: 60, max: 250, unit: 'mmHg' },
-  Diastolic:{ min: 30, max: 150, unit: 'mmHg' },
-  RBSValue: { min: 1,  max: 40, unit: 'mmol/L' },
-} as const;
-
-type FieldKey = keyof typeof FIELD_LIMITS;
-
-function validateField(field: FieldKey, value: string): string | null {
-  if (!value || value.trim() === '') return null; // empty is allowed (handled by `required`)
-  const num = parseFloat(value);
-  if (Number.isNaN(num)) return 'Must be a valid number';
-  const limit = FIELD_LIMITS[field];
-  if (num < limit.min) return `Minimum is ${limit.min} ${limit.unit}`;
-  if (num > limit.max) return `Maximum is ${limit.max} ${limit.unit}`;
-  return null;
-}
 
 interface FieldFindingsProps {
   clientId: number;
