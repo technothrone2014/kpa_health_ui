@@ -14,6 +14,23 @@ const OCR_PILOT_PAGE_LIMIT = 1;
 // In the supplied scan, row 1 is at y=106-135 and row 2 starts at y=168.
 const FIRST_ROW_Y_MIN = 80;
 const FIRST_ROW_Y_MAX = 155;
+const FIRST_ROW_X_RANGES = [
+  { field: 'NO', left: 0, right: 50 },
+  { field: 'NAME', left: 50, right: 190 },
+  { field: 'CAT', left: 190, right: 235 },
+  { field: 'C/NO', left: 235, right: 280 },
+  { field: 'TEL', left: 280, right: 353 },
+  { field: 'AGE', left: 353, right: 415 },
+  { field: 'SEX', left: 415, right: 450 },
+  { field: 'WT', left: 450, right: 495 },
+  { field: 'HT', left: 495, right: 545 },
+  { field: 'HIP', left: 545, right: 605 },
+  { field: 'WAIST', left: 605, right: 655 },
+  { field: 'SYST', left: 655, right: 710 },
+  { field: 'DIAS', left: 710, right: 755 },
+  { field: 'RBS', left: 755, right: 820 },
+  { field: 'REFERRALS', left: 820, right: 900 },
+];
 
 const REFERRAL_CODES: Record<number, { title: string; match: string[] }> = {
   1: { title: 'Cancer screening', match: ['cancer'] },
@@ -103,6 +120,31 @@ interface ManualSheetOCRProps {
 }
 
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const groupFirstRowCandidatesByColumn = (text: string): string => {
+  const grouped: Record<'A' | 'B', string[]> = { A: [], B: [] };
+  let candidate: 'A' | 'B' | null = null;
+  for (const line of text.split(/\r?\n/)) {
+    if (line.startsWith('FIRST TABLE ROW CANDIDATE A -')) {
+      candidate = 'A';
+      continue;
+    }
+    if (line.startsWith('FIRST TABLE ROW CANDIDATE B -')) {
+      candidate = 'B';
+      continue;
+    }
+    if (!candidate) continue;
+    const word = line.match(/^\[x=(\d+),y=(\d+)\]\s*(.+)$/);
+    if (!word) continue;
+    const x = Number(word[1]);
+    const column = FIRST_ROW_X_RANGES.find((range) => x >= range.left && x < range.right);
+    if (column) grouped[candidate].push(`${column.field}: ${word[3]} [x=${x},y=${word[2]}]`);
+  }
+  return [
+    `Pass A by column: ${grouped.A.join(' | ') || '(no positioned words)'}`,
+    `Pass B by column: ${grouped.B.join(' | ') || '(no positioned words)'}`,
+  ].join('\n');
+};
 
 const getLookupId = (value: string | null | undefined, options: Lookup[]): string => {
   if (!value) return '';
@@ -343,13 +385,18 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
             true,
             tableRectangle
           );
-          const text = [
+          const firstRowText = [
             'DOCUMENT TITLE AND STATION / MONTH / DATE:',
             metadataText || '(No text recognized in this section)',
             'FIRST TABLE ROW CANDIDATE A - SPARSE TEXT (positions normalized across the full table region):',
             firstRowSparseText || '(No text recognized in this pass)',
             'FIRST TABLE ROW CANDIDATE B - SINGLE BLOCK (positions normalized across the full table region):',
             firstRowBlockText || '(No text recognized in this pass)',
+          ].join('\n');
+          const text = [
+            firstRowText,
+            'COLUMN-GROUPED OCR CANDIDATES (using the sheet column positions):',
+            groupFirstRowCandidatesByColumn(firstRowText),
           ].join('\n');
           const previewCanvas = document.createElement('canvas');
           previewCanvas.width = Math.round(scanCanvas.width * 0.375);
@@ -415,7 +462,7 @@ The field table has exactly these columns from left to right: 1. NO (preprinted 
 
 Return each row with exactly these data fields: rowNumber, name, category, idNumber, phoneNumber, age, sex, weight, height, hip, waist, systolic, diastolic, rbs, referrals. Do not extract medication, comment, or other fields. Do not infer fields from column titles or use/interpret a referral key. Referrals are only the numbers written in that row, joined by commas, or "N/A" when none are written. Use the printed row number and the word positions [x=0..1000,y=0..1000] to keep values in their original row and column; x increases from left to right and y from top to bottom. Ignore table headings, document decoration, and the referral key. Do not shift values to neighboring fields to make them seem plausible.
 
-The OCR contains two readings of the same handwritten row. Treat both as hypotheses, not ground truth. Compare words at similar x/y positions and prefer a reading supported by both passes. Handwriting and OCR can confuse O/0, I/l/1, S/5, Z/2, B/8, and G/6; consider these only when the field type and the visible candidate support that reading. Do not replace characters mechanically. Preserve partial names and strings; never guess a person's name from context or a client record. For numeric fields, use the expected field format and valid ranges only to resolve a visible ambiguity, never to invent a missing value. If readings disagree and the text does not support one clear value, use null.
+The OCR contains two readings of the same handwritten row, with the detected words also grouped by their x-position into likely columns. Treat both readings as noisy candidates, not ground truth. Do not require the two passes to agree: use the clearest candidate for each column when its position and field type support it. Handwriting and OCR can confuse O/0, I/l/1, S/5, Z/2, B/8, and G/6; consider these only when a visible candidate and the field context support that reading. Do not replace characters mechanically. Preserve the best visible spelling for names; never guess a person's name from a client record or unrelated context. For numeric fields, use the expected field format and valid ranges to resolve a visible ambiguity, not to discard every imperfect reading. Use null only when no candidate can be read with reasonable confidence or the candidates remain equally plausible.
 
 Use null for blank or uncertain values; do not guess, infer missing measurements, or create rows without evidence. Return category as E, PU, or DEP, and sex as M or F. Keep ID/check numbers and telephone numbers as strings so leading zeroes are preserved. Join the two parts of a split C/NO into one digit string. Use numeric values for age and measurements. Keep referral codes as their printed numbers, separated by commas, or return "N/A". If a digit or word is uncertain, use null. Do not use any words outside the provided first-row crop to fill a field. Do not output markdown.${corrections}\nPage 1, first-row-only OCR text:\n${page.text}`;
         const response = await aiService.chat({
