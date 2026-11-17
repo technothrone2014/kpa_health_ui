@@ -10,6 +10,11 @@ import aiService from '../api/aiService';
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
 
+const OCR_PILOT_PAGE_LIMIT = 1;
+// In the supplied scan, row 1 is at y=106-135 and row 2 starts at y=168.
+const FIRST_ROW_Y_MIN = 80;
+const FIRST_ROW_Y_MAX = 155;
+
 const REFERRAL_CODES: Record<number, { title: string; match: string[] }> = {
   1: { title: 'Cancer screening', match: ['cancer'] },
   2: { title: 'Dental screening', match: ['dental'] },
@@ -221,21 +226,22 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
     try {
       const pdf = await getDocument({ data: await file.arrayBuffer() }).promise;
       if (pdf.numPages > 30) throw new Error('The PDF may contain no more than 30 pages.');
+      const pagesToProcess = Math.min(pdf.numPages, OCR_PILOT_PAGE_LIMIT);
       let pageNumberProgress = 1;
-      const pageCountProgress = pdf.numPages;
+      const pageCountProgress = pagesToProcess;
       const worker = await createWorker('eng', 1, {
         logger: (message) => {
           if (message.status === 'recognizing text') {
-            const pageProgress = ((pageNumberProgress - 1) + message.progress / 2) / pageCountProgress;
+            const pageProgress = ((pageNumberProgress - 1) + message.progress / 3) / pageCountProgress;
             setProgress(Math.round(pageProgress * 100));
           }
         },
       });
       const nextPages: OCRPage[] = [];
       try {
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        for (let pageNumber = 1; pageNumber <= pagesToProcess; pageNumber++) {
           pageNumberProgress = pageNumber;
-          setStatus(`Rendering page ${pageNumber} of ${pdf.numPages} at high resolution…`);
+          setStatus(`Rendering page ${pageNumber} of ${pagesToProcess} for the first-row test…`);
           const page = await pdf.getPage(pageNumber);
           const pageRotation = ((page.rotate + rotation) % 360 + 360) % 360;
           const viewport = page.getViewport({ scale: 3.5, rotation: pageRotation });
@@ -258,9 +264,10 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
             section: string,
             rectangle: { left: number; top: number; width: number; height: number },
             pageSegmentationMode: PSM,
-            includeWordPositions = false
+            includeWordPositions = false,
+            positionRectangle = rectangle
           ) => {
-            setStatus(`Recognizing ${section} on page ${pageNumber} of ${pdf.numPages} locally…`);
+            setStatus(`Recognizing ${section} on page ${pageNumber} of ${pagesToProcess} locally…`);
             await worker.setParameters({
               tessedit_pageseg_mode: pageSegmentationMode,
               preserve_interword_spaces: '1',
@@ -288,10 +295,10 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
                 .sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0)
                 .map((word) => {
                   const x = Math.max(0, Math.min(1000, Math.round(
-                    ((word.bbox.x0 + word.bbox.x1) / 2 - rectangle.left) / rectangle.width * 1000
+                    ((word.bbox.x0 + word.bbox.x1) / 2 - positionRectangle.left) / positionRectangle.width * 1000
                   )));
                   const y = Math.max(0, Math.min(1000, Math.round(
-                    ((word.bbox.y0 + word.bbox.y1) / 2 - rectangle.top) / rectangle.height * 1000
+                    ((word.bbox.y0 + word.bbox.y1) / 2 - positionRectangle.top) / positionRectangle.height * 1000
                   )));
                   return `[x=${x},y=${y}] ${word.text}`;
                 })
@@ -310,22 +317,39 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
             },
             PSM.SPARSE_TEXT
           );
-          const tableText = await recognizeRegion(
-            'table headings and handwritten rows',
-            {
-              left: Math.round(scanCanvas.width * 0.05),
-              top: Math.round(scanCanvas.height * 0.10),
-              width: Math.round(scanCanvas.width * 0.90),
-              height: Math.round(scanCanvas.height * 0.75),
-            },
+          const tableRectangle = {
+            left: Math.round(scanCanvas.width * 0.05),
+            top: Math.round(scanCanvas.height * 0.10),
+            width: Math.round(scanCanvas.width * 0.90),
+            height: Math.round(scanCanvas.height * 0.75),
+          };
+          const firstRowRectangle = {
+            left: tableRectangle.left,
+            top: tableRectangle.top + Math.round(tableRectangle.height * FIRST_ROW_Y_MIN / 1000),
+            width: tableRectangle.width,
+            height: Math.round(tableRectangle.height * (FIRST_ROW_Y_MAX - FIRST_ROW_Y_MIN) / 1000),
+          };
+          const firstRowSparseText = await recognizeRegion(
+            'the first printed row (sparse-text pass)',
+            firstRowRectangle,
             PSM.SPARSE_TEXT,
-            true
+            true,
+            tableRectangle
+          );
+          const firstRowBlockText = await recognizeRegion(
+            'the first printed row (single-block pass)',
+            firstRowRectangle,
+            PSM.SINGLE_BLOCK,
+            true,
+            tableRectangle
           );
           const text = [
             'DOCUMENT TITLE AND STATION / MONTH / DATE:',
             metadataText || '(No text recognized in this section)',
-            'FIELD TABLE (word positions are normalized from 0 to 1000 across the table region):',
-            tableText || '(No text recognized in this section)',
+            'FIRST TABLE ROW CANDIDATE A - SPARSE TEXT (positions normalized across the full table region):',
+            firstRowSparseText || '(No text recognized in this pass)',
+            'FIRST TABLE ROW CANDIDATE B - SINGLE BLOCK (positions normalized across the full table region):',
+            firstRowBlockText || '(No text recognized in this pass)',
           ].join('\n');
           const previewCanvas = document.createElement('canvas');
           previewCanvas.width = Math.round(scanCanvas.width * 0.375);
@@ -342,7 +366,7 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
           sourceCanvas.height = 0;
           scanCanvas.width = 0;
           scanCanvas.height = 0;
-          setProgress(Math.round((pageNumber / pdf.numPages) * 100));
+          setProgress(Math.round((pageNumber / pageCountProgress) * 100));
         }
       } finally {
         await worker.terminate();
@@ -351,7 +375,7 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
         throw new Error('No text was detected. Try a clearer scan or a higher-quality PDF.');
       }
       setPages(nextPages);
-      setStatus(`Local OCR complete: ${nextPages.length} page(s).`);
+      setStatus('First-row OCR ready: page 1 only. Check the local OCR text before extracting the row.');
     } catch (error) {
       console.error('Manual-sheet OCR failed:', error);
       setStatus('');
@@ -379,19 +403,21 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
       const nextRows: ReviewRow[] = [];
       let detectedDate = '';
       let detectedStation = '';
-      for (const page of pages) {
+      for (const page of pages.filter((item) => item.pageNumber === 1).slice(0, OCR_PILOT_PAGE_LIMIT)) {
         if (!page.text) continue;
-        setStatus(`Using AI to organize page ${page.pageNumber} of ${pages.length}…`);
+        setStatus('Using AI to extract row 1 from page 1…');
         const corrections = examples.length
           ? `\nPrior de-identified human corrections (field, mistaken value, corrected value):\n${JSON.stringify(examples.slice(0, 40))}\n`
           : '';
-        const prompt = `Extract numbered client rows from this scanned field-screening sheet. Return exactly one JSON object with keys "captureDate", "station", and "rows". Use only the document-header region for station and capture date; captureDate must be YYYY-MM-DD or null. A month without a readable day is not a complete capture date.
+        const prompt = `This is a first-row pilot. Extract only printed row 1 from page 1. Return exactly one JSON object with keys "captureDate", "station", and "rows". The rows array must contain at most one row and must never contain a row other than rowNumber 1. Use only the document-header region for station and capture date; captureDate must be YYYY-MM-DD or null. A month without a readable day is not a complete capture date.
 
 The field table has exactly these columns from left to right: 1. NO (preprinted row number 1-15), 2. NAME (full name), 3. CAT (E=Employee, PU=Port User, DEP=Dependent), 4. C/NO (ID/check number; digits written on two lines belong together), 5. TEL (Kenyan mobile number, usually 10 digits and beginning 0), 6. AGE (age as written), 7. SEX (M or F), 8. WT (weight in kg), 9. HT (height in cm), 10. Hip circumference in cm, 11. Waist circumference in cm, 12. SYST (systolic), 13. DIAS (diastolic), 14. RBS, 15. REFERRALS.
 
 Return each row with exactly these data fields: rowNumber, name, category, idNumber, phoneNumber, age, sex, weight, height, hip, waist, systolic, diastolic, rbs, referrals. Do not extract medication, comment, or other fields. Do not infer fields from column titles or use/interpret a referral key. Referrals are only the numbers written in that row, joined by commas, or "N/A" when none are written. Use the printed row number and the word positions [x=0..1000,y=0..1000] to keep values in their original row and column; x increases from left to right and y from top to bottom. Ignore table headings, document decoration, and the referral key. Do not shift values to neighboring fields to make them seem plausible.
 
-Use null for blank or uncertain values; do not guess, infer missing measurements, or create rows without evidence. Return category as E, PU, or DEP, and sex as M or F. Keep ID/check numbers and telephone numbers as strings so leading zeroes are preserved. Join the two parts of a split C/NO into one digit string. Use numeric values for age and measurements. Keep referral codes as their printed numbers, separated by commas, or return "N/A". If a digit or word is uncertain, use null. Do not output markdown.${corrections}\nPage ${page.pageNumber} OCR text:\n${page.text}`;
+The OCR contains two readings of the same handwritten row. Treat both as hypotheses, not ground truth. Compare words at similar x/y positions and prefer a reading supported by both passes. Handwriting and OCR can confuse O/0, I/l/1, S/5, Z/2, B/8, and G/6; consider these only when the field type and the visible candidate support that reading. Do not replace characters mechanically. Preserve partial names and strings; never guess a person's name from context or a client record. For numeric fields, use the expected field format and valid ranges only to resolve a visible ambiguity, never to invent a missing value. If readings disagree and the text does not support one clear value, use null.
+
+Use null for blank or uncertain values; do not guess, infer missing measurements, or create rows without evidence. Return category as E, PU, or DEP, and sex as M or F. Keep ID/check numbers and telephone numbers as strings so leading zeroes are preserved. Join the two parts of a split C/NO into one digit string. Use numeric values for age and measurements. Keep referral codes as their printed numbers, separated by commas, or return "N/A". If a digit or word is uncertain, use null. Do not use any words outside the provided first-row crop to fill a field. Do not output markdown.${corrections}\nPage 1, first-row-only OCR text:\n${page.text}`;
         const response = await aiService.chat({
           messages: [
             { role: 'system', content: 'You convert OCR text from health-screening forms into conservative structured data. Never invent missing fields or values.' },
@@ -409,8 +435,9 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
 
         for (const raw of extracted.rows as ExtractedRow[]) {
           const rowNumber = Number(raw.rowNumber);
-          if (!Number.isInteger(rowNumber) || rowNumber < 1 || rowNumber > 15) {
-            throw new Error(`AI returned an invalid row number on page ${page.pageNumber}. Please retry extraction.`);
+          if (rowNumber !== 1) continue;
+          if (nextRows.some((row) => row.page === 1 && row.rowNumber === 1)) {
+            throw new Error('AI returned more than one result for page 1, row 1. Please retry extraction.');
           }
           const categoryId = getLookupId(raw.category, options.categories);
           const genderId = getLookupId(raw.sex, options.genders);
@@ -455,7 +482,7 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
         }
       }
       if (nextRows.length === 0) {
-        throw new Error('No numbered rows were extracted. Review the OCR text and try again.');
+        throw new Error('No result was extracted for page 1, row 1. Review the first-row OCR text and try again.');
       }
       setRows(nextRows);
       if (detectedDate) setCaptureDate(detectedDate);
@@ -465,7 +492,7 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
         );
         if (station) setSelectedStation(String(station.Id));
       }
-      setStatus(`AI organized ${nextRows.length} row(s). Verify every suggested field before import.`);
+      setStatus('AI extracted page 1, row 1. Verify every suggested field against the scan.');
     } catch (error) {
       console.error('Manual-sheet AI extraction failed:', error);
       const apiMessage = axios.isAxiosError(error) && typeof error.response?.data?.message === 'string'
@@ -640,7 +667,7 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
             <ScanText size={22} /> Manual Sheet OCR
           </h2>
           <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 13 }}>
-            Scan, review, correct, then import. OCR suggestions are never saved without your confirmation.
+            First-row test: scan page 1, review row 1, then decide whether the extraction is accurate enough to continue.
           </p>
         </div>
         <button type="button" onClick={onClose} aria-label="Close" style={{ border: 0, background: 'transparent', cursor: 'pointer' }}>
@@ -649,7 +676,7 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
       </header>
 
       <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 12, fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
-        PDF pages are rendered and OCR-processed locally in this browser. OCR text—not the PDF image—is sent to the configured AI chat service to organize the rows. Verify every field before saving.
+        Only page 1 and its first table row are OCR-processed in this test. Two local OCR layout passes are compared to accommodate handwriting; the browser sends their text and positions—not the PDF image—to the configured AI chat service. No other pages or rows are extracted.
       </div>
       <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, marginBottom: 14 }}>
         <input type="checkbox" checked={useCorrectionExamples} onChange={(e) => setUseCorrectionExamples(e.target.checked)} />
@@ -695,11 +722,11 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
         </button>
         <button type="button" onClick={runLocalOCR} disabled={!file || busy} style={buttonStyle}>
           {busy && pages.length === 0 ? <Loader2 className="spin" size={16} /> : <ScanText size={16} />}
-          Run local OCR
+          Scan page 1, row 1
         </button>
         <button type="button" onClick={extractRowsWithAI} disabled={pages.length === 0 || busy} style={{ ...buttonStyle, background: '#1a4d8c' }}>
           {busy && pages.length > 0 ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
-          Organize text with AI
+          Extract row 1 with AI
         </button>
         {busy && <progress max={100} value={progress} style={{ width: 130 }} />}
       </div>
@@ -707,7 +734,7 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
 
       {pages.length > 0 && (
         <details style={{ marginBottom: 20 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>View local OCR text ({pages.length} pages)</summary>
+          <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>View local OCR text for page 1, row 1</summary>
           <div style={{ display: 'grid', gap: 12, marginTop: 10 }}>
             {pages.map((page) => (
               <div key={page.pageNumber} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, border: '1px solid #e2e8f0', borderRadius: 8, padding: 10 }}>
@@ -722,7 +749,7 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
       {rows.length > 0 && lookups && (
         <>
           <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: 12, fontSize: 12, marginBottom: 14 }}>
-            AI-extracted values are provisional. Confirm identity, category, sex, measurements, and referral codes against the scanned sheet before importing.
+            Pilot result: only page 1, row 1 was extracted. AI values are provisional; confirm every field against the scanned sheet before importing this single row.
           </div>
           <div style={{ display: 'grid', gap: 14 }}>
             {rows.map((row) => {
