@@ -226,7 +226,7 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
       const worker = await createWorker('eng', 1, {
         logger: (message) => {
           if (message.status === 'recognizing text') {
-            const pageProgress = ((pageNumberProgress - 1) + message.progress / 3) / pageCountProgress;
+            const pageProgress = ((pageNumberProgress - 1) + message.progress / 2) / pageCountProgress;
             setProgress(Math.round(pageProgress * 100));
           }
         },
@@ -266,16 +266,17 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
               preserve_interword_spaces: '1',
               user_defined_dpi: '252',
             });
-            const result = await worker.recognize(scanCanvas, { rectangle });
+            const result = await worker.recognize(
+              scanCanvas,
+              { rectangle },
+              { blocks: includeWordPositions }
+            );
             if (includeWordPositions) {
-              const words = (
-                result.data as typeof result.data & {
-                  words?: Array<{
-                    text: string;
-                    bbox: { x0: number; y0: number; x1: number; y1: number };
-                  }>;
-                }
-              ).words?.filter((word) =>
+              const words = result.data.blocks?.flatMap((block) =>
+                block.paragraphs.flatMap((paragraph) =>
+                  paragraph.lines.flatMap((line) => line.words)
+                )
+              ).filter((word) =>
                 word.text.trim() &&
                 Number.isFinite(word.bbox.x0) &&
                 Number.isFinite(word.bbox.y0) &&
@@ -283,17 +284,15 @@ const ManualSheetOCR: React.FC<ManualSheetOCRProps> = ({ stationId, onClose, onS
                 Number.isFinite(word.bbox.y1)
               ) ?? [];
               if (words.length === 0) return result.data.text.trim();
-              const minX = Math.min(...words.map((word) => word.bbox.x0));
-              const maxX = Math.max(...words.map((word) => word.bbox.x1));
-              const minY = Math.min(...words.map((word) => word.bbox.y0));
-              const maxY = Math.max(...words.map((word) => word.bbox.y1));
-              const xRange = Math.max(maxX - minX, 1);
-              const yRange = Math.max(maxY - minY, 1);
               return words
                 .sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0)
                 .map((word) => {
-                  const x = Math.round(((word.bbox.x0 + word.bbox.x1) / 2 - minX) / xRange * 1000);
-                  const y = Math.round(((word.bbox.y0 + word.bbox.y1) / 2 - minY) / yRange * 1000);
+                  const x = Math.max(0, Math.min(1000, Math.round(
+                    ((word.bbox.x0 + word.bbox.x1) / 2 - rectangle.left) / rectangle.width * 1000
+                  )));
+                  const y = Math.max(0, Math.min(1000, Math.round(
+                    ((word.bbox.y0 + word.bbox.y1) / 2 - rectangle.top) / rectangle.height * 1000
+                  )));
                   return `[x=${x},y=${y}] ${word.text}`;
                 })
                 .join('\n');
