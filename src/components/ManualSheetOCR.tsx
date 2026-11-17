@@ -71,6 +71,23 @@ const FEEDBACK_FIELD_MAP: Record<string, string> = {
   referralCodes: 'Referrals',
 };
 
+const OCR_INTERPRETATION_FIELDS: Array<[string, string]> = [
+  ['name', 'Name'],
+  ['category', 'Category'],
+  ['idNumber', 'C/NO'],
+  ['phoneNumber', 'Phone'],
+  ['age', 'Age'],
+  ['gender', 'Sex'],
+  ['weight', 'Weight'],
+  ['height', 'Height'],
+  ['hip', 'Hip circumference'],
+  ['waist', 'Waist circumference'],
+  ['systolic', 'Systolic'],
+  ['diastolic', 'Diastolic'],
+  ['rbs', 'RBS'],
+  ['referralCodes', 'Referrals'],
+];
+
 type Lookup = { Id: number; Title: string; LegacyColumn?: string | null };
 type LookupData = {
   categories: Lookup[];
@@ -948,13 +965,13 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
       {status && <p role="status" style={{ color: '#475569', fontSize: 13 }}>{status}</p>}
 
       {pages.length > 0 && (
-        <details style={{ marginBottom: 20 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>View local OCR text for page 1, row 1</summary>
+        <details open style={{ marginBottom: 20 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>Local OCR conversion — page 1, row 1 (visible by default)</summary>
           <div style={{ display: 'grid', gap: 12, marginTop: 10 }}>
             {pages.map((page) => (
               <div key={page.pageNumber} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, border: '1px solid #e2e8f0', borderRadius: 8, padding: 10 }}>
                 <img src={page.preview} alt={`Rotated preview of page ${page.pageNumber}`} style={{ width: '100%', height: 'auto', border: '1px solid #cbd5e1' }} />
-                <pre style={{ whiteSpace: 'pre-wrap', overflow: 'auto', maxHeight: 240, fontSize: 11, margin: 0 }}>{page.text || '(No text detected)'}</pre>
+                <pre style={{ whiteSpace: 'pre-wrap', overflow: 'auto', maxHeight: '60vh', fontSize: 11, margin: 0 }}>{page.text || '(No text detected)'}</pre>
               </div>
             ))}
           </div>
@@ -978,6 +995,19 @@ Use null for blank or uncertain values; do not guess, infer missing measurements
                       <X size={16} /> Exclude row
                     </button>
                   </div>
+                  <section aria-label="AI interpretation before edits" style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                    <strong style={{ fontSize: 12 }}>AI interpretation (original, before edits)</strong>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 8 }}>
+                      {OCR_INTERPRETATION_FIELDS.map(([field, label]) => (
+                        <div key={String(field)} style={{ minWidth: 0, fontSize: 11 }}>
+                          <span style={{ display: 'block', color: '#64748b' }}>{label}</span>
+                          <strong style={{ display: 'block', overflowWrap: 'anywhere' }}>
+                            {row.original[String(field)]?.trim() || '(blank / uncertain)'}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
                     {matchedClient ? (
                       <div style={{
